@@ -11,6 +11,8 @@
 
 | ファイル | 役割 | 状態 |
 |---|---|---|
+| [AGENTS.md](AGENTS.md) | エージェント向けの起動入口。`rules/BOOTSTRAP.lrf` の SIGMA を読み込む | 新規追加。`.HARNESS` の方式を参考にした PADDOCK 独立の規則 |
+| [rules/](rules/) | LRF/1 形式の設計・実行規則。入口は [rules/BOOTSTRAP.lrf](rules/BOOTSTRAP.lrf) | 新規追加。`.HARNESS` の LRF は読み込まない |
 | [decisions.md](decisions.md) | **ACCEPTED D-001〜D-014（14件）**、Design Baseline、OPEN O-001〜O-010 | 会話転記。人間署名付きGit承認は未完 |
 | [Issues.md](Issues.md) | 中目標16領域・小目標89件、安定ID・依存・証拠・Cursor | 全体として未実装。M00-S01は文書実体あり・未独立検証 |
 | [method.md](method.md) | `SIGMA/1: PIDGEN/text`、`CONTINUE/1`、検証Receipt・再開契約 | 設計案 |
