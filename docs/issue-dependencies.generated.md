@@ -3,7 +3,7 @@
 > AUTO-GENERATED. **DO NOT EDIT**. Source: `Issues.md`.
 > Generator: `python3 scripts/lint_design.py --emit-summary`.
 > 中目標への集約は表示専用。**依存DAGは小目標IDでのみ成立**。
-> Issues.md SHA-256: `fb8280eb0b8411093d655e393a1502bd4830ec3f91bdc9b87b1087c534b30a89`
+> Issues.md SHA-256: `4adb8f90cb04f9a71fd9710e57b0be4fa4249ddca6e21e04b05b1e2e4055380b`
 
 **小目標: 89件 / 依存辺: 148本 / 中目標: 16領域。**
 

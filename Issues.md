@@ -31,13 +31,13 @@ active_goal: M00
 active_issue: PDK-M00-S01
 issue_state: IMPLEMENTED
 execution_state: VERIFICATION_PENDING
-current_branch: master
+current_branch: main
 verified_commit: NONE
 last_receipt: NONE
 last_verified_test: "python.exe -m unittest discover -s .\\tests -v (5/5); python.exe .\\scripts\\lint_design.py (PASS)"
 blocker: NONE
-next_action: "PDK-M00-S01の独立レビューと終端記録。完了後にのみPDK-M00-S02へ進む"
-confidence: "文書受入条件とローカルlint/負例テストはPASS。レビュー未実施、Gitは初期コミットなし、CI/DB試験なし"
+next_action: "GitHub CLI認証を復旧した後、承認済みのletwir/paddock公開作成を行う。S01独立レビューは別途未完了"
+confidence: "ローカルlint/負例テストPASS、初期コミットはmainに存在。GitHub CLIは401、公開未実施。独立レビュー/CI/DB試験なし"
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -77,7 +77,7 @@ confidence: "文書受入条件とローカルlint/負例テストはPASS。レ�
   - `depends_on`: none
   - `acceptance`: D-001〜D-014が記載され、レビュー追補はDESIGN_BASELINEとして識別でき、READMEから脅威モデル・Issues・Methodへ到達できる。
   - `evidence_expected`: Markdownの存在、リンク検査、Decision ID重複検査、内容Hash。
-  - `current_evidence`: 2026-10-13のローカル検証でD-001〜D-014の14件、DESIGN_BASELINE区分、README内リンク、89件/148辺の依存Lintを確認。`python.exe -m unittest discover -s .\\tests -v` 5/5 PASS、`python.exe .\\scripts\\lint_design.py` PASS。Git RootはPADDOCKだが初期コミットなし。独立レビュー/CIは未実施。
+  - `current_evidence`: 2026-10-13のローカル検証でD-001〜D-014の14件、DESIGN_BASELINE区分、README内リンク、89件/148辺の依存Lintを確認。`python.exe -m unittest discover -s .\\tests -v` 5/5 PASS、`python.exe .\\scripts\\lint_design.py` PASS。初期コミット`94e436cff03d20173e8b7d6f87241ae3175cd720`は`main`に存在。GitHub CLIは401のため公開未実施。独立レビュー/CIは未実施。
 - [ ] `PDK-M00-S02` — 新規Gitリポジトリを独立初期化する。
   - `depends_on`: PDK-M00-S01
   - `acceptance`: `.HARNESS`のサブディレクトリではないGit Rootであることを確認。既存`.HARNESS`に差分なし。
