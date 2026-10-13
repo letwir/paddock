@@ -28,15 +28,15 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M00
-active_issue: PDK-M06-S07
+active_issue: PDK-M00-S04
 issue_state: WIP
 execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "python3 -m unittest discover -s tests -v (18/18, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git rev-parse --show-toplevel (/data/data/com.termux/files/home/repo/paddock); git diff --check (PASS)"
-blocker: PDK-M06-S07 requires a compliant RFC 8785 JCS codec; current package is fail-closed interface only
-next_action: "Implement and verify a compliant RFC 8785 JCS codec for PDK-M06-S07; do not claim the current fail-closed interface implements JCS"
+last_verified_test: "python3 -m unittest discover -s tests -v (28/28, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git diff --check (PASS)"
+blocker: PDK-M06-S07 blocked pending compliant RFC 8785 JCS codec; D-015 choice recorded
+next_action: "PDK-M00-S04: create a reproducible interrupted-session fixture and verify that a clean session reconstructs the same next READY Issue without marking unverified work DONE"
 confidence: "各Issueはユーザー指定により、ローカルで再現可能なテストと独立ローカルレビューを証拠として依存DAG順に進める。CI/remote attestationは前提にしない。作業ツリーに未コミット変更あり"
 ```
 
@@ -83,11 +83,12 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `acceptance`: PADDOCK自身が`git rev-parse --show-toplevel`で独立Git Rootとして識別され、そのRootのパス文字列が明示した親Repo Root配下ではないことを確認する。既存`.HARNESS`の状態は未観測であり、受入条件の対象外。
   - `evidence_expected`: PADDOCKでの`git rev-parse --show-toplevel`結果と`tests/test_s02_repo_boundary.py`のルート同定・パス関係テスト。
   - `current_evidence`: `tests/test_s02_repo_boundary.py` confirms `git rev-parse --show-toplevel` resolves to PADDOCK root and path-string ancestry check is false for the configured parent boundary. Focused tests 3/3 PASS; full Python suite 18/18 PASS; design lint 89 issues/148 edges PASS; `git diff --check` PASS. Independent read-only source review confirmed implementation and scope; the verifier could not independently execute commands in its environment. `.HARNESS` state remains unobserved and outside acceptance after user-authorized criteria revision.
-- [ ] `PDK-M00-S03` — 文書を変更する時の追跡契約を導入する。
+- [x] `PDK-M00-S03` — 文書を変更する時の追跡契約を導入する。
   - `depends_on`: PDK-M00-S02
-  - `acceptance`: Decision supersede、Issue ID、検証Receipt、Cursor間の整合検査が再実行可能。
-  - `evidence_expected`: 検査コマンド・Exit Code・実行Commit。
-- [ ] `PDK-M00-S04` — `CONTINUE/1`を模擬通信断で演習する。
+  - `acceptance`: Decision IDは重複せず、supersedes参照は既存の異なるDecision IDを指す。Issue ID/DAG/Cursorの整合を検査し、last_receiptがNONEか許可Root内の存在するpaddock.receipt/1文書でactive Issue IDと一致することを再実行可能に検査する。Receipt構造のLintは発行者や結果の信頼性を証明しない。
+  - `evidence_expected`: malformed supersede、Issue ID/DAG、欠落/escape/不正Schema/wrong Issue receipt、Cursor fixtureの負例テストとLint Exit Code。
+  - `current_evidence`: `scripts/lint_design.py` checks append-only sequential unique D IDs, section-scoped supersedes targets (rejecting unknown and self-targets), Cursor↔Issue state (including missing state), and structural Receipt path/schema/active-Issue references with resolved in-repository path containment while explicitly not authenticating receipts. `tests/test_s03_tracking_contract.py` adds twelve clean/negative mutation tests including missing/invalid/escaped/symlink Receipt references, unregistered/mismatched receipt issue, missing state, and supersedes failures. Full local Python suite 30/30 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` PASS. Independent read-only review checked current sources; an initial reported receipt mismatch was disproved by rereading the actual active cursor (S04 matches the fixture). Receipt validation is structural only, not authenticity or complete schema proof.
+- [-] `PDK-M00-S04` — `CONTINUE/1`を模擬通信断で演習する。
   - `depends_on`: PDK-M00-S03
   - `acceptance`: 新セッションが過去会話なしで同じ次Issueを選べ、未確認作業をDONEにしない。
   - `evidence_expected`: 再開前後Cursor、差分、検証ログ。

@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import collections
 import hashlib
+import json
 from pathlib import Path
 import re
 import sys
@@ -81,7 +82,9 @@ def validate(root: Path, check_generated: bool = True) -> tuple[list[str], dict[
     cursor_state = re.search(r'^issue_state: (.+)$',text,re.M)
     if not cursor_issue or cursor_issue.group(1) not in records:
         errs.append('CURSOR_BAD_ID')
-    elif cursor_state:
+    if not cursor_state:
+        errs.append('CURSOR_MISSING_STATE')
+    elif cursor_issue and cursor_issue.group(1) in records:
         expected = {'TODO':' ', 'WIP':'-', 'IMPLEMENTED':'~', 'TESTED':'*', 'DONE':'x'}
         if expected.get(cursor_state.group(1)) != records[cursor_issue.group(1)][0]:
             errs.append('CURSOR_STATUS_MISMATCH')
@@ -102,6 +105,42 @@ def validate(root: Path, check_generated: bool = True) -> tuple[list[str], dict[
     expected_decisions = list(range(1, max(decision_numbers, default=0) + 1))
     if len(decisions) != len(set(decisions)) or decision_numbers != expected_decisions or len(decisions) < 14:
         errs.append(f'DECISION_REGISTER: expected sequential unique D-001..D-N with N >= 14, got {len(decisions)}')
+
+    # Decision supersedes are append-only: references must resolve to a
+    # different registered ID. The linter never rewrites the decision record.
+    decision_doc = documents.get('decisions.md', '')
+    sections = list(re.finditer(r'^### (D-\d{3})[^\n]*\n', decision_doc, re.M))
+    for index, section in enumerate(sections):
+        end = sections[index + 1].start() if index + 1 < len(sections) else len(decision_doc)
+        body = decision_doc[section.end():end]
+        for superseded in re.findall(r'^\s*supersedes:\s*(D-\d{3})\s*$', body, re.M):
+            if superseded == section.group(1):
+                errs.append(f'DECISION_SUPERSEDES_SELF: {section.group(1)}')
+            elif superseded not in decisions:
+                errs.append(f'DECISION_SUPERSEDES_UNKNOWN: {section.group(1)}->{superseded}')
+
+    # Cursor receipt references are structural evidence references only. This
+    # does not authenticate the runner or turn a local report into CI proof.
+    receipt_ref = re.search(r'^last_receipt: "?([^"\n]+)"?\s*$', text, re.M)
+    if receipt_ref and receipt_ref.group(1) != 'NONE':
+        rel = Path(receipt_ref.group(1))
+        receipt_path = root / rel
+        try:
+            resolved_root = root.resolve()
+            resolved_receipt = receipt_path.resolve(strict=True)
+            inside_root = resolved_receipt == resolved_root or resolved_root in resolved_receipt.parents
+        except (OSError, RuntimeError):
+            inside_root = False
+        if rel.is_absolute() or '..' in rel.parts or not inside_root or not receipt_path.is_file():
+            errs.append(f'RECEIPT_REF_INVALID: {receipt_ref.group(1)}')
+        else:
+            try:
+                receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+                active = cursor_issue.group(1) if cursor_issue else None
+                if receipt.get('schema_version') != 'paddock.receipt/1' or receipt.get('issue_id') not in records or receipt.get('issue_id') != active:
+                    errs.append(f'RECEIPT_SCHEMA_INVALID: {receipt_ref.group(1)}')
+            except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                errs.append(f'RECEIPT_SCHEMA_INVALID: {receipt_ref.group(1)}')
 
     # Markdown links within project; reject escapes from repo root for local links.
     for name, doc in documents.items():
