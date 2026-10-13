@@ -28,16 +28,16 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M01
-active_issue: PDK-M01-S06
-issue_state: WIP
-execution_state: IMPLEMENTING
+active_issue: PDK-M01-S02
+issue_state: TODO
+execution_state: READY
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); python3 -m unittest discover -s tests -v (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git diff --check (PASS); gofmt -d (no output)"
+last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); GO111MODULE=off go vet ./internal/governance/domain (PASS); python3 -m unittest discover -s tests -q (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); gofmt and git diff --check (PASS)"
 blocker: PDK-M00-S07 blocked pending exact remote branch-protection authorization; PDK-M06-S07 pending compliant RFC 8785 implementation method
-next_action: "PDK-M01-S06: define pure three-epoch, rollback-freeze, Safe Baseline and DB-unavailable deny contract; preserve unrelated worktree changes"
-confidence: "PDK-M01-S01 locally tested and independently reviewed; moving to the required pure safety contract before DB work. Existing unrelated uncommitted files are preserved."
+next_action: "PDK-M01-S02: implement pure StartCanary/EffectivePolicy/Promote/Rollback transitions using the S06 three-epoch/freeze contract; preserve unrelated worktree changes"
+confidence: "S01/S06 have local Runner tests and independent source reviews. S06 models the LKG verifier boundary but does not implement cryptographic verification or DB persistence. Continue with S02; unrelated uncommitted files remain preserved."
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -142,10 +142,11 @@ confidence: "PDK-M01-S01 locally tested and independently reviewed; moving to th
   - `depends_on`: PDK-M00-S05, PDK-M01-S06
   - `acceptance`: INV-01/02/03/06、Rollback、Emergency Stop、HOLD/Monitoringの公平性仮定と限界をTLA+/Alloy等で明示。CounterexampleはIssueへ返す。
   - `evidence_expected`: Model Source、tool version、モデル探索ログ、Safety/Liveness結果。
-- [-] `PDK-M01-S06` — Epoch 3層・二相Rollback・Safety Modeの純粋状態契約。
+- [x] `PDK-M01-S06` — Epoch 3層・二相Rollback・Safety Modeの純粋状態契約。
   - `depends_on`: PDK-M01-S01, PDK-M00-S06
   - `acceptance`: `scope_activation_epoch`, `root_authz_epoch`, `security_epoch`を区別し、`ROLLING_BACK`はFreezeを開始、最終Policy切替時にScope/該当Root Epochを1回進める。LKG不可→Safe Baseline、DB断→Gateway denyをモデル化。
   - `evidence_expected`: Root A非波及、切替・凍結・再開の状態表/Unit Fixture。
+  - `current_evidence`: `internal/governance/domain/safety.go` implements pure three-epoch AuthorityState transitions, Scope Freeze at rollback start without generation change, final LKG/Safe Baseline switch advancing Scope and only the target Root epoch exactly once, Emergency Stop advancing only Security Epoch, and fail-closed EffectivePolicy/Authorize on freeze, safe-stop, stale epoch/digest, or unavailable DB. `LKGAssessment` explicitly models the outer trusted verifier boundary; unavailable, invalid, malformed, or unknown status selects embedded Safe Baseline. Tests cover epoch independence, Root A/B isolation, freeze, finalized rollback, fallback, emergency stop, stale grants, and DB outage. Local Runner: `GO111MODULE=off go test ./internal/governance/domain -count=1` PASS; `GO111MODULE=off go vet ./internal/governance/domain` PASS; Python suite 35/35 PASS; design lint PASS (89 issues/148 edges); gofmt and `git diff --check` PASS. Independent read-only review found no acceptance gap after the LKG boundary correction. SHA-256: safety.go `694a323a0827e615b7c96f25bce55f9f932fb0b538a783af8515ec921a57d553`, safety_test.go `d8e435343337eccbe89bf3ce18703e1fa26480ec30b004a04f933029cf42be4`. Limitation: domain models the trusted verifier's LKG assessment but does not perform cryptographic verification or DB persistence; Android/arm64 Go race detector unavailable.
 
 
 ### M02 / P0 / PostgreSQL Migration・DDL
