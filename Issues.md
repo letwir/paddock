@@ -28,16 +28,16 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M00
-active_issue: PDK-M00-S01
-issue_state: IMPLEMENTED
-execution_state: VERIFICATION_PENDING
+active_issue: PDK-M00-S02
+issue_state: TODO
+execution_state: BLOCKED
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "python.exe -m unittest discover -s .\\tests -v (5/5); python.exe .\\scripts\\lint_design.py (PASS)"
-blocker: NONE
-next_action: "PDK-M00-S01の独立レビューと終端記録。完了後にのみPDK-M00-S02へ進む"
-confidence: "PADDOCKはGitHubでpublic、default branch main。ローカルlint/負例テストPASS。S01独立レビュー/CI/DB試験は未実施"
+last_verified_test: "GO111MODULE=off go test ./internal/testkeys (PASS); python3 -m unittest discover -s tests -v (15/15, PASS); python3 scripts/lint_design.py (PASS; 89 issues/148 edges); git diff --check (PASS)"
+blocker: PDK-M00-S02 blocked on prohibited .HARNESS inspection; PDK-M06-S07 blocked on OPEN O-008 codec choice
+next_action: "BLOCKED: PDK-M00-S02 requires evidence about .HARNESS that PADDOCK rules prohibit accessing; PDK-M06-S07 awaits user choice on OPEN O-008. Resume with a PADDOCK-allowed evidence source or explicit decision; do not bypass either gate"
+confidence: "各Issueはユーザー指定により、ローカルで再現可能なテストと独立ローカルレビューを証拠として依存DAG順に進める。CI/remote attestationは前提にしない。作業ツリーに未コミット変更あり"
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -73,15 +73,16 @@ confidence: "PADDOCKはGitHubでpublic、default branch main。ローカルlint/
 
 **中目標:** `.HARNESS`から独立したPADDOCKのDecision/Queue/Methodを再現可能に保つ。
 
-- [~] `PDK-M00-S01` — 3正本+READMEの初期内容を用意する。
+- [x] `PDK-M00-S01` — 3正本+READMEの初期内容を用意する。
   - `depends_on`: none
   - `acceptance`: D-001〜D-014が記載され、レビュー追補はDESIGN_BASELINEとして識別でき、READMEから脅威モデル・Issues・Methodへ到達できる。
   - `evidence_expected`: Markdownの存在、リンク検査、Decision ID重複検査、内容Hash。
-  - `current_evidence`: 2026-10-13のローカル検証でD-001〜D-014の14件、DESIGN_BASELINE区分、README内リンク、89件/148辺の依存Lintを確認。`python.exe -m unittest discover -s .\\tests -v` 5/5 PASS、`python.exe .\\scripts\\lint_design.py` PASS。初期コミット`94e436cff03d20173e8b7d6f87241ae3175cd720`を含むPADDOCKはGitHub `letwir/paddock`でpublic、default branch `main`。独立レビュー/CIは未実施。
+  - `current_evidence`: 2026-10-13のローカル検証でD-001〜D-014の14件、DESIGN_BASELINE区分、README内リンク、89件/148辺の依存Lintを確認。ユーザー承認のローカル検証方式により別プロセスから `python3 -m unittest discover -s tests -v` (6/6 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), `git diff --check` (PASS) を再実行し、文書受入条件を確認。HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`、作業ツリー変更: `Issues.md`, `docs/issue-dependencies.generated.md`, `tests/test_lint_design.py`、テストファイルSHA-256 `ead4f28595d199473ee9e7cf826ba009793d012691b79932e4538d978ea9086d`。これはローカル検証でありTrusted CI/remote attestationではない。
 - [ ] `PDK-M00-S02` — 新規Gitリポジトリを独立初期化する。
   - `depends_on`: PDK-M00-S01
   - `acceptance`: `.HARNESS`のサブディレクトリではないGit Rootであることを確認。既存`.HARNESS`に差分なし。
   - `evidence_expected`: `git rev-parse --show-toplevel`, `git status --short`, `git diff`。
+  - `blocker`: PADDOCKの権限境界で`.HARNESS`は参照/書込対象外のため、既存`.HARNESS`に差分がないことを確認できない。User confirmation or a PADDOCK-allowed evidence source is needed; no `.HARNESS` access performed.
 - [ ] `PDK-M00-S03` — 文書を変更する時の追跡契約を導入する。
   - `depends_on`: PDK-M00-S02
   - `acceptance`: Decision supersede、Issue ID、検証Receipt、Cursor間の整合検査が再実行可能。
@@ -91,22 +92,25 @@ confidence: "PADDOCKはGitHubでpublic、default branch main。ローカルlint/
   - `acceptance`: 新セッションが過去会話なしで同じ次Issueを選べ、未確認作業をDONEにしない。
   - `evidence_expected`: 再開前後Cursor、差分、検証ログ。
 
-- [ ] `PDK-M00-S05` — 脅威モデルの設計とTrust Boundaryのレビュー。
+- [x] `PDK-M00-S05` — 脅威モデルの設計とTrust Boundaryのレビュー。
   - `depends_on`: PDK-M00-S01
-  - `acceptance`: [`THREAT_MODEL.md`](THREAT_MODEL.md)を入力として、Prompt Injection、SKILL/Go依存Supply Chain、Open Enrollment DoS、Sybil、権限/DB/時刻/鍵喪失を資産・入口・境界・緩和・残余リスクに分離する。
+  - `acceptance`: [`THREAT_MODEL.md`](THREAT_MODEL.md)を入力として、Prompt Injection、SKILL/Go依存Supply Chain、Open Enrollment DoS、Sybil、権限/DB/時刻/鍵喪失を資産・入口・境界・緩和・残余リスクに分離する。全Threat行で各要素と受入Issue参照を明示する。
   - `evidence_expected`: Threat Model差分、脅威ID参照の整合検査、Verifierレビュー。
-- [ ] `PDK-M00-S06` — Bootstrap信頼根・O-002/O-003・Safety Plane方針の設計Gate。
+  - `current_evidence`: Threat Model全15行に資産・入口/Trust Boundary・緩和・残余リスクを追加し、Issue参照を保持。`tests/test_lint_design.py`に表構造・列検査を追加。別プロセスで`python3 -m unittest discover -s tests -v` 7/7 PASS、`python3 scripts/lint_design.py` PASS (89 issues/148 edges)、`git diff --check` PASS。独立ローカルレビューで全15行の欄とIssue参照を確認。HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`。ローカル検証のみ（Trusted CI/remote attestationではない）；緩和策の実装有効性・ペンテストは未検証。
+- [x] `PDK-M00-S06` — Bootstrap信頼根・O-002/O-003・Safety Plane方針の設計Gate。
   - `depends_on`: PDK-M00-S05
   - `acceptance`: PoC鍵の範囲・DBセットアップ条件・Emergency Stopの発火/解除経路・組込みSafe Baselineの境界を設計基準として記録。未決の運用値はOPENのまま残す。
   - `evidence_expected`: Bootstrap設計レビュー、対応するO-002/O-003/O-010の解決Issueリンク。
+  - `current_evidence`: `docs/bootstrap-safety.md` defines disposable PoC-only approval key scope; isolated non-production DB boundary and fail-closed behavior; human Emergency Stop trigger/enforcement/release; embedded Safe Baseline; and explicit OPEN links O-002→PDK-M06-S08, O-003→PDK-M02-S05, O-010→PDK-M06-S05. README links the baseline. `tests/test_lint_design.py::test_s06_bootstrap_safety_boundaries` checks key clauses and unresolved links. Independent local verifier confirmed all stated dimensions and ran `python3 -m unittest discover -s tests -v` (8/8 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), `git diff --check` (PASS), HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`. Local-only verification; no CI/remote attestation. Design does not grant production DB access or credentials.
 - [ ] `PDK-M00-S07` — `decisions.md`の承認証拠と保護を確立する。
   - `depends_on`: PDK-M00-S02, PDK-M00-S06
   - `acceptance`: CODEOWNERS、保護Branch、署名・人間承認者とDecision supersedeの履歴を確定。初期転記を人間が検査し署名付きCommitへ関連付ける。WorkerによるACCEPTED直書きを認可しない。
   - `evidence_expected`: Git設定/CIログ/承認Commit SHA・日時・署名者照合。リモート機能未設定ならBLOCKED。
-- [ ] `PDK-M00-S08` — Issue小目標DAGと文書参照の再現可能Lint。
+- [x] `PDK-M00-S08` — Issue小目標DAGと文書参照の再現可能Lint。
   - `depends_on`: PDK-M00-S01
   - `acceptance`: Issue ID重複・Dangling Dependency・Cycle・OPEN解決Issue欠落・Markdown参照・Cursor不整合を検出。中目標一覧を手作業の依存グラフ扱いしない。
   - `evidence_expected`: `scripts/lint_design.py` のExit Code、生成集約表、故障Fixture。
+  - `current_evidence`: `tests/test_s08_acceptance.py` adds mutation fixtures for duplicate Issue ID, dangling dependency, cycle, OPEN without concrete resolver, broken Markdown link, Cursor status mismatch, and derived summary/hash behavior. Independent local verifier reran full unittest suite (15/15 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), and `git diff --check` (PASS), HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`. Local-only verification; no remote CI attestation.
 
 
 ### M01 / P0 / Go Domain型・実行契約
@@ -293,10 +297,12 @@ confidence: "PADDOCKはGitHubでpublic、default branch main。ローカルlint/
   - `depends_on`: PDK-M00-S06
   - `acceptance`: JCS等の確定Byte Codec/型制限、Bundle・Approval・Commandの用途タグ、署名対象schema_versionとanti-replay文脈を仕様化し検証。
   - `evidence_expected`: Golden Vector、Key順/Unicode/数値Fixture、cross-protocol署名拒否。
-- [ ] `PDK-M06-S08` — PoC専用署名鍵・Fixture/Trust Root配置（O-002）。
+  - `blocker`: O-008 remains OPEN and explicitly lists RFC 8785 JCS or another deterministic codec as unresolved. Acceptance requires selecting a codec; choosing one would resolve an OPEN decision without user direction. Defer this Issue and continue with independent READY work.
+- [x] `PDK-M06-S08` — PoC専用署名鍵・Fixture/Trust Root配置（O-002）。
   - `depends_on`: PDK-M00-S06
   - `acceptance`: テスト専用公開鍵の配置、秘密鍵の非Git・非ログ、期限/失効/回転の検証経路と本番鍵との差を固定。
   - `evidence_expected`: Key provenance・test-only labeling・不正Keyでの拒否Fixture。秘密鍵内容は記録しない。
+  - `current_evidence`: RFC 8032 §7.1 Test 1 public Ed25519 vector stored without private key bytes; README and JSON explicitly test-only and disclaim production authority. `internal/testkeys/poc_fixture_test.go` verifies the vector and rejects tampered message/signature; fixed-time pure fixture cases cover valid, expired, revoked, rotation successor accepted, and old non-revoked key rejected by active fingerprint mismatch. O-002 algorithm/custody remain OPEN. Independent local verifier: `GO111MODULE=off go test ./internal/testkeys` PASS; full unittest 15/15 PASS; design lint PASS (89 issues/148 edges); `git diff --check` PASS. Local evidence only, not CI attestation.
 
 
 ### M07 / P0 / Hybrid Epoch・Scoped Canary・Rollback

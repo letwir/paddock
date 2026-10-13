@@ -15,23 +15,23 @@
 
 ## 1. 脅威一覧と検証目標
 
-| Threat | Entry / 失敗形 | 推奨Mitigation（実装前） | 受入Issue |
-|---|---|---|---|
-| TM-001 Prompt Injection | 未知Workerの成果物/検索結果/ログ/Skill説明→Steward、NAYA、Verifierに『指示』として混入 | 未信頼入力をDataとして分離、構造化出力検証、Tool Gatewayの別認可、Artifact経由で権限を付与しない、敵対Fixture | PDK-M12-S05, PDK-M00-S05 |
-| TM-002 SKILL/Go Supply Chain | Digest固定済みの悪性コード、依存置換、ビルド注入、署名者侵害 | 出所証拠、依存Pin/Lock、Build隔離、独立検証、SBOM、段階配布、Digest失効、生成物は最小権限 | PDK-M12-S02, PDK-M12-S05 |
-| TM-003 Enrollment DoS | 公開登録への大量Challenge、CPU/DB/メモリ/費用枯渇 | 未知Identityの共有Quota、Ingress Rate Limit、Challenge TTL、Queue Limit、事前高負荷処理禁止、隔離 | PDK-M10-S05 |
-| TM-004 Sybil/評価者結託 | 攻撃者が複数Identity/Verifierを作りTrustを水増し | Control/Measurement Dependency別Evidence Graph、独立ドメインの証明、未知は票加算しない、信頼根固定 | PDK-M11-S01, PDK-M11-S02 |
-| TM-005 自己昇格・自己承認 | 候補Policyが自身の審査閾値を下げ、Issuer権限を生成 | Kernel Ceiling、Pinned Governance、署名済みApproval、決定論的判定、G2/G3はPoCで拒否 | PDK-M06-S02, PDK-M06-S04 |
-| TM-006 Break-glass拒否・解除 | AgentがEmergency Stopに従わない/解除する | 独立Safety Plane、停止用人間鍵、解除の別認可、Gateway Fail Closed、オフライン物理停止は非保証 | PDK-M06-S05 |
-| TM-007 復帰先の死滅 | LKGが署名失効・破損・削除されRollback不能 | 事前認可Rollback、組込みdeny-all Safe Baseline、SAFE_STOPPED、復帰は人間経路 | PDK-M06-S06, PDK-M07-S04 |
-| TM-008 Epoch/Root交差 | Root B CanaryでScope Epochが進みRoot A Grant誤失効/誤許可 | Scope Activation / Root Authorization / Global Security Epochの分離、Effective Digest、Root Scope Bind | PDK-M01-S06, PDK-M07-S07 |
-| TM-009 Replay/署名文脈混同 | 署名の別用途への再利用、JSON正規化差異、Command ID再送混乱 | Canonical Encoding、用途タグ、Schema Version、Command Receiptと固定Request Digest | PDK-M06-S07, PDK-M04-S05 |
-| TM-010 Commit Unknown/DB分断 | Commit直後の切断、二重更新・古いLeaseでの確定 | DB Row Lock/CAS/Serializable Retry、同じCommand ID再照会、Outbox+Inbox、Fault Injection | PDK-M04-S06, PDK-M15-S07 |
-| TM-011 Clock/Cache staleness | Worker時計の偽装、Gateway失効情報の旧キャッシュ | DB Clock、Gateway最大staleness制限、高リスク操作は最新取得不能でdeny | PDK-M03-S06, PDK-M08-S05 |
-| TM-012 偽Receipt・Decision改竄 | Workerがexit_code 0を捏造、decisions.mdを無断編集 | CI Runner実観測Receipt、署名/Attestation、Protected Branch/CODEOWNERS、人間承認Commit照合 | PDK-M14-S04, PDK-M00-S07 |
-| TM-013 Active Slot永久占有 | HOLD/MONITORINGが停止し次Rolloutが開始不可 | DB時刻ベースDeadline、期限超過でABORT、Monitor完了、管理回復手順 | PDK-M07-S06 |
-| TM-014 オフライン失効不能 | 切断中Workerへ停止命令が届かない | 事前配賦されたローカル計算だけ許可、外部副作用はGateway越し、期限付きOffline Grant | PDK-M08-S04, PDK-M06-S05 |
-| TM-015 データ露出 | Credential/Artifact/ログに機密や秘密鍵が混入 | 短期鍵束縛Credential、ログRedaction、Sandbox default deny、Data Zone Policy、隔離検査 | PDK-M10-S02, PDK-M12-S01 |
+| Threat | 守る資産 | 入口 / Trust Boundary | 失敗形 | 推奨Mitigation（実装前） | 残余リスク / 非保証 | 受入Issue |
+|---|---|---|---|---|---|---|
+| TM-001 Prompt Injection | 人間の非常停止権、Policy、Credential | Worker/外部Artifact→Steward・NAYA・Verifier (T1) | 成果物・検索結果・ログ・Skill説明の文章が命令として実行される | 未信頼入力をDataとして分離、構造化出力検証、Tool Gatewayで別認可、Artifactから権限を付与しない、敵対Fixture | モデルが構造化Dataを誤解する残余リスク。保証はGatewayの強制境界に限定 | PDK-M12-S05, PDK-M00-S05 |
+| TM-002 SKILL/Go Supply Chain | Artifact完全性、Policy、実行環境 | Builder/依存元→Build/Verifier/配布 (T1,T6) | Digest固定後の悪性コード、依存置換、ビルド注入、署名者侵害 | 出所証拠、依存Pin/Lock、隔離Build、独立検証、SBOM、段階配布、Digest失効、最小権限 | 信頼された署名者・Build基盤の侵害、未知脆弱性は残る | PDK-M12-S02, PDK-M12-S05 |
+| TM-003 Enrollment DoS | 可用性、利用予算、DB資源 | 匿名登録→Ingress/Challenge/DB (T1,T2) | 大量ChallengeがCPU/DB/メモリ/費用を枯渇させる | 未知Identity共有Quota、Ingress Rate Limit、Challenge TTL、Queue Limit、事前高負荷処理禁止、隔離 | 分散攻撃の完全遮断や容量保証はしない | PDK-M10-S05 |
+| TM-004 Sybil/評価者結託 | Trust Anchor、Trust判断 | Worker/Verifier Identity→Evidence Graph/Trust Engine (T1,T3) | 複数Identityや結託票でTrustを水増しする | Control/Measurement Dependency別Evidence Graph、独立ドメイン証明、未知は票加算しない、信頼根固定 | 完全な独立Identity証明は保証対象外 | PDK-M11-S01, PDK-M11-S02 |
+| TM-005 自己昇格・自己承認 | Issuer権限、Policy、Approval | Agent提案→Trust Engine/Authority Broker (T3) | 候補Policyが閾値を下げ、自身にIssuer権限を与える | Kernel Ceiling、Pinned Governance、署名Approval、決定論的判定、G2/G3はPoCで拒否 | Trust Anchorまたは人間承認経路の侵害は別途リスク | PDK-M06-S02, PDK-M06-S04 |
+| TM-006 Break-glass拒否・解除 | 人間の非常停止権、外部副作用制御 | Human Safety Plane→Gateway/Agent (T4) | Agentが停止を拒否、または無権限で解除する | 独立Safety Plane、人間停止鍵、解除の別認可、Gateway Fail Closed | 切断端末の物理停止は非保証 | PDK-M06-S05 |
+| TM-007 復帰先の死滅 | 可用性、安全なPolicy状態 | Rollback/LKG→Gateway実効Policy (T4) | LKGが失効・破損・削除されRollback不能 | 事前認可Rollback、埋込みdeny-all Safe Baseline、SAFE_STOPPED、人間による復帰 | Safe Baseline移行後の機能可用性は保証しない | PDK-M06-S06, PDK-M07-S04 |
+| TM-008 Epoch/Root交差 | DB状態、Lease、RootごとのGrant | Root B Canary→Scope/Root Epoch判定 (T2,T4) | Scope Epoch更新がRoot A Grantを誤失効/誤許可 | Scope Activation / Root Authorization / Global Security Epoch分離、Effective Digest、Root Scope Bind | 実装不備はModel Checkingと故障注入まで残る | PDK-M01-S06, PDK-M07-S07 |
+| TM-009 Replay/署名文脈混同 | Trust Anchor、Receipt、DB状態 | 署名入力/Command API→Verifier/Repository (T2,T3) | 署名を別用途へ再利用、正規化差異、Command再送で二重更新 | Canonical Encoding、用途タグ、Schema Version、固定Request Digest付きReceipt | 暗号実装・鍵漏洩のリスクは残る | PDK-M06-S07, PDK-M04-S05 |
+| TM-010 Commit Unknown/DB分断 | DB状態、Lease、Receipt、Outbox | Coordinator→DB→応答経路 (T2,T5) | Commit直後の切断で二重更新または古いLeaseが確定 | Row Lock/CAS/Serializable Retry、同一Command ID再照会、Outbox+Inbox、Fault Injection | 外部API Exactly-onceは保証しない | PDK-M04-S06, PDK-M15-S07 |
+| TM-011 Clock/Cache staleness | Lease、Credential、Epoch | Worker時計/Gateway Cache→権限判定 (T2,T4) | 時計偽装または古い失効情報で期限切れ権限を許可 | DB Clock、Gateway最大staleness制限、高リスク操作は最新取得不能時deny | DB/Host侵害時の時刻完全性は非保証 | PDK-M03-S06, PDK-M08-S05 |
+| TM-012 偽Receipt・Decision改竄 | Decision正本、Receipt、Release権限 | Worker/CI→Receipt、Git→Decision/Release (T6) | Workerがexit 0を捏造、またはDecisionを無断変更 | Runner実観測、署名/Attestation、Protected Branch/CODEOWNERS、人間承認Commit照合 | CI管理者・署名鍵・承認者の侵害は別途残る。ローカル検証はCI Attestationではない | PDK-M14-S04, PDK-M00-S07 |
+| TM-013 Active Slot永久占有 | Rollout可用性、DB状態 | HOLD/MONITORING→Scheduler/DB (T2,T4) | 状態が停止し、後続Rolloutが開始不能 | DB時刻Deadline、期限超過ABORT、Monitor完了条件、管理回復手順 | DB時刻/制御面の同時障害では手動復旧が必要 | PDK-M07-S06 |
+| TM-014 オフライン失効不能 | Credential、外部副作用制御 | Coordinator断→Worker/Gateway (T2,T4) | 切断中Workerに停止・失効が届かない | 事前配賦ローカル計算だけ許可、外部副作用はGateway経由、期限付きOffline Grant | 切断端末への即時停止・物理停止は非保証 | PDK-M08-S04, PDK-M06-S05 |
+| TM-015 データ露出 | Credential、機密データ、Artifact | DB/ログ/Artifact/Sandbox境界 (T1,T2,T5) | Credentialや秘密鍵が保存・ログ・配布物へ混入 | 短期鍵束縛Credential、ログRedaction、Sandbox default deny、Data Zone Policy、隔離検査 | ホストroot侵害時の完全秘匿は非保証 | PDK-M10-S02, PDK-M12-S01 |
 
 ## 2. Safety Planeの設計境界
 

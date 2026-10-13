@@ -1,6 +1,7 @@
 """PADDOCK design linter negative fixtures; no database/network dependencies."""
 from pathlib import Path
 import importlib.util
+import re
 import shutil
 import tempfile
 import unittest
@@ -17,7 +18,10 @@ class DesignLintTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         for f in MODULE.NAME_FILES:
             shutil.copy2(SOURCE/f, self.root/f)
+        shutil.copy2(SOURCE/'AGENTS.md',self.root/'AGENTS.md')
+        shutil.copytree(SOURCE/'rules',self.root/'rules')
         (self.root/'docs').mkdir()
+        shutil.copy2(SOURCE/'docs/bootstrap-safety.md',self.root/'docs/bootstrap-safety.md')
         (self.root/'scripts').mkdir()
         shutil.copy2(SOURCE/'scripts/lint_design.py',self.root/'scripts/lint_design.py')
         shutil.copy2(SOURCE/'docs/issue-dependencies.generated.md',self.root/'docs/issue-dependencies.generated.md')
@@ -39,6 +43,39 @@ class DesignLintTests(unittest.TestCase):
         errors,rows,_=MODULE.validate(self.root)
         self.assertEqual(errors,[])
         self.assertEqual(len(rows),89)
+
+    def test_s01_acceptance_content(self):
+        decisions=(self.root/'decisions.md').read_text(encoding='utf-8')
+        expected={f'D-{i:03d}' for i in range(1,15)}
+        self.assertEqual(set(MODULE.DEC_RE.findall(decisions)),expected)
+        readme=(self.root/'README.md').read_text(encoding='utf-8')
+        for target in ('THREAT_MODEL.md','Issues.md','method.md'):
+            self.assertRegex(readme,rf'\]\({re.escape(target)}\)')
+        for path in ('decisions.md','THREAT_MODEL.md','README.md'):
+            self.assertIn('DESIGN_BASELINE',(self.root/path).read_text(encoding='utf-8'))
+
+    def test_s05_threat_model_dimensions(self):
+        threat=(self.root/'THREAT_MODEL.md').read_text(encoding='utf-8')
+        rows=[line for line in threat.splitlines() if re.match(r'^\| TM-\d{3} ',line)]
+        self.assertEqual(len(rows),15)
+        for heading in ('守る資産','入口 / Trust Boundary','推奨Mitigation','残余リスク'):
+            self.assertIn(heading,threat)
+        for row in rows:
+            cells=[cell.strip() for cell in row.strip('|').split('|')]
+            self.assertEqual(len(cells),7,row)
+            self.assertTrue(cells[1],row)
+            self.assertTrue(cells[2],row)
+            self.assertTrue(cells[4],row)
+            self.assertTrue(cells[5],row)
+            self.assertRegex(cells[6],r'PDK-M\d{2}-S\d{2}')
+
+    def test_s06_bootstrap_safety_boundaries(self):
+        safety=(self.root/'docs/bootstrap-safety.md').read_text(encoding='utf-8')
+        for phrase in ('PoC approval keys','dedicated disposable test database',
+                       'Emergency Stop lifecycle','Safe Baseline','**Release:**',
+                       'O-002','O-003','O-010','PDK-M06-S08','PDK-M02-S05','PDK-M06-S05',
+                       'remain OPEN','grants no DB access'):
+            self.assertIn(phrase,safety)
 
     def test_unknown_dependency(self):
         self.patch_issues('`depends_on`: PDK-M00-S01','`depends_on`: PDK-M99-S99')

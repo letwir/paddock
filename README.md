@@ -14,9 +14,10 @@
 | [AGENTS.md](AGENTS.md) | エージェント向けの起動入口。`rules/BOOTSTRAP.lrf` の SIGMA を読み込む | 新規追加。`.HARNESS` の方式を参考にした PADDOCK 独立の規則 |
 | [rules/](rules/) | LRF/1 形式の設計・実行規則。入口は [rules/BOOTSTRAP.lrf](rules/BOOTSTRAP.lrf) | 新規追加。`.HARNESS` の LRF は読み込まない |
 | [decisions.md](decisions.md) | **ACCEPTED D-001〜D-014（14件）**、Design Baseline、OPEN O-001〜O-010 | 会話転記。人間署名付きGit承認は未完 |
-| [Issues.md](Issues.md) | 中目標16領域・小目標89件、安定ID・依存・証拠・Cursor | 全体として未実装。M00-S01は文書実体あり・未独立検証 |
+| [Issues.md](Issues.md) | 中目標16領域・小目標89件、安定ID・依存・証拠・Cursor | Issue別の現在状態を参照。各Issueはローカル検証で進行中 |
 | [method.md](method.md) | `SIGMA/1: PIDGEN/text`、`CONTINUE/1`、検証Receipt・再開契約 | 設計案 |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | Safety Plane、Sybil、Prompt Injection、Supply Chain、DoS等 | 未レビュー・未検証 |
+| [docs/bootstrap-safety.md](docs/bootstrap-safety.md) | PoC trust root・DB境界・Emergency Stop/Safe BaselineのDESIGN_BASELINE | S06設計案。運用値はOPEN |
 | [docs/issue-dependencies.generated.md](docs/issue-dependencies.generated.md) | 小目標`depends_on`から**機械生成した依存表** | 派生文書・手編集禁止 |
 | [scripts/lint_design.py](scripts/lint_design.py) | ID/DAG/OPEN/Markdown参照/Cursorを静的チェック | ローカルの設計文書検査 |
 
@@ -28,7 +29,7 @@
 2. `decisions.md` → `method.md` → `THREAT_MODEL.md` → `Issues.md`の順に読む。
 3. `python3 scripts/lint_design.py` でID・小目標DAG・OPEN解決先を確認する。
 4. `Issues.md`のDurable Cursor、実Git差分、CI/検証Receiptを照合する。**Cursorはヒントであり実際の状態より優先しない**。
-5. 依存と許可が満たされる**小目標1件**を選ぶ。実行前に`[-] WIP`、実装後に`[~]`、検査の実観測後`[*]`、独立Verifier/CIと受入条件を満たした後`[x]`。
+5. 依存と許可が満たされる**小目標1件**を選ぶ。実行前に`[-] WIP`、実装後に`[~]`、ローカル検査の実観測後`[*]`、ローカル独立検証と受入条件を満たした後`[x]`。現在のユーザー指示ではCI/remote attestationを完了条件にしない。
 6. 通信断なら `continue` と指示する。未確定のDB Commitは**同じCommand ID**で照合し、別IDで再実行しない。
 
 ### 推奨する設計文書の確認コマンド
