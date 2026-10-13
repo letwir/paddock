@@ -28,16 +28,16 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M01
-active_issue: PDK-M01-S02
-issue_state: TODO
-execution_state: READY
+active_issue: PDK-M01-S03
+issue_state: WIP
+execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); GO111MODULE=off go vet ./internal/governance/domain (PASS); python3 -m unittest discover -s tests -q (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); gofmt and git diff --check (PASS)"
+last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); GO111MODULE=off go vet ./internal/governance/domain (PASS); python3 -m unittest discover -s tests -q (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py selects PDK-M01-S03; gofmt clean; git diff --check PASS"
 blocker: PDK-M00-S07 blocked pending exact remote branch-protection authorization; PDK-M06-S07 pending compliant RFC 8785 implementation method
-next_action: "PDK-M01-S02: implement pure StartCanary/EffectivePolicy/Promote/Rollback transitions using the S06 three-epoch/freeze contract; preserve unrelated worktree changes"
-confidence: "S01/S06 have local Runner tests and independent source reviews. S06 models the LKG verifier boundary but does not implement cryptographic verification or DB persistence. Continue with S02; unrelated uncommitted files remain preserved."
+next_action: "PDK-M01-S03: define pure WorkOrder/Attempt/Dependency domain values and enforce Root-consistent acyclic execution DAG; preserve unrelated worktree changes"
+confidence: "S02 locally tested and independently reviewed; delegated implementation was re-run and assessed by Main. Continue to S03. Other pre-existing uncommitted changes remain preserved; CI/CD is not yet established."
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -125,11 +125,12 @@ confidence: "S01/S06 have local Runner tests and independent source reviews. S06
   - `acceptance`: `SHADOW → CANARY → MONITORING → COMPLETED`と`CANARY/MONITORING → ROLLING_BACK → ROLLED_BACK/SAFE_STOPPED`を表現。HOLDは監視結果/保留状態であり無期限待機にしない。
   - `evidence_expected`: Domain型、Go unit tests、`go test` Exit Code。
   - `current_evidence`: `internal/governance/domain/types.go` defines SHA-256 Digest parsing/validation, overflow-safe Epoch increment, Scope/Rollout identifiers and values, accepted rollout states, and separate finite monitoring decisions (HOLD is not a state). Local Runner observed `GO111MODULE=off go test ./internal/governance/domain -count=1` exit 0; Python suite `python3 -m unittest discover -s tests -q` 35/35 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` exit 0; `gofmt -d` produced no output. Independent read-only review found no concrete acceptance gaps. Source SHA-256: types.go `d9272e2467d994af60a3c89017a59672665a65ef6fbfd8aa9df20bc3d8064224`, types_test.go `d2e3500f831a3ef9c63b702382da544a0888cbd1ac4cefa5b00c0515a4e622d7`. Observed base HEAD `0f46640f3a5c9b6e86abb5894187d7d416d57fc9`; local tests/review only, no remote CI attestation.
-- [ ] `PDK-M01-S02` — `StartCanary/EffectivePolicy/Promote/Rollback`の純粋遷移。
+- [x] `PDK-M01-S02` — `StartCanary/EffectivePolicy/Promote/Rollback`の純粋遷移。
   - `depends_on`: PDK-M01-S01
   - `acceptance`: Scope Epoch 40→41→42→43のFixtureに加え、Root A/B別の認可EpochとSecurity Epochが独立。Rollback/Freezeが正しく反映される。
   - `evidence_expected`: Table-driven Tests、差分。
-- [ ] `PDK-M01-S03` — WorkOrder/Attempt/DependencyのDomainとDAG制約。
+  - `current_evidence`: `internal/governance/domain/rollout.go` implements pure Scope-scoped Canary, Promote, and two-phase rollback. Main Runner verifies Scope Activation Epoch 40→41→42→43; Root B Canary preserves Root A policy/authz epoch; Security Epoch is independent and stale Security/Scope/Root snapshots are rejected; rollback freezes without epoch changes and final switch advances Scope and affected Root epochs once; invalid/unavailable LKG selects Safe Baseline; DB unavailable and Safe Baseline scopes fail closed; pure transitions preserve input snapshots. Runner commands: `GO111MODULE=off go test ./internal/governance/domain -count=1` PASS; `GO111MODULE=off go vet ./internal/governance/domain` PASS; `gofmt -d` empty; `git diff --check` PASS. Independent source review found and prompted fixes for stale Security Epoch and Safe Baseline promotion. SHA-256: rollout.go `693129a8bf89e2382a788a6673e4cccf4c3291874a56d919d215ac8169f098fd`, rollout_test.go `55319e442fe7dcc5f6eace07ef66c4500d0eeec2437ea35bc7df486eb74f1dec`. Earlier Python run failed on stale generated index; final suite status recorded after regeneration below. LKG usability remains an outer trusted-verifier input, not cryptographically established by this Domain package.
+- [-] `PDK-M01-S03` — WorkOrder/Attempt/DependencyのDomainとDAG制約。
   - `depends_on`: PDK-M01-S01
   - `acceptance`: 所属Treeと実行DAGが分離、異RootのDependency・循環を拒否。
   - `evidence_expected`: Domain Test、禁止例Fixture。
