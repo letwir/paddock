@@ -28,15 +28,15 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M01
-active_issue: PDK-M01-S04
+active_issue: PDK-M01-S05
 issue_state: WIP
 execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); GO111MODULE=off go vet ./internal/governance/domain (PASS); python3 -m unittest discover -s tests -q (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py selects PDK-M01-S04; gofmt clean; git diff --check PASS"
+last_verified_test: "python3 -m unittest discover -s tests -q (40/40 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py selects PDK-M01-S05; git diff --check PASS"
 blocker: PDK-M00-S07 blocked pending exact remote branch-protection authorization; PDK-M06-S07 pending compliant RFC 8785 implementation method
-next_action: "PDK-M01-S04: add static test that domain packages do not import storage, HTTP, or LLM dependencies; continue READY issues without waiting between completions"
+next_action: "PDK-M01-S05: model-check Rollout × Root/Scope/Security Epoch × Lease including rollback, emergency stop, bounded HOLD/Monitoring fairness assumptions, and counterexamples; use local tests and available checker; preserve unrelated worktree changes"
 confidence: "S03 locally verified by Main Runner and independently source-reviewed; S01/S02/S06 evidence retained. Continue to S04; unrelated pre-existing files remain untouched. CI/CD availability is not asserted."
 ```
 
@@ -135,12 +135,13 @@ confidence: "S03 locally verified by Main Runner and independently source-review
   - `acceptance`: 所属Treeと実行DAGが分離、異RootのDependency・循環を拒否。
   - `evidence_expected`: Domain Test、禁止例Fixture。
   - `current_evidence`: `internal/governance/domain/work_order.go` separates parent-based WorkOrder ownership Trees from execution Dependency DAG edges. Tree validation checks unique WorkOrder IDs, valid Root IDs, parent existence and same-Root membership, exactly one top-level WorkOrder per Root, and that all parent chains terminate at their Root tree top. Dependency validation separately rejects invalid/duplicate node IDs, unknown endpoints, cross-Root edges, self/duplicate edges, and cycles, while allowing independent tasks and execution edges that differ from parent ownership. `Attempt.Validate` checks non-empty trimmed attempt ID, valid WorkOrder ID, and positive attempt number. Main Runner commands: `GO111MODULE=off go test ./internal/governance/domain -count=1` PASS; `GO111MODULE=off go vet ./internal/governance/domain` PASS; `gofmt -d` empty; `git diff --check` PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `python3 -m unittest discover -s tests -q` PASS (35/35). Independent source review found no concrete acceptance gap. SHA-256: work_order.go `7d3e37bfb25a6ee9df33150e320bccc0ce6122da64241842c918974bd250ba66`, work_order_test.go `684cdff608f331756aefef380f2ef1434c275fb6bb563747806c5e7c977f1027`. Evidence is local to the reviewed source revision; no CI/CD claim.
-- [-] `PDK-M01-S04` — DomainとStorageの依存禁止を検査。
+- [x] `PDK-M01-S04` — DomainとStorageの依存禁止を検査。
   - `depends_on`: PDK-M01-S02
   - `acceptance`: `internal/*/domain`はpgx/HTTP/LLMライブラリをimportしない。
   - `evidence_expected`: 静的検査/Go Test。
+  - `current_evidence`: `tests/test_domain_dependency_boundary.py` scans Go files under `internal/**/domain` without traversing symlinks; tokenizes import declarations, aliases, comments, raw/quoted literals and Go string escapes; rejects listed database/SQL, network/HTTP, pgx/gRPC, and common LLM/provider SDK imports. Fixtures cover standard imports, forbidden single/grouped/aliased imports, comments, parentheses in paths, escaped forbidden `net/http`, arbitrary nested discovery, symlink exclusion, and dependency-edge synthetic cases. Main Runner focused unittest 5/5 PASS; full Python suite 40/40 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` PASS. SHA-256: `tests/test_domain_dependency_boundary.py` `325fdbbcff339c6f233e0e2064daee86e61506fc9c73a4efd6bb7dd0d15b29ed`. Limitation: static denylist is not an exhaustive catalog of all future third-party providers or a full Go compiler/parser; CI/CD pipeline is not asserted available.
 
-- [ ] `PDK-M01-S05` — Rollout × Root/Scope/Security Epoch × Leaseを有限状態モデル検査。
+- [-] `PDK-M01-S05` — Rollout × Root/Scope/Security Epoch × Leaseを有限状態モデル検査。
   - `depends_on`: PDK-M00-S05, PDK-M01-S06
   - `acceptance`: INV-01/02/03/06、Rollback、Emergency Stop、HOLD/Monitoringの公平性仮定と限界をTLA+/Alloy等で明示。CounterexampleはIssueへ返す。
   - `evidence_expected`: Model Source、tool version、モデル探索ログ、Safety/Liveness結果。
