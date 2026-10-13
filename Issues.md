@@ -27,17 +27,17 @@ snapshot_date: 2026-10-12
 project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
-active_goal: M00
-active_issue: PDK-M00-S07
+active_goal: M01
+active_issue: PDK-M01-S06
 issue_state: WIP
 execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "python3 -m unittest discover -s tests -v (35/35, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py (exit 0, first ready M00-S07); git diff --check (PASS)"
-blocker: PDK-M06-S07 blocked pending compliant RFC 8785 JCS codec; D-015 choice recorded
-next_action: "PDK-M00-S07: implement repository-local decision protection artifacts, then identify external GitHub settings that cannot be asserted without separate authorization"
-confidence: "各Issueはユーザー指定により、ローカルで再現可能なテストと独立ローカルレビューを証拠として依存DAG順に進める。CI/remote attestationは前提にしない。作業ツリーに未コミット変更あり"
+last_verified_test: "GO111MODULE=off go test ./internal/governance/domain -count=1 (PASS); python3 -m unittest discover -s tests -v (35/35 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git diff --check (PASS); gofmt -d (no output)"
+blocker: PDK-M00-S07 blocked pending exact remote branch-protection authorization; PDK-M06-S07 pending compliant RFC 8785 implementation method
+next_action: "PDK-M01-S06: define pure three-epoch, rollback-freeze, Safe Baseline and DB-unavailable deny contract; preserve unrelated worktree changes"
+confidence: "PDK-M01-S01 locally tested and independently reviewed; moving to the required pure safety contract before DB work. Existing unrelated uncommitted files are preserved."
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -104,10 +104,11 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `acceptance`: PoC鍵の範囲・DBセットアップ条件・Emergency Stopの発火/解除経路・組込みSafe Baselineの境界を設計基準として記録。未決の運用値はOPENのまま残す。
   - `evidence_expected`: Bootstrap設計レビュー、対応するO-002/O-003/O-010の解決Issueリンク。
   - `current_evidence`: `docs/bootstrap-safety.md` defines disposable PoC-only approval key scope; isolated non-production DB boundary and fail-closed behavior; human Emergency Stop trigger/enforcement/release; embedded Safe Baseline; and explicit OPEN links O-002→PDK-M06-S08, O-003→PDK-M02-S05, O-010→PDK-M06-S05. README links the baseline. `tests/test_lint_design.py::test_s06_bootstrap_safety_boundaries` checks key clauses and unresolved links. Independent local verifier confirmed all stated dimensions and ran `python3 -m unittest discover -s tests -v` (8/8 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), `git diff --check` (PASS), HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`. Local-only verification; no CI/remote attestation. Design does not grant production DB access or credentials.
-- [-] `PDK-M00-S07` — `decisions.md`の承認証拠と保護を確立する。
+- [ ] `PDK-M00-S07` — `decisions.md`の承認証拠と保護を確立する。
   - `depends_on`: PDK-M00-S02, PDK-M00-S06
   - `acceptance`: CODEOWNERS、保護Branch、署名・人間承認者とDecision supersedeの履歴を確定。初期転記を人間が検査し署名付きCommitへ関連付ける。WorkerによるACCEPTED直書きを認可しない。
   - `evidence_expected`: Git設定/CIログ/承認Commit SHA・日時・署名者照合。リモート機能未設定ならBLOCKED。
+  - `blocker`: Current user has authorized push but not GitHub branch-protection/CODEOWNERS setting mutations. Protected branch, authorized reviewers, and signed human approval commit cannot be evidenced from PADDOCK-local source. Resume when user explicitly authorizes the exact remote settings action or a repository-local prerequisite can be completed without claiming protection.
 - [x] `PDK-M00-S08` — Issue小目標DAGと文書参照の再現可能Lint。
   - `depends_on`: PDK-M00-S01
   - `acceptance`: Issue ID重複・Dangling Dependency・Cycle・OPEN解決Issue欠落・Markdown参照・Cursor不整合を検出。中目標一覧を手作業の依存グラフ扱いしない。
@@ -119,10 +120,11 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
 
 **中目標:** DB/LLMに依存しない状態機械をContract Firstで実装する。
 
-- [ ] `PDK-M01-S01` — `Digest`, `Epoch`, `Scope`, `Rollout`, `RolloutState`とエラー型を定義。
+- [x] `PDK-M01-S01` — `Digest`, `Epoch`, `Scope`, `Rollout`, `RolloutState`とエラー型を定義。
   - `depends_on`: PDK-M00-S02
   - `acceptance`: `SHADOW → CANARY → MONITORING → COMPLETED`と`CANARY/MONITORING → ROLLING_BACK → ROLLED_BACK/SAFE_STOPPED`を表現。HOLDは監視結果/保留状態であり無期限待機にしない。
   - `evidence_expected`: Domain型、Go unit tests、`go test` Exit Code。
+  - `current_evidence`: `internal/governance/domain/types.go` defines SHA-256 Digest parsing/validation, overflow-safe Epoch increment, Scope/Rollout identifiers and values, accepted rollout states, and separate finite monitoring decisions (HOLD is not a state). Local Runner observed `GO111MODULE=off go test ./internal/governance/domain -count=1` exit 0; Python suite `python3 -m unittest discover -s tests -q` 35/35 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` exit 0; `gofmt -d` produced no output. Independent read-only review found no concrete acceptance gaps. Source SHA-256: types.go `d9272e2467d994af60a3c89017a59672665a65ef6fbfd8aa9df20bc3d8064224`, types_test.go `d2e3500f831a3ef9c63b702382da544a0888cbd1ac4cefa5b00c0515a4e622d7`. Observed base HEAD `0f46640f3a5c9b6e86abb5894187d7d416d57fc9`; local tests/review only, no remote CI attestation.
 - [ ] `PDK-M01-S02` — `StartCanary/EffectivePolicy/Promote/Rollback`の純粋遷移。
   - `depends_on`: PDK-M01-S01
   - `acceptance`: Scope Epoch 40→41→42→43のFixtureに加え、Root A/B別の認可EpochとSecurity Epochが独立。Rollback/Freezeが正しく反映される。
@@ -140,7 +142,7 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `depends_on`: PDK-M00-S05, PDK-M01-S06
   - `acceptance`: INV-01/02/03/06、Rollback、Emergency Stop、HOLD/Monitoringの公平性仮定と限界をTLA+/Alloy等で明示。CounterexampleはIssueへ返す。
   - `evidence_expected`: Model Source、tool version、モデル探索ログ、Safety/Liveness結果。
-- [ ] `PDK-M01-S06` — Epoch 3層・二相Rollback・Safety Modeの純粋状態契約。
+- [-] `PDK-M01-S06` — Epoch 3層・二相Rollback・Safety Modeの純粋状態契約。
   - `depends_on`: PDK-M01-S01, PDK-M00-S06
   - `acceptance`: `scope_activation_epoch`, `root_authz_epoch`, `security_epoch`を区別し、`ROLLING_BACK`はFreezeを開始、最終Policy切替時にScope/該当Root Epochを1回進める。LKG不可→Safe Baseline、DB断→Gateway denyをモデル化。
   - `evidence_expected`: Root A非波及、切替・凍結・再開の状態表/Unit Fixture。
