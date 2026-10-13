@@ -58,7 +58,9 @@ class S03TrackingContractTests(unittest.TestCase):
     def test_receipt_schema_and_issue_reference_are_checked(self):
         path = self.root / "receipts" / "PDK-M00-S02" / "sample.json"
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({"schema_version": "paddock.receipt/1", "issue_id": "PDK-M00-S04"}), encoding="utf-8")
+        issues_text = (self.root / "Issues.md").read_text(encoding="utf-8")
+        active_issue = re.search(r"^active_issue: (PDK-M\d{2}-S\d{2})$", issues_text, re.M).group(1)
+        path.write_text(json.dumps({"schema_version": "paddock.receipt/1", "issue_id": active_issue}), encoding="utf-8")
         self.mutate("Issues.md", 'last_receipt: NONE', 'last_receipt: "receipts/PDK-M00-S02/sample.json"')
         self.assertFalse(any("RECEIPT_" in err for err in self.errors()), self.errors())
         path.write_text(json.dumps({"schema_version": "wrong/1", "issue_id": "PDK-M99-S99"}), encoding="utf-8")

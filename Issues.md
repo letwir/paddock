@@ -28,15 +28,15 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M00
-active_issue: PDK-M00-S04
+active_issue: PDK-M00-S07
 issue_state: WIP
 execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "python3 -m unittest discover -s tests -v (28/28, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git diff --check (PASS)"
+last_verified_test: "python3 -m unittest discover -s tests -v (35/35, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py (exit 0, first ready M00-S07); git diff --check (PASS)"
 blocker: PDK-M06-S07 blocked pending compliant RFC 8785 JCS codec; D-015 choice recorded
-next_action: "PDK-M00-S04: create a reproducible interrupted-session fixture and verify that a clean session reconstructs the same next READY Issue without marking unverified work DONE"
+next_action: "PDK-M00-S07: implement repository-local decision protection artifacts, then identify external GitHub settings that cannot be asserted without separate authorization"
 confidence: "各Issueはユーザー指定により、ローカルで再現可能なテストと独立ローカルレビューを証拠として依存DAG順に進める。CI/remote attestationは前提にしない。作業ツリーに未コミット変更あり"
 ```
 
@@ -88,10 +88,11 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `acceptance`: Decision IDは重複せず、supersedes参照は既存の異なるDecision IDを指す。Issue ID/DAG/Cursorの整合を検査し、last_receiptがNONEか許可Root内の存在するpaddock.receipt/1文書でactive Issue IDと一致することを再実行可能に検査する。Receipt構造のLintは発行者や結果の信頼性を証明しない。
   - `evidence_expected`: malformed supersede、Issue ID/DAG、欠落/escape/不正Schema/wrong Issue receipt、Cursor fixtureの負例テストとLint Exit Code。
   - `current_evidence`: `scripts/lint_design.py` checks append-only sequential unique D IDs, section-scoped supersedes targets (rejecting unknown and self-targets), Cursor↔Issue state (including missing state), and structural Receipt path/schema/active-Issue references with resolved in-repository path containment while explicitly not authenticating receipts. `tests/test_s03_tracking_contract.py` adds twelve clean/negative mutation tests including missing/invalid/escaped/symlink Receipt references, unregistered/mismatched receipt issue, missing state, and supersedes failures. Full local Python suite 30/30 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` PASS. Independent read-only review checked current sources; an initial reported receipt mismatch was disproved by rereading the actual active cursor (S04 matches the fixture). Receipt validation is structural only, not authenticity or complete schema proof.
-- [-] `PDK-M00-S04` — `CONTINUE/1`を模擬通信断で演習する。
+- [x] `PDK-M00-S04` — `CONTINUE/1`を模擬通信断で演習する。
   - `depends_on`: PDK-M00-S03
-  - `acceptance`: 新セッションが過去会話なしで同じ次Issueを選べ、未確認作業をDONEにしない。
-  - `evidence_expected`: 再開前後Cursor、差分、検証ログ。
+  - `acceptance`: `tests/test_s04_continue_resume.py` must simulate interruption in a disposable fixture, then launch a fresh subprocess with no session memory; it selects the same active WIP Issue, and rejects changing unverified WIP to DONE. No claim of actual network/process crash is required.
+  - `evidence_expected`: Test-captured before/after Cursor snapshots, controlled unverified-work diff, and subprocess command/stdout/exit-code log in disposable fixture; test report and local verifier review.
+  - `current_evidence`: `tests/test_s04_continue_resume.py` uses a disposable temp repository, captures identical before/after Cursor text, creates a controlled unverified WIP artifact and unified diff, then executes `continue_plan.py` in a fresh subprocess and records command/stdout/exit status in temporary JSON; it asserts S04 remains WIP and is selected. Independent verifier confirmed this meets the revised simulated-interruption acceptance and independently ran focused tests 5/5, full suite 35/35, design lint PASS (89 issues/148 edges), planner CLI exit 0 (active S04), and `git diff --check` PASS at HEAD `9d6296b17c9b569e7f010fe7c30755a94ff0042f`. Local simulation only; not a real crash or CI attestation.
 
 - [x] `PDK-M00-S05` — 脅威モデルの設計とTrust Boundaryのレビュー。
   - `depends_on`: PDK-M00-S01
@@ -103,7 +104,7 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `acceptance`: PoC鍵の範囲・DBセットアップ条件・Emergency Stopの発火/解除経路・組込みSafe Baselineの境界を設計基準として記録。未決の運用値はOPENのまま残す。
   - `evidence_expected`: Bootstrap設計レビュー、対応するO-002/O-003/O-010の解決Issueリンク。
   - `current_evidence`: `docs/bootstrap-safety.md` defines disposable PoC-only approval key scope; isolated non-production DB boundary and fail-closed behavior; human Emergency Stop trigger/enforcement/release; embedded Safe Baseline; and explicit OPEN links O-002→PDK-M06-S08, O-003→PDK-M02-S05, O-010→PDK-M06-S05. README links the baseline. `tests/test_lint_design.py::test_s06_bootstrap_safety_boundaries` checks key clauses and unresolved links. Independent local verifier confirmed all stated dimensions and ran `python3 -m unittest discover -s tests -v` (8/8 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), `git diff --check` (PASS), HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`. Local-only verification; no CI/remote attestation. Design does not grant production DB access or credentials.
-- [ ] `PDK-M00-S07` — `decisions.md`の承認証拠と保護を確立する。
+- [-] `PDK-M00-S07` — `decisions.md`の承認証拠と保護を確立する。
   - `depends_on`: PDK-M00-S02, PDK-M00-S06
   - `acceptance`: CODEOWNERS、保護Branch、署名・人間承認者とDecision supersedeの履歴を確定。初期転記を人間が検査し署名付きCommitへ関連付ける。WorkerによるACCEPTED直書きを認可しない。
   - `evidence_expected`: Git設定/CIログ/承認Commit SHA・日時・署名者照合。リモート機能未設定ならBLOCKED。
@@ -298,7 +299,7 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `depends_on`: PDK-M00-S06
   - `acceptance`: JCS等の確定Byte Codec/型制限、Bundle・Approval・Commandの用途タグ、署名対象schema_versionとanti-replay文脈を仕様化し検証。
   - `evidence_expected`: Golden Vector、Key順/Unicode/数値Fixture、cross-protocol署名拒否。
-  - `blocker`: O-008 remains OPEN and explicitly lists RFC 8785 JCS or another deterministic codec as unresolved. Acceptance requires selecting a codec; choosing one would resolve an OPEN decision without user direction. Defer this Issue and continue with independent READY work.
+  - `blocker`: D-015 selects RFC 8785 JCS, but no compliant JCS codec or verified vectors are available. Keep fail-closed; select no external dependency without authorization and do not claim completion.
 - [x] `PDK-M06-S08` — PoC専用署名鍵・Fixture/Trust Root配置（O-002）。
   - `depends_on`: PDK-M00-S06
   - `acceptance`: テスト専用公開鍵の配置、秘密鍵の非Git・非ログ、期限/失効/回転の検証経路と本番鍵との差を固定。
