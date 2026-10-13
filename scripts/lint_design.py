@@ -98,8 +98,10 @@ def validate(root: Path, check_generated: bool = True) -> tuple[list[str], dict[
         for target in target_ids:
             if target not in records: errs.append(f'OPEN_UNKNOWN_ISSUE: {name}->{target}')
     decisions = DEC_RE.findall(dec)
-    if len(decisions) != len(set(decisions)) or len(decisions) != 14:
-        errs.append(f'DECISION_REGISTER: expected 14 unique D-IDs, got {len(decisions)}')
+    decision_numbers = sorted(int(item[2:]) for item in decisions)
+    expected_decisions = list(range(1, max(decision_numbers, default=0) + 1))
+    if len(decisions) != len(set(decisions)) or decision_numbers != expected_decisions or len(decisions) < 14:
+        errs.append(f'DECISION_REGISTER: expected sequential unique D-001..D-N with N >= 14, got {len(decisions)}')
 
     # Markdown links within project; reject escapes from repo root for local links.
     for name, doc in documents.items():

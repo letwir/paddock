@@ -47,7 +47,9 @@ class DesignLintTests(unittest.TestCase):
     def test_s01_acceptance_content(self):
         decisions=(self.root/'decisions.md').read_text(encoding='utf-8')
         expected={f'D-{i:03d}' for i in range(1,15)}
-        self.assertEqual(set(MODULE.DEC_RE.findall(decisions)),expected)
+        found=set(MODULE.DEC_RE.findall(decisions))
+        self.assertTrue(expected.issubset(found))
+        self.assertEqual(len(found),len(MODULE.DEC_RE.findall(decisions)))
         readme=(self.root/'README.md').read_text(encoding='utf-8')
         for target in ('THREAT_MODEL.md','Issues.md','method.md'):
             self.assertRegex(readme,rf'\]\({re.escape(target)}\)')

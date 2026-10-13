@@ -1,7 +1,7 @@
 # PADDOCK — decisions.md
 
 > SIGMA/1: PIDGEN/text · Project state / Decision SSOT
-> Snapshot: 2026-10-12 · Revision: design-review/2 · Status: DESIGN_ONLY · Repo: **PADDOCK (independent)**
+> Snapshot: 2026-10-13 · Revision: design-review/2 · Status: DESIGN_ONLY · Repo: **PADDOCK (independent)**
 > Provenance: 2026-10-12の設計対話から転記。**未署名の転記記録であり、Gitコミットや人間承認署名の代用品ではない**。Git導入後、保護された承認コミットにより固定する（PDK-M00-S07）。既存 `.HARNESS` は表記・運用上の参照のみ。
 
 ## 0. 読み方・正本性
@@ -32,10 +32,15 @@
 | D-012 | 実装契約の正本 | **B: Contract First**。Go Domainの契約を先に固定し、永続化Adapterを実装する | M01, M03 |
 | D-013 | PostgreSQLアクセス | **A: pgx Native**。ORM/sqlc必須化せず、明示SQLとpgxでTransactionを制御する | M02, M03 |
 | D-014 | Repository Boundary | **新規の独立したPADDOCKリポジトリ**。`.HARNESS`は参照・流用のみ、黙示的な認可/規則継承なし | M00 |
+| D-015 | Canonicalization/Signature Envelope | **RFC 8785 JCS**をBundle/Approval/Commandのcanonical bytesに採用。Domain Separation、schema version、anti-replayは引き続き必須。実装済みとは主張しない（S07 verifierまで未確認） | PDK-M06-S07 |
 
 ### D-014 / Repository Boundary — ACCEPTED (2026-10-12の独立Repo化依頼)
 
 PADDOCKは**新規独立リポジトリ**。`letwir/config/.HARNESS` 内で実装しない。`.HARNESS` の `SIGMA/1: PIDGEN/text`、LRF、Issue状態管理、独立Verifier等は参照・必要に応じた再利用に限る。既存 `.HARNESS` の実行規則、ホスト固有制約、アカウント/エージェント配車方針、認可をPADDOCKへ黙示継承しない。
+
+### D-015 / Canonicalization/Signature Envelope — ACCEPTED (2026-10-13の現在タスクでの明示選択)
+
+ユーザーは現在のタスクで **RFC 8785 JCS** を選択した。Bundle/Approval/Commandのcanonical bytesにJCSを用いる。用途間の再利用を防ぐDomain Separation、署名対象のschema version、anti-replayは引き続き必須とする。これは設計判断の記録であり、実装が存在するとの主張ではない。実装はS07 verifierで確認されるまで未確認。
 
 ## 2. システム境界と責務（DESIGN_BASELINE）
 
@@ -181,7 +186,7 @@ GUI/CUI/APIは同じ契約を利用する。GUIはRTS/配車場的な監視・�
 | O-005 | UI/CUI、NAYA実モデル | PoC以降 | PDK-M13-S01, PDK-M13-S03 |
 | O-006 | Token閾値/Lease秒数/Trust統計閾値 | 例示値のみ。Gateway認可キャッシュ最大staleness、HOLD/Monitoring期限も未決 | PDK-M07-S06, PDK-M08-S05, PDK-M11-S03 |
 | O-007 | 公開先・CI・GitHubリポジトリ名 | 新規独立Repoであること以外は未決。Decision保護/Verifier of Recordの設計も必要 | PDK-M00-S07, PDK-M14-S04 |
-| O-008 | Canonicalization/Signature Envelope | RFC 8785 JCSまたは別の決定的Codec、用途分離タグとスキーマ版を未決 | PDK-M06-S07 |
+| O-008 | Canonicalization/Signature Envelope | RFC 8785 JCSを選択済み（D-015）。Domain Separation、schema version、anti-replayは引き続き必須 | PDK-M06-S07 |
 | O-009 | Event/Outbox retention・schema evolution | 保持期間・partition/archival/consumer replay対応を未決 | PDK-M05-S05 |
 | O-010 | 安全停止の解除・人間鍵とTrust Rootの更新 | Safety Planeでの失効・復旧が必要。運用鍵/復旧Quorumは未決 | PDK-M00-S06, PDK-M06-S05 |
 
@@ -207,3 +212,4 @@ GUI/CUI/APIは同じ契約を利用する。GUIはRTS/配車場的な監視・�
 
 - 2026-10-12: D-001〜D-013を会話内の明示選択として整理。D-014独立Repo境界を追加。実装完了を示す記録ではない。
 - 2026-10-12: 設計レビューに基づきSafety Plane、Safe Baseline、Root別Epoch、監視liveness、Threat Model等を**DESIGN_BASELINE**として追記。正式なACCEPTED Decisionは増やしていない。Git承認Commitは未確定。
+- 2026-10-13: 現在タスクでのユーザー明示選択に基づきD-015を追記。RFC 8785 JCSをBundle/Approval/Commandのcanonical bytesに採用し、Domain Separation・schema version・anti-replayを必須として保持。実装はS07 verifierまで未確認。

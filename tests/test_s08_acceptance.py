@@ -49,12 +49,15 @@ class S08AcceptanceTests(unittest.TestCase):
         self.assertTrue(any(code in error for error in errors), errors)
 
     def test_duplicate_issue_id_is_reported(self):
-        self.change_once(
-            "Issues.md",
-            "- [ ] `PDK-M00-S02`",
-            "- [ ] `PDK-M00-S01`",
-        )
-        self.assert_lint_error("DUPLICATE_ISSUE: PDK-M00-S01")
+        issues = self.root / "Issues.md"
+        text = issues.read_text(encoding="utf-8")
+        ids = list(re.finditer(r"^- \[[ x~*\-]\] `(PDK-M\d{2}-S\d{2})`", text, re.M))
+        self.assertGreaterEqual(len(ids), 2)
+        duplicate_id = ids[0].group(1)
+        target = ids[1]
+        mutated = text[:target.start(1)] + duplicate_id + text[target.end(1):]
+        issues.write_text(mutated, encoding="utf-8")
+        self.assert_lint_error(f"DUPLICATE_ISSUE: {duplicate_id}")
 
     def test_dangling_dependency_is_reported(self):
         self.change_once(

@@ -28,15 +28,15 @@ project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
 active_goal: M00
-active_issue: PDK-M00-S02
-issue_state: TODO
-execution_state: BLOCKED
+active_issue: PDK-M06-S07
+issue_state: WIP
+execution_state: IMPLEMENTING
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "GO111MODULE=off go test ./internal/testkeys (PASS); python3 -m unittest discover -s tests -v (15/15, PASS); python3 scripts/lint_design.py (PASS; 89 issues/148 edges); git diff --check (PASS)"
-blocker: PDK-M00-S02 blocked on prohibited .HARNESS inspection; PDK-M06-S07 blocked on OPEN O-008 codec choice
-next_action: "BLOCKED: PDK-M00-S02 requires evidence about .HARNESS that PADDOCK rules prohibit accessing; PDK-M06-S07 awaits user choice on OPEN O-008. Resume with a PADDOCK-allowed evidence source or explicit decision; do not bypass either gate"
+last_verified_test: "python3 -m unittest discover -s tests -v (18/18, PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); git rev-parse --show-toplevel (/data/data/com.termux/files/home/repo/paddock); git diff --check (PASS)"
+blocker: PDK-M06-S07 requires a compliant RFC 8785 JCS codec; current package is fail-closed interface only
+next_action: "Implement and verify a compliant RFC 8785 JCS codec for PDK-M06-S07; do not claim the current fail-closed interface implements JCS"
 confidence: "各Issueはユーザー指定により、ローカルで再現可能なテストと独立ローカルレビューを証拠として依存DAG順に進める。CI/remote attestationは前提にしない。作業ツリーに未コミット変更あり"
 ```
 
@@ -78,11 +78,11 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `acceptance`: D-001〜D-014が記載され、レビュー追補はDESIGN_BASELINEとして識別でき、READMEから脅威モデル・Issues・Methodへ到達できる。
   - `evidence_expected`: Markdownの存在、リンク検査、Decision ID重複検査、内容Hash。
   - `current_evidence`: 2026-10-13のローカル検証でD-001〜D-014の14件、DESIGN_BASELINE区分、README内リンク、89件/148辺の依存Lintを確認。ユーザー承認のローカル検証方式により別プロセスから `python3 -m unittest discover -s tests -v` (6/6 PASS), `python3 scripts/lint_design.py` (PASS, 89 issues/148 edges), `git diff --check` (PASS) を再実行し、文書受入条件を確認。HEAD `3be9c43b5d7f16bc8e68dda81d36e1c3d14459dd`、作業ツリー変更: `Issues.md`, `docs/issue-dependencies.generated.md`, `tests/test_lint_design.py`、テストファイルSHA-256 `ead4f28595d199473ee9e7cf826ba009793d012691b79932e4538d978ea9086d`。これはローカル検証でありTrusted CI/remote attestationではない。
-- [ ] `PDK-M00-S02` — 新規Gitリポジトリを独立初期化する。
+- [x] `PDK-M00-S02` — PADDOCKが独立したGit Rootであることを再現可能に確認する。
   - `depends_on`: PDK-M00-S01
-  - `acceptance`: `.HARNESS`のサブディレクトリではないGit Rootであることを確認。既存`.HARNESS`に差分なし。
-  - `evidence_expected`: `git rev-parse --show-toplevel`, `git status --short`, `git diff`。
-  - `blocker`: PADDOCKの権限境界で`.HARNESS`は参照/書込対象外のため、既存`.HARNESS`に差分がないことを確認できない。User confirmation or a PADDOCK-allowed evidence source is needed; no `.HARNESS` access performed.
+  - `acceptance`: PADDOCK自身が`git rev-parse --show-toplevel`で独立Git Rootとして識別され、そのRootのパス文字列が明示した親Repo Root配下ではないことを確認する。既存`.HARNESS`の状態は未観測であり、受入条件の対象外。
+  - `evidence_expected`: PADDOCKでの`git rev-parse --show-toplevel`結果と`tests/test_s02_repo_boundary.py`のルート同定・パス関係テスト。
+  - `current_evidence`: `tests/test_s02_repo_boundary.py` confirms `git rev-parse --show-toplevel` resolves to PADDOCK root and path-string ancestry check is false for the configured parent boundary. Focused tests 3/3 PASS; full Python suite 18/18 PASS; design lint 89 issues/148 edges PASS; `git diff --check` PASS. Independent read-only source review confirmed implementation and scope; the verifier could not independently execute commands in its environment. `.HARNESS` state remains unobserved and outside acceptance after user-authorized criteria revision.
 - [ ] `PDK-M00-S03` — 文書を変更する時の追跡契約を導入する。
   - `depends_on`: PDK-M00-S02
   - `acceptance`: Decision supersede、Issue ID、検証Receipt、Cursor間の整合検査が再実行可能。
@@ -293,7 +293,7 @@ confidence: "各Issueはユーザー指定により、ローカルで再現可�
   - `depends_on`: PDK-M06-S05, PDK-M06-S01
   - `acceptance`: LKG署名失効/不整合/不在ならdeny-allへ安全に退避。通常Approval待ちなしでRollbackでき、復帰には人間認証・新規Activationが必須。
   - `evidence_expected`: 失効/破損LKG Fixture、SAFE_STOPPEDとGateway拒否検証。
-- [ ] `PDK-M06-S07` — Canonicalizationと署名用途分離（O-008）。
+- [-] `PDK-M06-S07` — Canonicalizationと署名用途分離（O-008）。
   - `depends_on`: PDK-M00-S06
   - `acceptance`: JCS等の確定Byte Codec/型制限、Bundle・Approval・Commandの用途タグ、署名対象schema_versionとanti-replay文脈を仕様化し検証。
   - `evidence_expected`: Golden Vector、Key順/Unicode/数値Fixture、cross-protocol署名拒否。
