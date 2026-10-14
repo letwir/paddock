@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/letwir/paddock/internal/governance/domain"
@@ -82,22 +83,28 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 	// These exercise zero-row CAS rejection, not an external-writer race.
 	for _, staleCase := range []string{"scope", "root", "rollout", "rollout state", "target", "security epoch"} {
 		t.Run("stale "+staleCase, func(t *testing.T) {
-			tx, err := pool.Begin(ctx)
+			caseCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+			defer cancel()
+			tx, err := pool.Begin(caseCtx)
 			if err != nil {
-				t.Fatal("begin stale transaction")
+				t.Fatalf("begin stale %s transaction: %v", staleCase, err)
 			}
-			defer tx.Rollback(ctx)
+			t.Cleanup(func() {
+				rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer rollbackCancel()
+				_ = tx.Rollback(rollbackCtx)
+			})
 			gov := newGovernanceTx(tx)
-			scope, err := gov.LockScope(ctx, domain.ScopeID(f.scope))
+			scope, err := gov.LockScope(caseCtx, domain.ScopeID(f.scope))
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("stale %s LockScope: %v", staleCase, err)
 			}
-			rollout, err := gov.LockRollout(ctx, domain.ScopeID(f.scope), domain.RolloutID(f.rollout))
+			rollout, err := gov.LockRollout(caseCtx, domain.ScopeID(f.scope), domain.RolloutID(f.rollout))
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("stale %s LockRollout: %v", staleCase, err)
 			}
-			if err := gov.ValidateTargets(ctx, domain.ScopeID(f.scope), []domain.RootID{domain.RootID(f.root)}); err != nil {
-				t.Fatal(err)
+			if err := gov.ValidateTargets(caseCtx, domain.ScopeID(f.scope), []domain.RootID{domain.RootID(f.root)}); err != nil {
+				t.Fatalf("stale %s ValidateTargets: %v", staleCase, err)
 			}
 			var staleErr error
 			checkMutation := func(rows int64, mutationErr error) error {
@@ -111,15 +118,15 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 			}
 			switch staleCase {
 			case "scope":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.policy_scopes SET activation_epoch=activation_epoch+1 WHERE scope_id=$1`, f.scope)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.policy_scopes SET activation_epoch=activation_epoch+1 WHERE scope_id=$1`, f.scope)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
 					next := scope
 					next.ActivationEpoch++
-					staleErr = gov.CompareAndSwapScope(ctx, scope, next)
+					staleErr = gov.CompareAndSwapScope(caseCtx, scope, next)
 				}
 			case "root":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.roots SET authorization_epoch=authorization_epoch+1 WHERE root_id=$1`, f.root)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.roots SET authorization_epoch=authorization_epoch+1 WHERE root_id=$1`, f.root)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
 					next := scope
@@ -127,26 +134,26 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 					r := next.Roots[domain.RootID(f.root)]
 					r.AuthorizationEpoch++
 					next.Roots[domain.RootID(f.root)] = r
-					staleErr = gov.CompareAndSwapScope(ctx, scope, next)
+					staleErr = gov.CompareAndSwapScope(caseCtx, scope, next)
 				}
 			case "rollout":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.policy_rollouts SET last_activation_epoch=last_activation_epoch+1 WHERE rollout_id=$1`, f.rollout)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.policy_rollouts SET last_activation_epoch=last_activation_epoch+1 WHERE rollout_id=$1`, f.rollout)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
 					next := rollout
 					next.LastActivationEpoch++
-					staleErr = gov.CompareAndSwapRollout(ctx, rollout, next)
+					staleErr = gov.CompareAndSwapRollout(caseCtx, rollout, next)
 				}
 			case "rollout state":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.policy_rollouts SET state='COMPLETED' WHERE rollout_id=$1`, f.rollout)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.policy_rollouts SET state='COMPLETED' WHERE rollout_id=$1`, f.rollout)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
 					next := rollout
 					next.State = domain.RolloutCompleted
-					staleErr = gov.CompareAndSwapRollout(ctx, rollout, next)
+					staleErr = gov.CompareAndSwapRollout(caseCtx, rollout, next)
 				}
 			case "target":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.rollout_targets SET base_root_epoch=base_root_epoch+1 WHERE rollout_id=$1 AND root_id=$2`, f.rollout, f.root)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.rollout_targets SET base_root_epoch=base_root_epoch+1 WHERE rollout_id=$1 AND root_id=$2`, f.rollout, f.root)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
 					next := rollout
@@ -157,23 +164,23 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 					target := next.Targets[domain.RootID(f.root)]
 					target.BaseRootEpoch++
 					next.Targets[domain.RootID(f.root)] = target
-					staleErr = gov.CompareAndSwapRollout(ctx, rollout, next)
+					staleErr = gov.CompareAndSwapRollout(caseCtx, rollout, next)
 				}
 			case "security epoch":
-				tag, mutationErr := tx.Exec(ctx, `UPDATE raw.security_generation SET security_epoch=security_epoch+1 WHERE singleton_id=true`)
+				tag, mutationErr := tx.Exec(caseCtx, `UPDATE raw.security_generation SET security_epoch=security_epoch+1 WHERE singleton_id=true`)
 				err = checkMutation(tag.RowsAffected(), mutationErr)
 				if err == nil {
-					staleErr = gov.CompareAndSwapSecurityEpoch(ctx, scope.SecurityEpoch, scope.SecurityEpoch+1)
+					staleErr = gov.CompareAndSwapSecurityEpoch(caseCtx, scope.SecurityEpoch, scope.SecurityEpoch+1)
 				}
 			}
 			if err != nil {
-				t.Fatalf("mutate fixture row: %v", err)
+				t.Fatalf("mutate stale %s fixture row: %v", staleCase, err)
 			}
 			if !errors.Is(staleErr, port.ErrStaleWrite) {
-				t.Fatalf("CAS error = %v, want ErrStaleWrite", staleErr)
+				t.Fatalf("stale %s CAS error = %v, want ErrStaleWrite", staleCase, staleErr)
 			}
-			if err := tx.Rollback(ctx); err != nil {
-				t.Fatalf("rollback stale transaction: %v", err)
+			if err := tx.Rollback(caseCtx); err != nil {
+				t.Fatalf("rollback stale %s transaction: %v", staleCase, err)
 			}
 		})
 	}
@@ -212,6 +219,11 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 	t.Helper()
 	lockCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
+	rollback := func(tx pgx.Tx) error {
+		rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer rollbackCancel()
+		return tx.Rollback(rollbackCtx)
+	}
 
 	ownerTx, err := pool.Begin(lockCtx)
 	if err != nil {
@@ -220,7 +232,7 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 	ownerOpen := true
 	defer func() {
 		if ownerOpen {
-			_ = ownerTx.Rollback(context.Background())
+			_ = rollback(ownerTx)
 		}
 	}()
 	var ownerPID int
@@ -245,7 +257,7 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 			completed <- queryResult{err: err}
 			return
 		}
-		defer tx.Rollback(context.Background())
+		defer rollback(tx)
 		var pid int
 		if err := tx.QueryRow(lockCtx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
 			completed <- queryResult{err: err}
@@ -272,16 +284,16 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 	case waiterPID = <-started:
 	case result := <-completed:
 		completionReceived = true
-		_ = ownerTx.Rollback(context.Background())
+		_ = rollback(ownerTx)
 		ownerOpen = false
 		t.Fatalf("concurrent transaction ended before reporting its pid: %v", result.err)
 	case <-lockCtx.Done():
-		_ = ownerTx.Rollback(context.Background())
+		_ = rollback(ownerTx)
 		ownerOpen = false
 		t.Fatalf("concurrent transaction did not start: %v", lockCtx.Err())
 	}
 	if waiterPID == ownerPID {
-		_ = ownerTx.Rollback(context.Background())
+		_ = rollback(ownerTx)
 		ownerOpen = false
 		t.Fatalf("transactions unexpectedly share backend pid %d", ownerPID)
 	}
@@ -314,7 +326,7 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 		default:
 		}
 	}
-	if err := ownerTx.Rollback(context.Background()); err != nil {
+	if err := rollback(ownerTx); err != nil {
 		t.Errorf("release Scope lock owner transaction: %v", err)
 	}
 	ownerOpen = false
