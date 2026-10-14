@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -25,6 +26,14 @@ var (
 type rolloutKey struct {
 	scope   domain.ScopeID
 	rollout domain.RolloutID
+}
+
+func (g *governanceTx) DatabaseTime(ctx context.Context) (time.Time, error) {
+	var now time.Time
+	if err := g.tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
+		return time.Time{}, fmt.Errorf("read PostgreSQL database time: %w", err)
+	}
+	return now, nil
 }
 
 type governanceTx struct {

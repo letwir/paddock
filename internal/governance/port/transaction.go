@@ -5,6 +5,7 @@ package port
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/letwir/paddock/internal/governance/domain"
 )
@@ -59,6 +60,9 @@ type Transactor interface {
 // call ValidateTargets after LockRollout (or after LockScope for a new rollout)
 // before any Scope CAS. It locks all same-scope Roots in deterministic order.
 type GovernanceTx interface {
+	// DatabaseTime returns PostgreSQL wall-clock time within this transaction.
+	// Callers must use it, rather than a worker-supplied timestamp, for deadlines.
+	DatabaseTime(ctx context.Context) (time.Time, error)
 	LockScope(ctx context.Context, scopeID domain.ScopeID) (ScopeSnapshot, error)
 	LockRollout(ctx context.Context, scopeID domain.ScopeID, rolloutID domain.RolloutID) (RolloutSnapshot, error)
 	ValidateTargets(ctx context.Context, scopeID domain.ScopeID, targets []domain.RootID) error

@@ -52,6 +52,47 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 	if err := requireSchema(ctx, pool); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("database clock contract", func(t *testing.T) {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin clock transaction: %v", err)
+		}
+		t.Cleanup(func() {
+			rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer rollbackCancel()
+			_ = tx.Rollback(rollbackCtx)
+		})
+		gov := newGovernanceTx(tx)
+		var transactionNow, firstClock time.Time
+		if err := tx.QueryRow(ctx, `SELECT now(), clock_timestamp()`).Scan(&transactionNow, &firstClock); err != nil {
+			t.Fatalf("read initial transaction/database clocks: %v", err)
+		}
+		firstDatabaseTime, err := gov.DatabaseTime(ctx)
+		if err != nil {
+			t.Fatalf("GovernanceTx.DatabaseTime: %v", err)
+		}
+		if firstDatabaseTime.Before(firstClock) {
+			t.Fatalf("DatabaseTime %v precedes clock_timestamp() %v", firstDatabaseTime, firstClock)
+		}
+		time.Sleep(25 * time.Millisecond)
+		var laterNow, laterClock time.Time
+		if err := tx.QueryRow(ctx, `SELECT now(), clock_timestamp()`).Scan(&laterNow, &laterClock); err != nil {
+			t.Fatalf("read subsequent transaction/database clocks: %v", err)
+		}
+		if !laterNow.Equal(transactionNow) {
+			t.Fatalf("now() changed within transaction: %v -> %v", transactionNow, laterNow)
+		}
+		if !laterClock.After(firstClock) {
+			t.Fatalf("clock_timestamp() did not advance: %v -> %v", firstClock, laterClock)
+		}
+		// A deliberately stale worker timestamp cannot determine expiry: the
+		// comparison's authority is the database clock returned by the port.
+		workerTimestamp := transactionNow.Add(24 * time.Hour)
+		deadline := transactionNow.Add(12 * time.Hour)
+		if !firstDatabaseTime.Before(deadline) || workerTimestamp.Before(deadline) {
+			t.Fatal("clock fixture does not distinguish database-time and worker-time deadline decisions")
+		}
+	})
 
 	suffix := make([]byte, 12)
 	if _, err := rand.Read(suffix); err != nil {

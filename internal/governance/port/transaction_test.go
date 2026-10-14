@@ -4,11 +4,38 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/letwir/paddock/internal/governance/domain"
 )
 
-type fakeGovernanceTx struct{ receivers []GovernanceTx }
+type fakeGovernanceTx struct {
+	receivers       []GovernanceTx
+	databaseTime    time.Time
+	databaseTimeErr error
+}
+
+func TestDatabaseTimeDelegatesResultAndError(t *testing.T) {
+	want := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	tx := &fakeGovernanceTx{databaseTime: want}
+	got, err := tx.DatabaseTime(context.Background())
+	if err != nil || !got.Equal(want) {
+		t.Fatalf("DatabaseTime() = %v, %v; want %v, nil", got, err, want)
+	}
+	wantErr := errors.New("database clock unavailable")
+	tx.databaseTimeErr = wantErr
+	if _, err := tx.DatabaseTime(context.Background()); !errors.Is(err, wantErr) {
+		t.Fatalf("DatabaseTime() error = %v, want %v", err, wantErr)
+	}
+	if len(tx.receivers) != 2 {
+		t.Fatalf("DatabaseTime called %d times, want 2", len(tx.receivers))
+	}
+}
+
+func (f *fakeGovernanceTx) DatabaseTime(context.Context) (time.Time, error) {
+	f.receivers = append(f.receivers, f)
+	return f.databaseTime, f.databaseTimeErr
+}
 
 func (f *fakeGovernanceTx) LockScope(context.Context, domain.ScopeID) (ScopeSnapshot, error) {
 	f.receivers = append(f.receivers, f)
