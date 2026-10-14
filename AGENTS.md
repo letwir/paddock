@@ -1,20 +1,81 @@
 # PADDOCK / LRF-1 bootstrap
 
-READ+COMPILE [SIGMA](rules/BOOTSTRAP.lrf) before action; then load matching records from [MANUAL](rules/MANUAL.lrf) and [LOAD](rules/LOAD.lrf) after task classification.
+## B-01 — Bootstrap and authority
+- **Subject:** Every agent acting in PADDOCK.
+- **Scope:** Bootstrap policy and its routed records.
+- **Modality:** MUST.
+- **Condition:** Before action, and after task classification.
+- **Action:** READ+COMPILE [SIGMA](rules/BOOTSTRAP.lrf); then load matching records from [MANUAL](rules/MANUAL.lrf) and [LOAD](rules/LOAD.lrf).
+- **Outcome:** The authority source is only the `decisions.md` **ACCEPTED register (D-001–D-017)** and LRF records routed from it. `DESIGN_BASELINE` is not ACCEPTED; recommendations in `OPEN` are not decisions. Existing `.HARNESS` (`letwir/config`) is **reference-only**: PADDOCK does not implicitly inherit its execution rules, credentials, authority, host environment, or agent-dispatch policy.
 
-権限の出所は `decisions.md` の **ACCEPTED レジスタ（D-001〜D-014）** と、そこからルーティングされた LRF 記録のみです。`DESIGN_BASELINE` は ACCEPTED ではなく、OPEN の推薦も決定として扱いません。既存 `.HARNESS`（letwir/config）は**参照のみ**で、その実行規則・資格情報・権限・ホスト環境・エージェント配車方針を PADDOCK は黙示に継承しません。
+## B-02 — Required reading and design lint
+- **Subject:** Agent selecting work.
+- **Scope:** Design documents and work selection.
+- **Modality:** MUST.
+- **Condition:** Before selecting work.
+- **Action:** Read, in order, `decisions.md` → `method.md` → `THREAT_MODEL.md` → `Issues.md`; run `python3 scripts/lint_design.py` to mechanically check IDs, the subgoal DAG, OPEN resolution targets, and Cursor consistency.
+- **Outcome:** Work selection follows the defined source documents and checked design references.
 
-- 読み順: `decisions.md` → `method.md` → `THREAT_MODEL.md` → `Issues.md`。作業選択の前に `python3 scripts/lint_design.py` を実行し、ID・小目標DAG・OPEN解決先・Cursor照合を機械検査する。
-- `Issues.md` の Cursor はヒントであり、実際の Git 状態・検証 Receipt より優先しない。矛盾時は実ファイル・Git・検証ログを観測して報告する。
-- 効果分類: `RO_LOCAL`=ローカル読み取り/検査、`RO_PUBLIC`=公開読み取り専用、`LW_SCOPE`=依頼された可逆的なワークスペース編集と比例する検査。`EXT_WRITE` / `RELEASE` / `LIVE_WRITE` / `VCS_WRITE` / `DESTRUCT` / `CRED` / `CHARGE` / `PROD_DEP` はその都度タスクの明示承認が必要。分類不能の効果: STOPして質問。
-- Worker の自己申告は検証証拠ではない。証拠は Runner による実際の実観測（Exit Code・Hash・対象Revision）のみ。未検証・未実行の検査を成功として報告しない。
-- 書込み対象は PADDOCK リポジトリ内。`.HARNESS` や親 Repo に書き込まない。1ファイル1Writer。
-- SIGMA/link が欠落・読めない・不正・構造不明・同順位衝突: 該当アクションを STOP して質問する。
+## B-03 — Cursor evidence precedence
+- **Subject:** Agent reconciling Issues state.
+- **Scope:** `Issues.md` Cursor versus observed repository and verification evidence.
+- **Modality:** MUST.
+- **Condition:** Cursor conflicts with observed state.
+- **Action:** Treat Cursor as a hint, not as higher priority than actual Git state or verification Receipts; observe the actual files, Git, and verification logs and report the discrepancy.
+- **Outcome:** Reported state is grounded in observation, not Cursor alone.
 
-## 状態語彙と再開
+## B-04 — Effect classification and approval
+- **Subject:** Agent considering an action.
+- **Scope:** Action effects.
+- **Modality:** MUST.
+- **Condition:** Before acting.
+- **Action:** Classify the effect: `RO_LOCAL` = local read/inspection; `RO_PUBLIC` = public read-only; `LW_SCOPE` = requested reversible workspace edits and proportionate checks. `EXT_WRITE`, `RELEASE`, `LIVE_WRITE`, `VCS_WRITE`, `DESTRUCT`, `CRED`, `CHARGE`, and `PROD_DEP` each require explicit approval for that task. If the effect cannot be classified, STOP and ask.
+- **Outcome:** Only effects allowed by their classification proceed.
 
-Issue 状態は `[ ] TODO` → `[-] WIP` → `[~] IMPLEMENTED` → `[*] TESTED` → `[x] DONE`。`[x]` は独立検証（信頼済み CI/Verifier）と受入条件充足の後にのみ付与する。通信断・会話断絶からの再開は `method.md` の `CONTINUE/1`（Preflight→Reconcile→Execute）に従い、`continue` 指示で読める状態を Cursor と Git に残す。
+## B-05 — Verification evidence
+- **Subject:** Agent reporting verification or advancing an Issue.
+- **Scope:** Verification claims and `[x]` status.
+- **Modality:** MUST.
+- **Condition:** Before claiming success or marking `[x]`.
+- **Action:** Do not treat Worker or Verifier self-report as evidence. The Runner must independently execute the acceptance checks and record actual observations: Exit Code, Hash, and target Revision. An independent review must be by trusted CI/Verifier **or** a Verifier subagent distinct from the implementer; the Verifier reviews the diff and acceptance criteria independently. Main compares the review report with Runner observations and reconciles and resolves findings. Do not report unverified or unrun checks as successful.
+- **Outcome:** `[x]` is allowed only after acceptance conditions are met and independent verification is confirmed. If CI is absent or unused, explicitly disclose that absence. Local results are not CI attestation. Self-report alone is not evidence.
 
-## この文書の位置づけ
+## B-06 — Restart contract
+- **Subject:** Agent resuming after communication or conversation interruption.
+- **Scope:** Continuation state.
+- **Modality:** MUST.
+- **Condition:** On restart or when leaving work resumable.
+- **Action:** Follow `method.md` `CONTINUE/1` (Preflight → Reconcile → Execute); leave state readable from the `continue` instruction in Cursor and Git.
+- **Outcome:** Work can be safely reconciled and resumed from durable state.
 
-本ファイルは**エージェント向け起動入口（ブートストラップ手順）**であり、設計判断の正本ではない。設計判断は `decisions.md`、手順・再開契約は `method.md`、仕事と状態は `Issues.md` を正本とする。人間・汎用閲覧の入口は `README.md`。
+## B-07 — Write boundary and ownership
+- **Subject:** Agent writing files.
+- **Scope:** Repository files and concurrent writers.
+- **Modality:** MUST.
+- **Condition:** Before and during a write.
+- **Action:** Write only within the PADDOCK repository; do not write to `.HARNESS` or the parent repository. Keep one Writer per file.
+- **Outcome:** Changes stay within the repository boundary and each file has a single writer.
+
+## B-08 — Invalid policy links
+- **Subject:** Agent following SIGMA or a linked rule.
+- **Scope:** The applicable action.
+- **Modality:** STOP.
+- **Condition:** SIGMA/link is missing, unreadable, invalid, structurally unclear, or has an equal-rank conflict.
+- **Action:** Stop the affected action and ask.
+- **Outcome:** No action proceeds under ambiguous or unusable policy.
+
+## B-09 — Issue state vocabulary
+- **Subject:** Agent updating an Issue state.
+- **Scope:** Issue lifecycle.
+- **Modality:** MUST.
+- **Condition:** Any state transition.
+- **Action:** Use `[ ] TODO` → `[-] WIP` → `[~] IMPLEMENTED` → `[*] TESTED` → `[x] DONE`; apply the `[x]` gate in B-05.
+- **Outcome:** State reflects the actual work and verification status.
+
+## B-10 — Document role and sources of truth
+- **Subject:** Reader or agent using this file.
+- **Scope:** Document authority.
+- **Modality:** MUST.
+- **Condition:** Interpreting project guidance.
+- **Action:** Treat this file as an **agent bootstrap entrypoint and procedure**, not the source of design decisions. Use `decisions.md` as the design-decision source of truth, `method.md` for procedures and the restart contract, and `Issues.md` for work and state; `README.md` is the entrypoint for humans and general readers.
+- **Outcome:** Each document is used only within its defined role.
