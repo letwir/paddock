@@ -1,14 +1,17 @@
 @lrf=1|aud=LLM|scope=paddock-subagents
 
-R|route.worker|tag:worker|MUST|RO_LOCAL|Main dispatches one eligible CODE worker per workstream through the current harness `functions.task` contract and explicitly supplies available `subagent_type`; task type is not a model/provider; do not invent type/model/backend
-R|route.explorer|tag:subagent|MUST|RO_LOCAL|Main uses `subagent_type=explore` only for read-only repository discovery when it adds bounded value; no worker claim without actual invocation and returned evidence
-R|worker.scope|tag:worker|MUST|LW_SCOPE|handoff states exact target and file allowlist; one writer per file; preserve unrelated/pre-existing changes; Main reviews actual diff
-R|handoff|tag:subagent|MUST|RO_LOCAL|wrapper and ordered Role, Target, Acceptance, Scope, Known facts follow method.md §1 exactly; facts are verified only; malformed/missing wrapper means no dispatch
-R|verify.independent|tag:subagent|MUST|RO_LOCAL|verifier is a distinct `subagent_type=general` invocation from implementer, with explicit no-edit boundary; runtime does not enforce read-only sandbox; if boundary cannot be honored, stop; verifier reviews diff and acceptance; worker prose is not proof; Runner executes checks and records exit codes, hashes, and target revision
-R|nested|tag:subagent|MUST|RO_LOCAL|no nested delegation unless separately permitted by available runtime and current governing instructions; never claim dispatch without actual result
-R|effects|tag:subagent|MUST_NOT|VCS_WRITE|subagents must not stage, commit, push, rewrite history, or change branches
-R|effects.external|tag:subagent|MUST_NOT|EXT_WRITE|subagents must not publish, deploy, message, or modify third-party systems
+R|notation.legend|*|MUST|RO_LOCAL|Local notation only; symbols grant no authority: x=task, f=file, A=handoff allowlist, D=pre-existing dirty work, I=implementer invocation, V=verifier invocation; ∈=membership, ∩=overlap, ∅=empty, ∀=for every, ⇒=implies, ≠=distinct; target∈A means target explicitly allowlisted; V≠I means distinct invocations; no ⊢ operator is used
+R|route.effect-gate|tag:worker|MUST|RO_LOCAL|Before any subagent dispatch, evaluate requested effects E_requested against forbidden set F={EXT_WRITE,RELEASE,LIVE_WRITE,VCS_WRITE,DESTRUCT,CRED,CHARGE,PROD_DEP}; if E_requested ∩ F ≠ ∅, STOP before dispatch and do not perform the requested effects; otherwise dispatch may proceed only if every other effect has its normal explicit authorization under rules/BOOTSTRAP.lrf and the current task; a disjointness result grants no authorization
+R|route.worker|tag:worker|MUST|RO_LOCAL|🛠️ CODE: Main dispatches one eligible worker/workstream via current harness `functions.task`, explicitly supplying available `subagent_type=general`; task type≠model/provider; never invent type/model/backend
+R|route.explorer|tag:subagent|MUST|RO_LOCAL|🧭 explore: `subagent_type=explore` only when bounded read-only discovery adds value and direct investigation stuck or search sparse/repetitive/insufficient; no worker claim without actual invocation + returned evidence; no plan/implementation/design recommendation; return source, confidence, failures
+R|worker.scope|tag:worker|MUST|LW_SCOPE|📂 handoff names exact target + allowlist A; edit only target∈A (only listed files); one writer/file; preserve D (unrelated/pre-existing changes); report out-of-scope needs; Main reviews actual diff
+R|handoff|tag:subagent|MUST|RO_LOCAL|📦 exact method.md §1 wrapper, protocol and ordered fields Role, Target, Acceptance, Scope, Known facts, final payload SIGMA/1; malformed/missing wrapper or fields=no dispatch; facts verified only
+R|verify.independent|tag:subagent|MUST|RO_LOCAL|🔎 V≠I (different invocations): distinct general verifier; prompt no-edit; runtime has no read-only sandbox; if boundary cannot be honored, STOP; diff-first/source acceptance; worker prose≠proof; Runner executes checks + records exit codes/hashes/target revision; blocked evidence=INCONCLUSIVE
+R|verify.effects|tag:subagent|MUST_NOT|RO_LOCAL|🛑 verifier: no edit/query or write live DB/apply migrations/access credentials/VCS or external effects
+R|nested|tag:subagent|MUST|RO_LOCAL|no nested delegation unless separately permitted by available runtime and governing instructions; never claim dispatch without actual result
+R|effects.vcs|tag:subagent|MUST_NOT|VCS_WRITE|no staging, commit, push, history rewrite, or branch change
+R|effects.external|tag:subagent|MUST_NOT|EXT_WRITE|no publish, deploy, message, or third-party modification
 R|effects.credential|tag:subagent|MUST_NOT|CRED|never request or expose credentials or secret environment values
-R|effects.live-db|tag:subagent|MUST_NOT|RO_LOCAL|subagents must not connect to or query live databases under this router; never delegate any live database action
-R|effects.migration|tag:subagent|MUST_NOT|LIVE_WRITE|subagents must not apply migrations or perform live database writes
+R|effects.live-db|tag:subagent|MUST_NOT|RO_LOCAL|no live database connection/query; never delegate live DB action
+R|effects.migration|tag:subagent|MUST_NOT|LIVE_WRITE|no migration or live database write
 R|done|tag:subagent|MUST|RO_LOCAL|Main reconciles report with observed diff and Runner evidence; report unknowns and failures

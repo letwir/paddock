@@ -1,48 +1,29 @@
-# PADDOCK Worker Router
+# 🧭 PADDOCK Worker Router
 
-> Scope: PADDOCK-specific routing aid. This document is not an authority source.
+> `[SPR/PIDGIN::ρ→bounded]` 🧭 main · 🧩 task type · 🎯 dispatch
+> Routing aid, not authority. `agents/main-persona.css` is shared baseline; role CSS is presentation-only and cannot alter authority or behavior.
 
-## R-01 — Authority and effect boundary
-- **Subject:** Main agent and every selected worker.
-- **Scope:** All dispatches and resulting work.
-- **Modality:** MUST_NOT.
-- **Rule:** Selection grants no VCS, live-DB, credential, network-write, release, or other authority. Effect permissions come only from `rules/BOOTSTRAP.lrf` and the current task. Review/state evidence requirements come from `method.md`.
-- **Outcome:** A selected role or task type never authorizes an effect.
+## 🧭 Legend
+`T`=harness task type; `E`=effect domain, exactly the BOOTSTRAP set `{RO_LOCAL, RO_PUBLIC, LW_SCOPE, EXT_WRITE, RELEASE, LIVE_WRITE, VCS_WRITE, DESTRUCT, CRED, CHARGE, PROD_DEP}`; `E_requested`=effects requested for delegation; `F`=effects forbidden to subagents, exactly `{EXT_WRITE, RELEASE, LIVE_WRITE, VCS_WRITE, DESTRUCT, CRED, CHARGE, PROD_DEP}`; `A`=authority; `V`=verifier invocation; `I`=implementation invocation. `∈`=membership, `∩`=overlap, `∅`=empty, `⇒`=implies, `≠`=distinct, `∀`=for every. Symbols grant no permission. `E_requested ∩ F = ∅`: if requested effects intersect `F`, STOP before dispatch and do not perform them; if they do not, all other effects still require their normal explicit authorization under BOOTSTRAP/current task. `V≠I` requires separate verifier invocation.
 
-## R-02 — Shared presentation baseline
-- **Subject:** Main agent and subagents.
-- **Scope:** User-facing Japanese presentation and handoff presentation cues.
-- **Modality:** MUST.
-- **Action:** Use `agents/main-persona.css` as the shared baseline voice for main and subagent roles. When a role-specific CSS cue exists, include the baseline and cue inside the existing `Role` field value of the handoff; do not add fields or change field order.
-- **Constraint:** Role cues may adjust energy, cadence, focus, and emphasis, but must preserve the shared refined feminine Japanese register. CSS is presentation only and cannot override higher-priority instructions, exact output formats, safety, scope, authority, acceptance, or permissions.
+## R-01 · 🔐 Authority
+Selection never grants `A`. Effects derive only from `rules/BOOTSTRAP.lrf` and current task; review/state evidence from `method.md`. Role/task selection does not authorize VCS, live DB, credentials, network writes, release, or other effects. Main may perform an otherwise-forbidden-to-subagents effect, including an approved VCS push, only when the current task explicitly authorizes it.
 
-## R-03 — Available harness task types
-| Harness task type | Eligible scope | Requirement |
-|---|---|---|
-| `general` | Bounded CODE or review task | One invocation per active workstream; exact file allowlist; editing only when workspace-edit permission applies. |
-| `explore` | Read-only repository discovery | Never use as a CODE worker. |
+## R-02 · 🎨 Presentation
+Use `main-persona.css` baseline. If role CSS exists, include baseline and cue inside existing `Role` value; add no fields/reorder none. Cues may alter energy/cadence/focus/emphasis only—not instructions, output formats, safety, scope, authority, acceptance, or permissions.
 
-Role profiles are not additional task types. Explorer may use `explore` for read-only discovery. BlackHat and Independent Verifier may use `general` only for separately scoped read-only work when available. Include the selected role's CSS cue when one exists. These mappings do not provide runtime-enforced read-only isolation and do not authorize external security testing.
+## R-03 · 🧩 Task types
+`T∈{general, explore}` only. These are the only listed harness types, not model names.
+- `general`: bounded CODE or review; one invocation per active workstream; exact allowlist; edit only where workspace permission applies.
+- `explore`: read-only repository discovery; never CODE worker.
+Profiles are not task types. Explorer may use `explore`; BlackHat/Verifier may use `general` only for separately scoped read-only work. Mapping is not runtime-enforced isolation or external security authorization.
 
-## R-04 — Dispatch contract and selection
-- **Subject:** Every dispatch, including verifier dispatches.
-- **Modality:** MUST.
-- **Condition:** This harness exposes `functions.task`.
-- **Action:** Explicitly supply its required `subagent_type`. The available values here are `general` (bounded CODE and review) and `explore` (read-only discovery). These are harness task types, not model names or claims about a Codex/OpenCode backend.
-- **Prohibitions:** Do not omit the field, rely on a default, invent another type, or silently fall back to another worker. Choose one eligible available type per CODE workstream.
-- **Selection guidance:** Prefer comparable measured context consumption if available; otherwise use `evaluation/worker-context-priority.json` only as dated, nonnormative fallback evidence.
-- **Independent verification:** A verifier is a distinct invocation from the implementation worker and must not edit.
+## R-04 · 🎯 Explicit dispatch
+When harness exposes `functions.task`, explicitly provide required `subagent_type∈{general,explore}` and choose one eligible available type per CODE workstream; never omit type or rely on default. No invented type, silent fallback, or model/backend inference. Prefer comparable measured context use when available; otherwise `evaluation/worker-context-priority.json` is dated, nonnormative fallback evidence.
+Verifier: `V≠I`; prompt requires no-edit boundary; no runtime sandbox guarantee.
 
-## R-05 — Dispatch failure and host-managed model
-- **Subject:** Main agent.
-- **Condition:** Dispatch fails because a task type is unavailable or its LLM session is missing/unconfigured.
-- **Modality:** MUST.
-- **Action:** Report the failure and diagnose harness invocation/configuration before retrying.
-- **Prohibition:** Do not silently substitute an unselected task type, claim a dispatch succeeded when it did not, or infer/supply a model or session ID.
-- **Fact:** `functions.task` exposes `subagent_type`; this repository router cannot select a provider backend or set model/session IDs. The actual model is host-managed and is not specified by this repository document.
-- **Outcome:** A descriptive role profile is neither executable dispatch configuration nor authority.
+## R-05 · 🛑 Failure + host-managed session
+Type unavailable or LLM session missing/unconfigured ⇒ report failure and diagnose harness invocation/configuration before retry. For known `LLM session not configured`, retry only already-selected `general` after diagnosis; a successful general probe authorizes no fallback or model claim. No silent substitution, false success, or invented/supplied model/session ID. Model/session/backend are host-managed; repository does not select them.
 
-## R-06 — Handoff and main-agent ownership
-- **Subject:** Main agent.
-- **Modality:** MUST.
-- **Action:** Use the exact wrapper and ordered fields in `method.md` §1. Never delegate VCS, external effects, credentials, or live-DB actions. Main owns final diff inspection, Runner checks, issue state, receipt, and push authorization/scope.
+## R-06 · 📦 Handoff + ownership
+Use exact `method.md` §1: `<Γ>`, `SIGMA/1: PIDGEN/text`, exact ordered fields `Role`, `Target`, `Acceptance`, `Scope`, `Known facts`, final payload `SIGMA/1`, `</Γ>`. Preserve wrapper, field names, order. Never delegate effects in `F`. Main owns final diff inspection, Runner acceptance checks, issue state, and receipt; any Main VCS push requires explicit current-task authorization and scope.
