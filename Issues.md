@@ -27,16 +27,16 @@ snapshot_date: 2026-10-12
 project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
-active_goal: M01
-active_issue: PDK-M01-S05
-issue_state: WIP
-execution_state: IMPLEMENTING
+active_goal: M02
+active_issue: PDK-M02-S05
+issue_state: TODO
+execution_state: NOT_STARTED
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "python3 -m unittest discover -s tests -q (40/40 PASS); python3 scripts/lint_design.py (PASS, 89 issues/148 edges); python3 scripts/continue_plan.py selects PDK-M01-S05; git diff --check PASS"
+last_verified_test: "python3 -m unittest tests.test_rollout_model_check -v (6/6 PASS; 292 states/735 transitions; Python 3.14.6); python3 scripts/lint_design.py PASS (89 issues/148 edges); git diff --check PASS"
 blocker: PDK-M00-S07 blocked pending exact remote branch-protection authorization; PDK-M06-S07 pending compliant RFC 8785 implementation method
-next_action: "PDK-M01-S05: model-check Rollout × Root/Scope/Security Epoch × Lease including rollback, emergency stop, bounded HOLD/Monitoring fairness assumptions, and counterexamples; use local tests and available checker; preserve unrelated worktree changes"
+next_action: "PDK-M02-S05: confirm PoC Test DB PostgreSQL version, injected DSN, isolation, migration runner, and recreation guards per acceptance; inspect current receipts and preserve unrelated worktree changes."
 confidence: "S03 locally verified by Main Runner and independently source-reviewed; S01/S02/S06 evidence retained. Continue to S04; unrelated pre-existing files remain untouched. CI/CD availability is not asserted."
 ```
 
@@ -141,10 +141,11 @@ confidence: "S03 locally verified by Main Runner and independently source-review
   - `evidence_expected`: 静的検査/Go Test。
   - `current_evidence`: `tests/test_domain_dependency_boundary.py` scans Go files under `internal/**/domain` without traversing symlinks; tokenizes import declarations, aliases, comments, raw/quoted literals and Go string escapes; rejects listed database/SQL, network/HTTP, pgx/gRPC, and common LLM/provider SDK imports. Fixtures cover standard imports, forbidden single/grouped/aliased imports, comments, parentheses in paths, escaped forbidden `net/http`, arbitrary nested discovery, symlink exclusion, and dependency-edge synthetic cases. Main Runner focused unittest 5/5 PASS; full Python suite 40/40 PASS; `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` PASS. SHA-256: `tests/test_domain_dependency_boundary.py` `325fdbbcff339c6f233e0e2064daee86e61506fc9c73a4efd6bb7dd0d15b29ed`. Limitation: static denylist is not an exhaustive catalog of all future third-party providers or a full Go compiler/parser; CI/CD pipeline is not asserted available.
 
-- [-] `PDK-M01-S05` — Rollout × Root/Scope/Security Epoch × Leaseを有限状態モデル検査。
+- [x] `PDK-M01-S05` — Rollout × Root/Scope/Security Epoch × Leaseを有限状態モデル検査。
   - `depends_on`: PDK-M00-S05, PDK-M01-S06
   - `acceptance`: INV-01/02/03/06、Rollback、Emergency Stop、HOLD/Monitoringの公平性仮定と限界をTLA+/Alloy等で明示。CounterexampleはIssueへ返す。
   - `evidence_expected`: Model Source、tool version、モデル探索ログ、Safety/Liveness結果。
+  - `current_evidence`: `tests/test_rollout_model_check.py` explores the finite transition system (lease generation saturated to its two behaviorally distinct values) and checks INV-01/02/03/06, Root B Canary isolation, two-phase rollback epoch freeze/switch, human-only Emergency Stop, DB outage deny-progress, conditional bounded Monitoring/HOLD liveness under explicit fairness assumptions, and an unfair/stalled lasso counterexample. Mutants for stale-lease acceptance and agent-controlled stop are caught. Local Runner: `python3 -m unittest tests.test_rollout_model_check -v` PASS (6/6; 292 states/735 transitions; Python 3.14.6); `python3 scripts/lint_design.py` PASS (89 issues/148 edges); `git diff --check` PASS. Full suite intentionally not rerun due prior OOM concern. Local Runner + separate verifier subagent + Main reconciliation satisfy D-016; CI attestation/Verifier-of-Record is absent and is not claimed. Conditional liveness is demonstrated by bounded traces under explicit fairness assumptions, not a universal temporal proof. Local model is Python, not TLA+/Alloy, and does not prove implementation correctness. CI attestation/Verifier-of-Record is absent; D-016 local verification path used: Runner executed focused tests and a separate verifier subagent independently reviewed the Issue acceptance, model, and evidence; Main reconciled the review and added the requested outage→human-stop deny-all assertion. Final Runner: focused suite 6/6 PASS, 292 states/735 transitions, Python 3.14.6; design lint PASS (89 issues/148 edges); `git diff --check` PASS. SHA-256 `tests/test_rollout_model_check.py`: `ae34dce65487aae6fccb1ce5b9cab2ecf2958fd5226a844dee8da488e6c0049c`; target repository revision: `c38b818578702bbc0bc40240dcd03341952c852e`. Conditional liveness is demonstrated by bounded traces under explicit fairness assumptions, not a universal temporal proof.
 - [x] `PDK-M01-S06` — Epoch 3層・二相Rollback・Safety Modeの純粋状態契約。
   - `depends_on`: PDK-M01-S01, PDK-M00-S06
   - `acceptance`: `scope_activation_epoch`, `root_authz_epoch`, `security_epoch`を区別し、`ROLLING_BACK`はFreezeを開始、最終Policy切替時にScope/該当Root Epochを1回進める。LKG不可→Safe Baseline、DB断→Gateway denyをモデル化。
