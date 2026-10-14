@@ -1,0 +1,14 @@
+@lrf=1|aud=LLM|scope=paddock-subagents
+
+R|route.worker|tag:worker|MUST|RO_LOCAL|Main dispatches one eligible CODE worker per workstream through the current harness `functions.task` contract and explicitly supplies available `subagent_type`; task type is not a model/provider; do not invent type/model/backend
+R|route.explorer|tag:subagent|MUST|RO_LOCAL|Main uses `subagent_type=explore` only for read-only repository discovery when it adds bounded value; no worker claim without actual invocation and returned evidence
+R|worker.scope|tag:worker|MUST|LW_SCOPE|handoff states exact target and file allowlist; one writer per file; preserve unrelated/pre-existing changes; Main reviews actual diff
+R|handoff|tag:subagent|MUST|RO_LOCAL|wrapper and ordered Role, Target, Acceptance, Scope, Known facts follow method.md §1 exactly; facts are verified only; malformed/missing wrapper means no dispatch
+R|verify.independent|tag:subagent|MUST|RO_LOCAL|verifier is a distinct `subagent_type=general` invocation from implementer, with explicit no-edit boundary; runtime does not enforce read-only sandbox; if boundary cannot be honored, stop; verifier reviews diff and acceptance; worker prose is not proof; Runner executes checks and records exit codes, hashes, and target revision
+R|nested|tag:subagent|MUST|RO_LOCAL|no nested delegation unless separately permitted by available runtime and current governing instructions; never claim dispatch without actual result
+R|effects|tag:subagent|MUST_NOT|VCS_WRITE|subagents must not stage, commit, push, rewrite history, or change branches
+R|effects.external|tag:subagent|MUST_NOT|EXT_WRITE|subagents must not publish, deploy, message, or modify third-party systems
+R|effects.credential|tag:subagent|MUST_NOT|CRED|never request or expose credentials or secret environment values
+R|effects.live-db|tag:subagent|MUST_NOT|RO_LOCAL|subagents must not connect to or query live databases under this router; never delegate any live database action
+R|effects.migration|tag:subagent|MUST_NOT|LIVE_WRITE|subagents must not apply migrations or perform live database writes
+R|done|tag:subagent|MUST|RO_LOCAL|Main reconciles report with observed diff and Runner evidence; report unknowns and failures
