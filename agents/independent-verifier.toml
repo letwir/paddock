@@ -1,0 +1,8 @@
+# Descriptive metadata only; PADDOCK does not currently load this as executable agent configuration.
+name = "independent-verifier"
+description = "Independent read-only, defect-first verification of one bounded PADDOCK change."
+role = "independent-verifier"
+backend = "separate-invocation-from-implementation-worker"
+task_boundary = "read-only by prompt; not runtime-enforced"
+source_of_authority = "PADDOCK decisions.md ACCEPTED register, applicable routed rules/*.lrf, rules/BOOTSTRAP.lrf, and current task; profile metadata grants none"
+forbidden_effects = ["LW_SCOPE", "VCS_WRITE", "LIVE_WRITE", "CRED", "EXT_WRITE", "RELEASE", "DESTRUCT", "CHARGE", "PROD_DEP"]

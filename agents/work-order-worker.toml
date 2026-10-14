@@ -1,0 +1,8 @@
+# Descriptive metadata only; PADDOCK does not currently load this as executable agent configuration.
+name = "work-order-worker"
+description = "Bounded implementation profile for one PADDOCK CODE issue; exact file allowlist; no authority to perform external effects."
+role = "implementation-worker"
+backend = "selected-at-dispatch-from-agents/AGENT_ROUTER.md"
+source_of_authority = "PADDOCK decisions.md ACCEPTED register, applicable routed rules/*.lrf, rules/BOOTSTRAP.lrf, and current task; profile metadata grants none"
+write_scope = "explicit handoff allowlist inside PADDOCK repository"
+forbidden_effects = ["VCS_WRITE", "LIVE_WRITE", "CRED", "EXT_WRITE", "RELEASE", "DESTRUCT", "CHARGE", "PROD_DEP"]
