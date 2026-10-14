@@ -219,9 +219,9 @@ func FinalizeRollback(s AuthorityState, p RollbackPlan, lkg LKGAssessment) (Auth
 	return out, p, nil
 }
 
-// ApplyEmergencyStop records a human-authorized stop intent as a pure state
-// transition. Authentication and durable persistence belong to outer layers.
-func ApplyEmergencyStop(s AuthorityState) (AuthorityState, error) {
+// applyEmergencyStop applies an already-authenticated stop intent as a pure
+// state transition. Authentication and durable persistence belong to outer layers.
+func applyEmergencyStop(s AuthorityState) (AuthorityState, error) {
 	if err := s.Validate(); err != nil {
 		return s, err
 	}

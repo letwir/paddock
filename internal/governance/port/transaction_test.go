@@ -15,6 +15,11 @@ type fakeGovernanceTx struct {
 	databaseTimeErr error
 }
 
+func (f *fakeGovernanceTx) LookupCommandReceipt(context.Context, string) (CommandReceipt, bool, error) {
+	return CommandReceipt{}, false, nil
+}
+func (f *fakeGovernanceTx) InsertCommandReceipt(context.Context, CommandReceipt) error { return nil }
+
 func TestDatabaseTimeDelegatesResultAndError(t *testing.T) {
 	want := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	tx := &fakeGovernanceTx{databaseTime: want}

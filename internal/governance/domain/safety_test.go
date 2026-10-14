@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"strings"
 	"testing"
@@ -117,20 +119,52 @@ func TestDatabaseUnavailableAndGrantEpochsFailClosed(t *testing.T) {
 	}
 }
 
-func TestEmergencyStopAdvancesOnlySecurityEpochAndDenies(t *testing.T) {
+func TestSafetyQuorumStopAdvancesSecurityEpochAndDeniesOldGrant(t *testing.T) {
 	initial := fixtureAuthority()
-	stopped, err := ApplyEmergencyStop(initial)
+	// Inject an exact-three-key PoC quorum: the production package neither
+	// creates nor provisions signer keys.
+	signers := make([]SafetySigner, 3)
+	privateKeys := make([]ed25519.PrivateKey, 3)
+	for i := range signers {
+		publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signers[i] = SafetySigner{ID: string(rune('a' + i)), PublicKey: publicKey}
+		privateKeys[i] = privateKey
+	}
+	quorum, err := NewSafetyQuorum(signers)
 	if err != nil {
 		t.Fatal(err)
 	}
+	const commandID = "stop-command"
+	message, err := SafetyApprovalMessage(SafetyActionStop, initial.Scope, initial.SecurityEpoch, commandID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signatures := []SafetySignature{
+		{SignerID: signers[0].ID, Signature: ed25519.Sign(privateKeys[0], message)},
+		{SignerID: signers[1].ID, Signature: ed25519.Sign(privateKeys[1], message)},
+	}
+	result, err := quorum.Stop(initial, initial.Scope, initial.SecurityEpoch, commandID, signatures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stopped := result.State
 	if stopped.SecurityEpoch != 8 || stopped.ScopeActivationEpoch != 40 || stopped.Roots["root-a"].AuthorizationEpoch != 10 {
 		t.Fatalf("emergency stop changed wrong generations: %+v", stopped)
+	}
+	if stopped.Mode != ScopeSafeStop {
+		t.Fatalf("stop mode = %s, want %s", stopped.Mode, ScopeSafeStop)
 	}
 	if err := Authorize(stopped, Grant{Root: "root-a", Policy: validPolicy(), AuthorizationEpoch: 10, SecurityEpoch: 7}); !errors.Is(err, ErrSafeStopped) {
 		t.Fatalf("emergency stop did not deny: %v", err)
 	}
 	if initial.Mode != ScopeActive || initial.SecurityEpoch != 7 {
 		t.Fatalf("input snapshot mutated: %+v", initial)
+	}
+	if initial.Roots["root-a"].AuthorizationEpoch != 10 || initial.Roots["root-a"].Policy != validPolicy() {
+		t.Fatalf("input root snapshot mutated: %+v", initial.Roots["root-a"])
 	}
 }
 

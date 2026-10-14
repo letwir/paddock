@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/letwir/paddock/internal/governance/application"
 	"github.com/letwir/paddock/internal/governance/domain"
 	"github.com/letwir/paddock/internal/governance/port"
 )
@@ -27,6 +29,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 	if dsn == "" {
 		t.Fatal("PADDOCK_DB_URL must be set to run integration tests")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cfg, err := pgxpool.ParseConfig(dsn)
@@ -118,6 +121,180 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 	if err := seedFixtures(ctx, pool, f); err != nil {
 		t.Fatalf("fixture setup failed: %v", err)
 	}
+	t.Run("SafetyService receipts in rollback-only transaction", func(t *testing.T) {
+		caseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		var baselineMode string
+		var baselineActivation, baselineSecurity int64
+		if err := pool.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&baselineMode, &baselineActivation); err != nil {
+			t.Fatalf("read pre-test scope baseline: %v", err)
+		}
+		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&baselineSecurity); err != nil {
+			t.Fatalf("read pre-test security baseline: %v", err)
+		}
+		tx, err := pool.Begin(caseCtx)
+		if err != nil {
+			t.Fatalf("begin safety transaction: %v", err)
+		}
+		open := true
+		defer func() {
+			if open {
+				rollbackCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
+				defer c()
+				_ = tx.Rollback(rollbackCtx)
+			}
+		}()
+		gov := newGovernanceTx(tx)
+		snapshot, err := gov.LockScope(caseCtx, domain.ScopeID(f.scope))
+		if err != nil {
+			t.Fatalf("read safety snapshot: %v", err)
+		}
+		keys := make([]ed25519.PrivateKey, 3)
+		signers := make([]domain.SafetySigner, 3)
+		for i := range keys {
+			pub, priv, e := ed25519.GenerateKey(rand.Reader)
+			if e != nil {
+				t.Fatal(e)
+			}
+			keys[i] = priv
+			signers[i] = domain.SafetySigner{ID: fmt.Sprintf("test-key-%d", i), PublicKey: pub}
+		}
+		quorum, err := domain.NewSafetyQuorum(signers)
+		if err != nil {
+			t.Fatal(err)
+		}
+		service := application.NewSafetyService(outerTxTransactor{tx: tx}, quorum)
+		gate := application.NewSafetyGate(outerTxTransactor{tx: tx})
+		makeSigs := func(action domain.SafetyAction, epoch domain.Epoch, id string, activation *[32]byte) []domain.SafetySignature {
+			var msg []byte
+			var e error
+			if activation == nil {
+				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id)
+			} else {
+				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id, *activation)
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			return []domain.SafetySignature{{SignerID: signers[0].ID, Signature: ed25519.Sign(keys[0], msg)}, {SignerID: signers[1].ID, Signature: ed25519.Sign(keys[1], msg)}}
+		}
+		stopID := f.scope + "_stop"
+		stopSigs := makeSigs(domain.SafetyActionStop, snapshot.SecurityEpoch, stopID, nil)
+		stopped, err := service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, stopSigs)
+		if err != nil || stopped.State.Mode != domain.ScopeSafeStop || stopped.State.SecurityEpoch != snapshot.SecurityEpoch+1 {
+			t.Fatalf("Stop result=%+v err=%v", stopped, err)
+		}
+		preStopRoot := snapshot.Roots[domain.RootID(f.root)]
+		preStopGrant := domain.Grant{Root: domain.RootID(f.root), Policy: preStopRoot.Policy, AuthorizationEpoch: preStopRoot.AuthorizationEpoch, SecurityEpoch: snapshot.SecurityEpoch}
+		if err := gate.CheckNewDispatch(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); !errors.Is(err, domain.ErrSafeStopped) {
+			t.Fatalf("CheckNewDispatch after Stop = %v, want ErrSafeStopped", err)
+		}
+		if err := gate.CheckNewGrant(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); !errors.Is(err, domain.ErrSafeStopped) {
+			t.Fatalf("CheckNewGrant after Stop = %v, want ErrSafeStopped", err)
+		}
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrSafeStopped) {
+			t.Fatalf("CheckHighRiskAction after Stop = %v, want ErrSafeStopped", err)
+		}
+		var mode string
+		var activationEpoch, securityEpoch int64
+		if err := tx.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&mode, &activationEpoch); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&securityEpoch); err != nil {
+			t.Fatal(err)
+		}
+		if mode != "SAFE_STOPPED" || activationEpoch != int64(snapshot.ActivationEpoch) || securityEpoch != int64(snapshot.SecurityEpoch+1) {
+			t.Fatalf("stopped DB state mode=%s activation=%d security=%d", mode, activationEpoch, securityEpoch)
+		}
+		var stopReceipt port.CommandReceipt
+		if err := tx.QueryRow(caseCtx, `SELECT command_id,request_digest,status,response_bytes FROM raw.command_receipts WHERE command_id=$1`, stopID).Scan(&stopReceipt.CommandID, &stopReceipt.RequestDigest, &stopReceipt.Status, &stopReceipt.Response); err != nil {
+			t.Fatal(err)
+		}
+		if stopReceipt.Status != "SUCCEEDED" || len(stopReceipt.Response) == 0 {
+			t.Fatalf("invalid stop receipt: %+v", stopReceipt)
+		}
+		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, stopSigs); err != nil {
+			t.Fatalf("Stop replay: %v", err)
+		}
+		changed := append([]domain.SafetySignature(nil), stopSigs...)
+		changed[0].Signature = append([]byte(nil), changed[0].Signature...)
+		changed[0].Signature[0] ^= 1
+		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, changed); err == nil {
+			t.Fatal("changed Stop request unexpectedly accepted")
+		}
+		activation := domain.AuthorityState{Scope: snapshot.ScopeID, ScopeActivationEpoch: snapshot.ActivationEpoch + 1, SecurityEpoch: stopped.State.SecurityEpoch + 1, Mode: domain.ScopeActive, DatabaseAvailable: true, Roots: stopped.State.Roots}
+		digest, err := domain.ActivationDigest(activation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		releaseID := f.scope + "_release"
+		releaseSigs := makeSigs(domain.SafetyActionRelease, stopped.State.SecurityEpoch, releaseID, &digest)
+		released, err := service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, activation, releaseSigs)
+		if err != nil || released.State.Mode != domain.ScopeActive || released.State.ScopeActivationEpoch != activation.ScopeActivationEpoch {
+			t.Fatalf("Release result=%+v err=%v", released, err)
+		}
+		if err := gate.CheckNewDispatch(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); err != nil {
+			t.Fatalf("CheckNewDispatch after Release: %v", err)
+		}
+		if err := gate.CheckNewGrant(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); err != nil {
+			t.Fatalf("CheckNewGrant after Release: %v", err)
+		}
+		releasedRoot := released.State.Roots[domain.RootID(f.root)]
+		releasedGrant := domain.Grant{Root: domain.RootID(f.root), Policy: releasedRoot.Policy, AuthorizationEpoch: releasedRoot.AuthorizationEpoch, SecurityEpoch: released.State.SecurityEpoch}
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, releasedGrant); err != nil {
+			t.Fatalf("CheckHighRiskAction after Release with current grant: %v", err)
+		}
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrStaleGrant) {
+			t.Fatalf("CheckHighRiskAction after Release with stale grant = %v, want ErrStaleGrant", err)
+		}
+		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, activation, releaseSigs); err != nil {
+			t.Fatalf("Release replay: %v", err)
+		}
+		altered := activation
+		altered.ScopeActivationEpoch++
+		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, altered, releaseSigs); err == nil {
+			t.Fatal("changed Release activation unexpectedly accepted")
+		}
+		var releaseStatus string
+		var response []byte
+		if err := tx.QueryRow(caseCtx, `SELECT status,response_bytes FROM raw.command_receipts WHERE command_id=$1`, releaseID).Scan(&releaseStatus, &response); err != nil {
+			t.Fatal(err)
+		}
+		if releaseStatus != "SUCCEEDED" || len(response) == 0 {
+			t.Fatalf("invalid release receipt status=%s", releaseStatus)
+		}
+		if err := tx.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&mode, &activationEpoch); err != nil {
+			t.Fatalf("read released scope state: %v", err)
+		}
+		if err := tx.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&securityEpoch); err != nil {
+			t.Fatalf("read released security epoch: %v", err)
+		}
+		if mode != "ACTIVE" || activationEpoch != int64(activation.ScopeActivationEpoch) || securityEpoch != int64(released.State.SecurityEpoch) || securityEpoch != int64(stopped.State.SecurityEpoch+1) {
+			t.Fatalf("released DB state mode=%s activation=%d security=%d; want mode=ACTIVE activation=%d security=%d", mode, activationEpoch, securityEpoch, activation.ScopeActivationEpoch, released.State.SecurityEpoch)
+		}
+		if err := tx.Rollback(caseCtx); err != nil {
+			t.Fatalf("rollback safety transaction: %v", err)
+		}
+		open = false
+		var finalMode string
+		var finalActivation, finalSecurity int64
+		if err := pool.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&finalMode, &finalActivation); err != nil {
+			t.Fatalf("read scope after rollback: %v", err)
+		}
+		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&finalSecurity); err != nil {
+			t.Fatalf("read security epoch after rollback: %v", err)
+		}
+		if finalMode != baselineMode || finalActivation != baselineActivation || finalSecurity != baselineSecurity {
+			t.Fatalf("rollback did not restore baseline: mode=%s activation=%d security=%d; want mode=%s activation=%d security=%d", finalMode, finalActivation, finalSecurity, baselineMode, baselineActivation, baselineSecurity)
+		}
+		var receiptCount int
+		if err := pool.QueryRow(caseCtx, `SELECT count(*) FROM raw.command_receipts WHERE command_id = ANY($1::text[])`, []string{stopID, releaseID}).Scan(&receiptCount); err != nil {
+			t.Fatalf("check receipts after rollback: %v", err)
+		}
+		if receiptCount != 0 {
+			t.Fatalf("command receipts remain after rollback: count=%d", receiptCount)
+		}
+	})
 
 	// Each stale case changes the exact row in the same transaction after the
 	// adapter has locked/snapshotted canonical Scope -> Rollout -> Root order.
@@ -225,6 +402,102 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 			}
 		})
 	}
+	t.Run("concurrent global security epoch CAS across scopes", func(t *testing.T) {
+		caseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		beginTxn := func(scopeID domain.ScopeID) (pgx.Tx, *governanceTx, domain.Epoch) {
+			tx, err := pool.Begin(caseCtx)
+			if err != nil {
+				t.Fatalf("begin scope %q transaction: %v", scopeID, err)
+			}
+			// Register bounded rollback immediately so every subsequent setup failure
+			// releases this transaction's Scope lock.
+			t.Cleanup(func() {
+				rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer rollbackCancel()
+				_ = tx.Rollback(rollbackCtx)
+			})
+			gov := newGovernanceTx(tx)
+			snapshot, err := gov.LockScope(caseCtx, scopeID)
+			if err != nil {
+				t.Fatalf("LockScope(%q): %v", scopeID, err)
+			}
+			return tx, gov, snapshot.SecurityEpoch
+		}
+		txA, govA, expected := beginTxn(domain.ScopeID(f.scope))
+		txB, govB, expectedB := beginTxn(domain.ScopeID(f.otherScope))
+		if expectedB != expected {
+			t.Fatalf("scope snapshots have different security epochs: %d and %d", expected, expectedB)
+		}
+		var baseline int64
+		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&baseline); err != nil {
+			t.Fatalf("read initial global security epoch: %v", err)
+		}
+		if int64(expected) != baseline {
+			t.Fatalf("scope snapshot epoch=%d differs from global baseline=%d", expected, baseline)
+		}
+		var pidA, pidB int
+		if err := txA.QueryRow(caseCtx, `SELECT pg_backend_pid()`).Scan(&pidA); err != nil {
+			t.Fatalf("read transaction A pid: %v", err)
+		}
+		if err := txB.QueryRow(caseCtx, `SELECT pg_backend_pid()`).Scan(&pidB); err != nil {
+			t.Fatalf("read transaction B pid: %v", err)
+		}
+		if err := govA.CompareAndSwapSecurityEpoch(caseCtx, expected, expected+1); err != nil {
+			t.Fatalf("transaction A CAS: %v", err)
+		}
+
+		attempted := make(chan struct{})
+		result := make(chan error, 1)
+		go func() {
+			close(attempted)
+			result <- govB.CompareAndSwapSecurityEpoch(caseCtx, expected, expected+1)
+		}()
+		<-attempted
+		// Observe PostgreSQL's actual blocking graph, not elapsed time alone.
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		blocked := false
+		for !blocked {
+			select {
+			case err := <-result:
+				t.Fatalf("transaction B CAS completed before A rollback: %v", err)
+			case <-ticker.C:
+				if err := pool.QueryRow(caseCtx, `SELECT $2 = ANY(pg_blocking_pids($1))`, pidB, pidA).Scan(&blocked); err != nil {
+					t.Fatalf("inspect CAS lock blocking: %v", err)
+				}
+			case <-caseCtx.Done():
+				t.Fatalf("transaction B did not block on A's epoch update: %v", caseCtx.Err())
+			}
+		}
+		rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := txA.Rollback(rollbackCtx); err != nil {
+			rollbackCancel()
+			t.Fatalf("rollback transaction A: %v", err)
+		}
+		rollbackCancel()
+		select {
+		case err := <-result:
+			if err != nil && !errors.Is(err, port.ErrStaleWrite) {
+				t.Fatalf("transaction B CAS after A rollback: %v", err)
+			}
+		case <-caseCtx.Done():
+			t.Fatalf("transaction B did not finish after A rollback: %v", caseCtx.Err())
+		}
+		rollbackCtx, rollbackCancel = context.WithTimeout(context.Background(), 5*time.Second)
+		if err := txB.Rollback(rollbackCtx); err != nil {
+			rollbackCancel()
+			t.Fatalf("rollback transaction B: %v", err)
+		}
+		rollbackCancel()
+		var final int64
+		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&final); err != nil {
+			t.Fatalf("read final global security epoch: %v", err)
+		}
+		if final != baseline {
+			t.Fatalf("global security epoch changed: before=%d after=%d", baseline, final)
+		}
+	})
 	assertScopeLockBlocksConcurrentTransaction(t, ctx, pool, f.scope)
 	// Confirm all changed fixture values were restored by rollback.
 	var activation, rootEpoch, securityEpoch, rolloutActivation, targetEpoch int64
@@ -385,6 +658,14 @@ func assertScopeLockBlocksConcurrentTransaction(t *testing.T, ctx context.Contex
 }
 
 type fixture struct{ bundle, scope, root, otherRoot, otherScope, otherScopeRoot, rollout string }
+
+// outerTxTransactor adapts an already-open transaction without taking ownership
+// of its commit. The integration test always performs the final rollback.
+type outerTxTransactor struct{ tx pgx.Tx }
+
+func (o outerTxTransactor) WithinTransaction(ctx context.Context, fn func(port.GovernanceTx) error) error {
+	return fn(newGovernanceTx(o.tx))
+}
 
 func requireSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	var missing []string

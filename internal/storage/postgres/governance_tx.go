@@ -28,6 +28,32 @@ type rolloutKey struct {
 	rollout domain.RolloutID
 }
 
+func (g *governanceTx) LookupCommandReceipt(ctx context.Context, commandID string) (port.CommandReceipt, bool, error) {
+	var r port.CommandReceipt
+	err := g.tx.QueryRow(ctx, `SELECT command_id, request_digest, status, response_bytes FROM raw.command_receipts WHERE command_id = $1`, commandID).Scan(&r.CommandID, &r.RequestDigest, &r.Status, &r.Response)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return port.CommandReceipt{}, false, nil
+	}
+	if err != nil {
+		return port.CommandReceipt{}, false, fmt.Errorf("lookup command receipt: %w", err)
+	}
+	if r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+		return port.CommandReceipt{}, false, fmt.Errorf("invalid or incomplete command receipt %q", commandID)
+	}
+	return r, true, nil
+}
+
+func (g *governanceTx) InsertCommandReceipt(ctx context.Context, r port.CommandReceipt) error {
+	if r.CommandID == "" || len(r.RequestDigest) != 64 || r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+		return errors.New("invalid completed command receipt")
+	}
+	_, err := g.tx.Exec(ctx, `INSERT INTO raw.command_receipts (command_id, request_digest, status, response_bytes, completed_at) VALUES ($1, $2, $3, $4, clock_timestamp())`, r.CommandID, r.RequestDigest, r.Status, r.Response)
+	if err != nil {
+		return fmt.Errorf("insert command receipt: %w", err)
+	}
+	return nil
+}
+
 func (g *governanceTx) DatabaseTime(ctx context.Context) (time.Time, error) {
 	var now time.Time
 	if err := g.tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
@@ -92,13 +118,15 @@ FOR UPDATE`, string(id)).Scan(&snapshot.ScopeID, &snapshot.ActivationEpoch, &mod
 		snapshot.LiveRolloutID = &rolloutID
 	}
 
-	// A shared lock makes the snapshot stable against Emergency Stop's exclusive
-	// singleton epoch update without serializing independent Scope transactions.
+	// KEY SHARE protects the singleton row's identity without conflicting with
+	// updates to its non-key security_epoch column. CAS below resolves concurrent
+	// epoch advances; FOR SHARE here would deadlock when two Scope transactions
+	// both upgrade their shared locks to update the singleton row.
 	if err := g.tx.QueryRow(ctx, `
 SELECT security_epoch
 FROM raw.security_generation
 WHERE singleton_id = true
-FOR SHARE`).Scan(&snapshot.SecurityEpoch); err != nil {
+FOR KEY SHARE`).Scan(&snapshot.SecurityEpoch); err != nil {
 		return port.ScopeSnapshot{}, fmt.Errorf("read/lock global security epoch: %w", err)
 	}
 

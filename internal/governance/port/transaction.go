@@ -24,6 +24,15 @@ type ScopeSnapshot struct {
 	Roots           map[domain.RootID]domain.RootAuthority
 }
 
+// CommandReceipt is a completed durable command outcome. Only SUCCEEDED
+// receipts with a valid response may be returned by LookupCommandReceipt.
+type CommandReceipt struct {
+	CommandID     string
+	RequestDigest string
+	Status        string
+	Response      []byte
+}
+
 // RolloutTargetSnapshot is one persisted rollout target row.
 type RolloutTargetSnapshot struct {
 	Baseline      domain.PolicyBinding
@@ -69,4 +78,6 @@ type GovernanceTx interface {
 	CompareAndSwapScope(ctx context.Context, expected, next ScopeSnapshot) error
 	CompareAndSwapRollout(ctx context.Context, expected, next RolloutSnapshot) error
 	CompareAndSwapSecurityEpoch(ctx context.Context, expected, next domain.Epoch) error
+	LookupCommandReceipt(ctx context.Context, commandID string) (CommandReceipt, bool, error)
+	InsertCommandReceipt(ctx context.Context, receipt CommandReceipt) error
 }
