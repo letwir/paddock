@@ -1,19 +1,52 @@
-# PADDOCK — THREAT_MODEL.md
+# PADDOCK — Threat Model
 
 > SIGMA/1: PIDGEN/text · Threat Model / DESIGN_BASELINE · 2026-10-12
-> **未検証の設計ベースライン**。ここに挙げたMitigationはまだ実装・ペンテスト済みではない。
+> **Status: unverified proposed design baseline.** This entire document is a proposal for future PADDOCK behavior, not a statement of current product requirements, implementation, or agent instructions. Its mitigations and constraints are recommendations for future design, not current authority. No mitigation below is represented as implemented or penetration-tested.
 
-## 0. Scope / 資産 / Trust Boundary
+## TM-0. Document semantics and status
 
-**対象:** Open Enrollment、Steward/NAYA/Verifier、WorkOrder/Attempt、Policy更新、Approval/Gateway、PostgreSQL、SKILL配布、CI/Receipt、通信断復旧。初期PoCはCoordinator×2、Worker Sim×2、Test DB×1、Root A/B。実LLM、外部公開Enrollment、機密RootはPoCでは有効化しない。
+- **DESIGN_BASELINE** means proposed future product constraints and mitigations, not an ACCEPTED decision and not a present operational authorization.
+- Any **MUST / MUST_NOT** words in this document describe proposed PADDOCK product design only. They do not state current implementation requirements or instructions for agents, and do not grant authority to an agent, worker, GitHub, or a production system.
+- Threat rows are records `TM-001` through `TM-015`. Each row associates its asset, entry/trust boundary, failure mode, recommended pre-implementation mitigation, residual risk/non-guarantee, and acceptance Issue references. Row content and associations are retained below.
+- T-boundary identifiers are defined in TM-0.3 and used as references in threat records.
 
-**守る資産:** 人間による非常停止権、Trust Anchor / Issuer権限、Policy BundleとDecision正本、Command Receipt、DB状態/Lease/Epoch、Credential・機密データ、Artifactの完全性、利用予算と可用性。
+### TM-0.1 Scope
 
-**境界:** (T1) 未知Worker/外部Artifact→LLM/Verifier、(T2) Worker→Coordinator Pull API、(T3) Agent提案→Trust Engine/Authority Broker、(T4) Governance更新→Gateway実効Policy、(T5) DB→Outbox→外部サービス、(T6) CI/署名鍵→Decision/Release。形式上のHandoff、プロンプト、Git上のMarkdownは認可主体ではない。
+**In scope:** Open Enrollment; Steward/NAYA/Verifier; WorkOrder/Attempt; Policy updates; Approval/Gateway; PostgreSQL; SKILL distribution; CI/Receipt; recovery from network interruption.
 
-**攻撃者モデル:** 匿名のSybil Worker集団、悪意あるBuilder/Skill、侵害された既知Worker、誘導されるLLM、評価者結託、偽CI Receipt、古いCredential/Policyの再利用、ネットワーク分断/時計ずれ、依存パッケージの供給元侵害。DB管理者/OSホスト全体の侵害に対しては現PoCで完全防護を主張しない。
+**Initial PoC configuration:** two Coordinators, two Worker Simulators, one Test DB, and Root A/B. Real LLMs, external/public Enrollment, and confidential Roots are not enabled in the PoC.
 
-## 1. 脅威一覧と検証目標
+### TM-0.2 Protected assets
+
+- Human emergency-stop authority.
+- Trust Anchor / Issuer authority.
+- Policy Bundle and canonical Decision record.
+- Command Receipt.
+- DB state, Lease, and Epoch.
+- Credentials and confidential data.
+- Artifact integrity.
+- Resource budget and availability.
+
+### TM-0.3 Trust boundaries
+
+| ID | Boundary |
+|---|---|
+| T1 | Unknown Worker / external Artifact → LLM / Verifier |
+| T2 | Worker → Coordinator Pull API |
+| T3 | Agent proposal → Trust Engine / Authority Broker |
+| T4 | Governance update → effective Gateway Policy |
+| T5 | DB → Outbox → external service |
+| T6 | CI / signing key → Decision / Release |
+
+Formal Handoff, prompts, and Markdown in Git are not authorization principals.
+
+### TM-0.4 Attacker model
+
+The model includes anonymous Sybil Worker groups; malicious Builders or Skills; compromised known Workers; an LLM susceptible to manipulation; colluding evaluators; forged CI Receipts; reuse of stale Credentials or Policy; network partition / clock skew; and compromise of dependency suppliers. The PoC does not claim complete protection against compromise of the DB administrator or the entire OS host.
+
+## TM-1. Threat records and verification targets
+
+The table is the canonical record set. Mitigations are recommendations before implementation; residual-risk statements are explicit non-guarantees, not claims of mitigation effectiveness.
 
 | Threat | 守る資産 | 入口 / Trust Boundary | 失敗形 | 推奨Mitigation（実装前） | 残余リスク / 非保証 | 受入Issue |
 |---|---|---|---|---|---|---|
@@ -33,23 +66,29 @@
 | TM-014 オフライン失効不能 | Credential、外部副作用制御 | Coordinator断→Worker/Gateway (T2,T4) | 切断中Workerに停止・失効が届かない | 事前配賦ローカル計算だけ許可、外部副作用はGateway経由、期限付きOffline Grant | 切断端末への即時停止・物理停止は非保証 | PDK-M08-S04, PDK-M06-S05 |
 | TM-015 データ露出 | Credential、機密データ、Artifact | DB/ログ/Artifact/Sandbox境界 (T1,T2,T5) | Credentialや秘密鍵が保存・ログ・配布物へ混入 | 短期鍵束縛Credential、ログRedaction、Sandbox default deny、Data Zone Policy、隔離検査 | ホストroot侵害時の完全秘匿は非保証 | PDK-M10-S02, PDK-M12-S01 |
 
-## 2. Safety Planeの設計境界
+## TM-2. Safety Plane design recommendations (DESIGN_BASELINE)
 
-1. **Human Emergency Stop:** 通常Policyの変更許容範囲に属さない固定の停止経路。Agentが自ら発行/解除できる権限とはしない。PoC用Keyと運用Keyを分離し、鍵漏洩・紛失・人間の本人確認/解除QuorumはO-010で決める。
-2. **Stop時の強制範囲:** Gatewayでの高リスク副作用、新規Lease/Grant/Policy有効化を禁止。DB稼働中はSecurity Epochを単調増加。DB不在時はGateway側deny-allを優先し、DB復旧後に停止理由・Epochを照合する。
-3. **Safe Baseline:** 通常Policy Bundleに依存しない埋込みのdeny-all。診断/復旧は独立した人間認可経路のみ。Agentには通常のTool権限を渡さない。
-4. **安全停止の解除:** 自動Rollback成功や経過時間だけで自動解除してはいけない。独立承認と現行署名・Kernel検証後の新Activationを要求。
-5. **限界:** Android/Termux等の通信断端末は物理停止できない。直接ネットワーク到達可能な外部副作用経路は、Gateway強制設計に違反するため別途遮断が必要。
+The following five items are proposed product-design constraints only. They are not live operational authorization, current-agent policy, or claims that the constraints are implemented:
 
-## 3. 保証境界・試験ゲート
+1. **Human Emergency Stop.** The proposed design constraint is a fixed stop path outside ordinary Policy modification, which ordinary Agents cannot issue or release. PoC keys and operational keys are separate. O-010 handles compromise/loss and human identity/quorum decisions.
+2. **Enforcement during Stop.** Stop forbids high-risk side effects, new Leases/Grants, and Policy activation. The Security Epoch is monotonic while the DB is up. When the DB is down, the Gateway denies all; on recovery, the stop reason and Epoch are reconciled.
+3. **Safe Baseline.** The proposed design includes an embedded deny-all independent of ordinary Policy Bundles. Recovery is available only through a separate human-authorized path, with no ordinary Agent tools.
+4. **Release from safe stop.** Safe stop is not auto-released merely because rollback succeeds or time passes. Release requires independent approval and a new Activation after signature and Kernel validation.
+5. **Limits.** Physical stop of disconnected Android/Termux devices is not guaranteed. Direct network paths to external side effects bypass Gateway enforcement by design and must be blocked separately.
 
-- **Prevent:** Domain/Ceiling/SQLの不変条件、Signer Identity、Gateway権限、署名用途分離。
-- **Detect:** Signed Evidence、Independent Verifier、CI Attestation、Event/Outbox、Prompt Injection/DoS異常検知。
-- **Recover:** Emergency Stop、Scope Freeze、Signed LKG、埋込Safe Baseline、Root/Global Epoch、再接続照合。
-- **Verify:** TLA+/Alloy有限ModelのSafety/Liveness、単独DB/Coordinator故障注入、Go native fuzz、Clock skew、Prompt Injection・SKILL改竄・Sybilの攻撃Fixture。
+## TM-3. Prevention, detection, recovery, verification
 
-**Risk Acceptance:** 未検証の実装や模擬Workerを本番信頼とみなさない。DB Admin/Host compromise、完全な独立Identity証明、外部API Exactly-once、オフライン端末の物理停止は現PoCの保証対象外。`PDK-M00-S05`の独立レビューと承認/ブロッカー記録なしに本番相当のOpen Enrollmentを有効化しない。
+These are proposed design dimensions and possible checks, not completed controls or test results.
 
-## 4. Provenance / Status
+- **Prevent:** Domain/Ceiling/SQL invariants; Signer Identity; Gateway authorization; signature-purpose separation.
+- **Detect:** Signed Evidence; Independent Verifier; CI Attestation; Event/Outbox; anomaly detection for Prompt Injection / DoS.
+- **Recover:** Emergency Stop; Scope Freeze; Signed LKG; embedded Safe Baseline; Root/Global Epoch; reconnect reconciliation.
+- **Verify:** TLA+/Alloy finite-model Safety/Liveness; isolated DB/Coordinator fault injection; Go native fuzzing; clock skew; attack fixtures for Prompt Injection, SKILL tampering, and Sybil.
 
-2026-10-12のレビュー指摘に対する**新規Threat Model草案**。署名された人間承認Commit、独立Verifier評価、実攻撃テストは未実施。設計への反映は `decisions.md` のDESIGN_BASELINEおよび`Issues.md`で管理する。
+## TM-4. Risk acceptance and non-guarantees
+
+As a DESIGN_BASELINE recommendation, do not treat an unverified implementation or simulated Worker as production trust. DB Admin/Host compromise, complete independent Identity proof, external API Exactly-once behavior, and physical stopping of offline devices are outside the current PoC guarantee. Production-equivalent Open Enrollment must not be enabled absent independent review and an approval/blocker record for `PDK-M00-S05`. These are proposed product-design constraints only, not live operational authorization, current-agent policy, or claims of implementation.
+
+## TM-5. Provenance and verification status
+
+This is a **Threat Model draft** responding to review comments dated 2026-10-12. As of this 2026-10-12 draft, no signed approval commit, independent verifier assessment, or real attack testing had been performed. Design incorporation is tracked as DESIGN_BASELINE in `decisions.md` and in `Issues.md`. The source status/date and unverified caveat remain applicable to this restructured document.

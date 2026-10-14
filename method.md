@@ -4,7 +4,7 @@
 > Snapshot: 2026-10-12 · Revision: design-review/2 · Applies to: this PADDOCK repository only
 > **目的:** 会話履歴・LLM内部状態・ネットワークセッションに依存せず、Git・Issue・Receiptを読み直して安全に作業を再開する。
 
-## 0. 文書の役割と優先順位
+## M0 / §0. 制御面 — 文書の役割と優先順位
 
 - `decisions.md`: **明示採用された設計判断の転記正本**。Proposalや今回のDESIGN_BASELINE追補を採用済みとして扱わない。Git移植後、承認者・署名・Commitを照合し移植記録を固定する。
 - `Issues.md`: **目標・依存・状態・Cursorの正本**。ただし状態の真偽はGit Tree/テストReceiptで照合する。
@@ -15,9 +15,9 @@
 - `.HARNESS` (`letwir/config/.HARNESS`) は **参照**。PADDOCKと別のリポジトリ・認可・端末環境である。既存HARNESSのLRFを無条件で実行規則に追加しない。
 - 現在の作業依頼と適用される上位指示が最優先。文書に書いてあるだけで外部Push・本番DB変更・秘密情報取扱い・課金は認可されない。
 
-## 1. PIDGEN/text と SIGMA/1 の使用契約
+## M1 / §1 委譲面 — PIDGEN/text と SIGMA/1 の使用契約
 
-### 1.1 元仕様との接続
+### M1.1 / §1.1 元仕様との接続
 
 参照: `https://github.com/letwir/config/blob/main/.HARNESS/rules/MANUAL.lrf` と `https://github.com/letwir/config/blob/main/.HARNESS/rules/state.lrf`。
 
@@ -39,7 +39,7 @@ SIGMA/1
 
 このエンベロープは単に**メッセージ形式**を定める。LLMが作業対象を知るためのものであり、Credential発行や生産環境の変更権限を付与しない。未確認事実を`Known facts`に混入させない。曖昧な部分は`Unknown`としてTarget/Acceptanceの外へ明示するか、Issueへ戻す。
 
-### 1.2 確定した小目標のHandoff例
+### M1.2 / §1.2 確定した小目標のHandoff例
 
 ```text
 <Γ>
@@ -55,11 +55,23 @@ SIGMA/1
 
 この例に書かれたPathは予定ディレクトリであって、現時点で存在することを保証しない。実行前に確認する。
 
-### 1.3 PIDGEN意味圧縮で保持する属性
+### M1.3 / §1.3 PIDGEN意味圧縮で保持する属性
 
 `Role`, `Target`, `Acceptance`, `Scope`, `Known facts`を省略しない。文を圧縮しても**目的・否定・権限境界・例外・停止条件・受入条件・確認済み事実**を不可逆に削らない。記号/絵文字だけを安全条件の唯一の媒体にしない。作業者は圧縮表現の未定義語を勝手に補完しない。
 
-## 2. 作業状態機械（Issues.md）
+## M2 / §2 状態面 — 作業状態機械（Issues.md）
+
+### M2.0 / §2.0 状態語彙と遷移
+
+| 状態 | 意味 | 次の許可された進行 |
+|---|---|---|
+| `[ ]` TODO | 未着手 | 着手時にCursorを更新し`[-]`へ |
+| `[-]` WIP | 作業中 | 安全な実装境界後に`[~]`へ |
+| `[~]` IMPLEMENTED | 実装境界到達 | 実観測の検査後に`[*]`へ |
+| `[*]` TESTED | Runnerが受入チェックを実行し、検査ReceiptがPASS | 独立レビューと最終記録は残る。Workerの自己申告/任意Receiptだけではなく、§2の四条件を満たした後だけ`[x]`へ |
+| `[x]` DONE | 受入済み | 完了。根拠なしの遷移は禁止 |
+
+↪ 範囲変更/撤回は状態図のTODO側へ戻す。アイコンは視覚的な案内にすぎず、表の状態・下記証拠条件が正本。
 
 ```text
 [ ] TODO ──着手・Cursor更新──> [-] WIP
@@ -74,9 +86,9 @@ SIGMA/1
                                 [x] DONE
 ```
 
-`[x]`は検査コマンド・Exit Code・対象Revision・信頼済みVerifier/CIの検証証拠が揃った場合のみ。**Workerが自身で作成したReceiptの`PASS`では完了しない**。実行結果を確認できない場合は「成功したはず」で先へ進めず、`[-]` / `[~]`を維持する。
+`[x]`には、(1) Runnerが受入チェックを実際に実行し、各チェックのExit Codeと対象Revision（および検査対象のHash）を記録した証拠、(2) 信頼済みCI/Verifierによる独立レビュー、または実装者とは別のVerifier subagentによる独立レビューのいずれか、(3) Mainによるレビューの指摘・証拠・全受入条件の照合と未解決事項の調停、(4) 残余リスクおよびCI/Verifierの有無の明示、がすべて必要。信頼済みCI/Verifierがない場合は別のVerifier subagentが必須。Verifierの自己申告だけでは不十分であり、Runnerによる実観測とMainの照合を代替しない。ローカルのみの検証はCI attestationやVerifier-of-Recordが存在するとは主張しない。実行結果・レビュー・照合を確認できない場合は「成功したはず」で先へ進めず、`[-]` / `[~]`を維持する。
 
-### 2.1 小目標を選ぶ規則
+### M2.1 / §2.1 小目標を選ぶ規則
 
 1. `Issues.md`のCursorを読む。
 2. Cursor候補が依存を満たすか検査。満たさなければ同じ中目標から依存完了済みの小目標を探す。
@@ -84,7 +96,7 @@ SIGMA/1
 4. 一度に責任を持つ小目標は原則**1件**。別件を並列化する場合はファイルの単独Write Ownerと独立した検証境界が必要。
 5. 「何が変わるか」「どの検査で終わるか」が未定ならIssueを分解してから実装する。
 
-### 2.2 Cursor更新のタイミング
+### M2.2 / §2.2 Cursor更新のタイミング
 
 - **開始前:** active_issue, phase, preflight commit/tree, next_action, worktree statusを保存。Issueは`[-]`。
 - **安全な実装境界後:** 出力、実行検査、未完了の箇所を追記。Issueは`[~]`まで。
@@ -93,11 +105,11 @@ SIGMA/1
 - **完了後:** 次のREADYなIssueをCursorに設定。実行しない場合はnext_actionだけ記録して終了。
 - **`verified_commit`の自己参照禁止:** Cursor自身の保存を含むCommit SHAを、同じファイル内で事前に確定値として記載しない。最後に検証済みだった**過去**のCommitを記録する。未作成・未検証なら`NONE`。現在のGit HEADと混同しない。
 
-## 3. CONTINUE/1 — 通信断・プロセス再起動・会話断絶からの復帰
+## M3 / §3 復帰面 — CONTINUE/1（通信断・プロセス再起動・会話断絶）
 
 **Trigger:** `continue`, `続き`, `再開`, 新WorkerによるHandoff。過去会話が閲覧できなくても実行可能にする。
 
-### 3.1 Preflight：最初は読み取り専用
+### M3.1 / §3.1 Preflight：最初は読み取り専用
 
 ```text
 1. Project Root確定 (git rev-parse --show-toplevel、存在しないなら明示して停止)
@@ -121,7 +133,7 @@ git log -1 --format='%H %s'
 
 新規ディレクトリでGit未初期化なら`REPO_NOT_INITIALIZED`として報告する。**誤った親Repoや既存`.HARNESS`に対してgit操作しない。** Git作成は対象パスを確認してから行う。
 
-### 3.2 Conflict Matrix
+### M3.2 / §3.2 Conflict Matrix
 
 | 観測 | 取扱い | 禁止事項 |
 |---|---|---|
@@ -138,7 +150,7 @@ git log -1 --format='%H %s'
 | `decisions.md`承認不明 | 転記の由来を明示し、人間の承認記録を待つ | Worker単独でACCEPTED改竄 |
 | DB/ネットワーク未接続 | 依存しない作業を実施、DB関連をBLOCKED | 接続成功・検証成功の捏造 |
 
-### 3.3 Recover → Reconcile → Execute
+### M3.3 / §3.3 Recover → Reconcile → Execute
 
 ```text
 READ_ONLY_PREFLIGHT
@@ -162,7 +174,7 @@ NEXT CURSOR / STOP
 
 もし大きい仕事が途中で切れる可能性があるなら、Issueを一層細かく分ける。**短い小目標と短い永続化境界**を優先し、長時間のLLMコンテキスト保持を再開契約にしない。
 
-### 3.4 通信断後に必要な再開出力
+### M3.4 / §3.4 通信断後に必要な再開出力
 
 ```yaml
 resume_report_schema: paddock.resume/1
@@ -180,7 +192,7 @@ blocker: <NONE|reason>
 
 この報告は毎回の出力末尾に短く載せてもよい。Receipt未確認の状態で`verified`を名乗らない。
 
-## 4. 開発工程と検証Gate
+## M4 / §4 実行面 — 開発工程と検証Gate
 
 既存`.HARNESS`のETLに似た工程を参考にするが、PADDOCKの開発規則として独立に定義する。
 
@@ -196,9 +208,18 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 - **POST_VERIFY:** `gofmt`, `go test`, `go test -race`, SQL Integration、Model Checking、Fuzz、差分/Scopeチェック（該当するものだけ）。**Runnerが実際にプロセスを起動し終了コードとHashを採録**する。
 - **FINISH:** Issue更新・Receipt/残余リスク・次Cursor。人間に未確認を成功として報告しない。
 
-**Verifierの独立性:** 同じモデルを別スレッドで起動しただけで独立ドメインとは扱わない。検査により確認した項目と意見評価を分ける。**Verifier of Recordは信頼済みCI Runner**とする計画（O-007未解決時は独立検証未達）。CI設定・鍵・Workflowも検証対象であり、Worker自己報告をCI署名済みとして扱わない。
+### M4.1 / §4.1 Subagent委譲・並列作業
 
-## 5. Receipt / Evidence Contract（信頼された観測のみ）
+- **CODEは bounded coding worker へ委譲する。** Main runnerは着手前に小目標の難易度・複雑度を見積もり（利用可能ならLunaの見積りを参考にする）、その見積り、正確な対象/書込みScope、受入条件、依存・停止条件を選択したbackendへ伝える。Solは利用可能で、かつタスクと実行コンテキストに適切な場合にのみ選ぶ。backendの選択や見積りは、実装・検証の証拠にも権限にもならない。
+- Workerへの指示は§1の固定PIDGEN/text形式を使い、変更可能なファイルを列挙する。Workerは指定Scope外を編集せず、曖昧・矛盾・依存未達・効果分類不明なら作業を止めて確認を求める。Main runnerは差分とScopeを照合し、実行・証拠採録・Issue/Cursor/Receipt更新の責任を保持する。
+ - **検証は実装から分離する。** 実装者とは別のVerifier subagentが利用可能な場合はこれを用いて受入条件に沿った独立レビューを行う。利用できない場合は信頼済みCI/Verifierが独立レビューを供給しなければならない。レビューは受入条件と関連する証拠・差分を対象とし、Verifier subagentは実装を編集してはならない。Verifierの報告もWorker Reportであり、それだけでは検証済みにならない。いずれの経路でもRunnerが受入チェックを実際に実行し、Exit Code・Hash・対象Revisionを採録する。Mainは結果、レビューの指摘、全受入条件を照合し、未解決事項を調停する（§2・§5）。信頼済みCI/Verifierがなく、別Verifier subagentも利用できない場合は`[x]`にしない。ローカルのみの場合はその制約と残余リスクを明記し、CI attestation/Verifier-of-Recordを主張してはならない。
+- **並列化は独立したbounded taskに限り、同時dispatchは最大16件とする。** 実際のruntime capacityおよび現在のタスク・効果ごとの承認範囲がより小さい場合は、その上限にも従う。16件を超えて準備できたtaskはキューに置き、実行中taskが完了してslotが空き、依存・ゲート・承認を再確認できた時点で順次dispatchする。依存DAG上で相互に前提でなく、先行ゲートを満たし、正確な書込みScope（特にファイル集合）が互いに重ならず、各ファイルに単一のWrite Ownerと独立した検証境界を確保できる場合にのみ同時dispatchする。1ファイル1Writerを守り、共有ファイルやScopeが不明なら直列化するかSTOPして確認する。既存の小目標の優先順・依存・安全ゲートは並列化で迂回しない。
+- Main runnerは結果を総合する前に、判断に関係する全dispatchの完了報告を待ち、各結果を実差分・実観測と照合する。未着・失敗・矛盾した報告を成功扱いせず、ブロッカーとして記録する。小目標の状態遷移も§2の証拠要件に従う。
+- 委譲で副作用の権限は増えない。Worker/VerifierはDB・本番/live service・VCS書込み・外部効果・秘密情報等の権限を得ず、必要な承認は現在のタスクと効果ごとのゲートに従う。承認欠如、曖昧な選択、範囲衝突、未知の副作用は既存のSTOP/質問規則に従う。
+
+**Verifierの独立性:** Verifierは実装者とは別のsubagent invocationとし、実装を編集しない。同じモデルの別invocationはレビュー役割の分離を満たすにとどまり、組織的・運用的な独立性や独立ドメインの証明にはならない。検査により確認した項目と意見評価を分ける。ローカル検証でCIがない場合は、その制約と残余リスクを明記し、CI attestation/Verifier-of-Recordを主張しない。将来の**Verifier of Recordは信頼済みCI Runner**とする設計はO-007に残る（未解決）。CI設定・鍵・Workflowも検証対象であり、Worker自己報告をCI署名済みとして扱わない。
+
+## M5 / §5 証拠面 — Receipt / Evidence Contract（信頼された観測のみ）
 
 将来の保存先: `receipts/<issue_id>/<utc>-<uuid>.json`。非機密ReceiptとCI Run URL/署名をGitで参照し、外部Raw Log・秘密・DSN値を入れない。
 
@@ -220,11 +241,11 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 }
 ```
 
-このJSONは**例示であって実行Receiptではない**。`verdict: PASS`は、信頼されたWrapper/CIが実行・採録し、Workflowの定義・Runner Identity・対象Git Revision・署名/Attestationを照合した後のみ。実行終了コードが0でも受入条件が未達ならPASSにしない。テスト前の`make verify`・`go test`の想定結果は`NOT_RUN`。ローカルWrapperによるReceiptはCIの代用ではなく暫定証拠。
+このJSONは**例示であって実行Receiptではない**。終了コード0だけで受入条件未達をPASSにしてはならない。テスト前の`make verify`・`go test`の想定結果は`NOT_RUN`。ローカルRunnerのReceiptは実行コマンド・Exit Code・Hash・対象Revisionを実観測として記録できるが、CI attestationではない。ローカルIssueの`[x]`は§2および§4の別VerifierレビューとMain照合も満たす場合に限る。信頼済みCI/Verifier of Recordによる attestation の主張は、実際にその検証が確認された場合だけ許される。
 
 **決定の保護:** `decisions.md`のACCEPTEDを書き換えるには、保護Branch・CODEOWNERS・人間承認者・署名Commitの照合が必要というDESIGN_BASELINE。GitHub接続・保護設定がない段階で『保護済み』と言わない。
 
-## 6. PostgreSQL Transaction・Fault Safety
+## M6 / §6 永続化面 — PostgreSQL Transaction・Fault Safety
 
 - DB正本: Scope/Rollout/CommandReceipt/Event/Outboxを一つのTransaction境界で変更。
 - 同じScopeを更新する場合、Command Receipt → Scope Row Lock → Rollout Row Lockの順序を守る。別トランザクションも同順序。
@@ -239,7 +260,7 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 - Policy確定・外部操作の認可は`(scope_activation_epoch,root_authz_epoch,security_epoch,effective_policy_digest,lease_epoch)`を区別する。Canary対象外Rootの認可Epochを無関係に増やさない。
 - 本番DBとテストDBを混ぜない。DBに接続できないなら、統合テストはNOT_RUNと報告する。
 
-## 7. Safety / Liveness / Bootstrapの追加ゲート
+## M7 / §7 安全面 — Safety / Liveness / Bootstrapの追加ゲート
 
 **実装開始前の順序:** `PDK-M00-S05` Threat Model → `M00-S06` 起点/停止境界 → `M01-S06` Epoch/Freeze契約 → `M01-S05` Model Checking → DB実装。O-002はM06-S08、O-003はM02-S05、O-007はM00-S07/M14-S04にそれぞれ解決Issueが必要。
 
@@ -250,7 +271,7 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 - **Threat Model:** [THREAT_MODEL.md](THREAT_MODEL.md)を検査。未知Worker・Prompt Injection・Supply Chain・DoSのいずれか未検討なら公開Registrationを有効にしない。
 - **モデル検査:** Rollout×Epoch×Leaseの有限状態でSafety+Livenessの仮定を明示。TLA+/Alloy PASSはGo/DB実装の独立検証を省略する理由にはならない。
 
-## 8. 開発者用の再開チェック（手動でも実行可能）
+## M8 / §8 チェック面 — 開発者用の再開チェック（手動でも実行可能）
 
 ```text
 [ ] PADDOCKのGit Rootを識別したか？
@@ -268,7 +289,7 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 [ ] リポジトリ内参照と小目標DAGをLintしたか？
 ```
 
-## 9. 未確定・曖昧な状態での停止ルール
+## M9 / §9 停止面 — 未確定・曖昧な状態での停止ルール
 
 - 明示されない外部効果の実行、秘密情報の表示/転記、誤ったGit Rootへの書込みは禁止。
 - `decisions.md`がACCEPTEDとする方針を変える必要が生じたら、Issueに理由と代替案を提示し、新しいDecision IDによる承認記録を待つ。実装都合でサイレント修正しない。
@@ -276,7 +297,7 @@ PRECEDENT → RESEARCH → PLAN → PRE_VERIFY → CODE → POST_VERIFY → FINI
 - 既存ファイルの中身が会話要約と矛盾する場合、**ファイルの現物・実試験結果を優先して状況報告**する。ただし不変の設計判断を無断変更しない。
 - サービスが切れた・Toolが失敗した場合、最新コミットとReceiptが確認できない処理を成功と主張しない。
 
-## 10. 運用メモ
+## M10 / §10 参照面 — 運用メモ
 
 - READMEは入口、`decisions.md`は採用判断、`Issues.md`は仕事、`method.md`は実行法。作業中の単なるメモを正本に昇格させない。
 - 初期の次の小目標は`PDK-M00-S01`の確認。レビュー修正版はまだGit未コミット・CI未検証。`PDK-M00-S02`以降は実際の新規Gitリポジトリが確認できるまで開始しない。
