@@ -34,9 +34,9 @@ execution_state: NOT_STARTED
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
-last_verified_test: "M15-S06 worktree: go test ./internal/harness ./cmd/coordinator ./cmd/worker-sim PASS; matching vet PASS; bash -n and scripts/run_poc_harness.sh PASS (2 coordinators, 2 workers, paddock_test PG18.6, scheduler stub, no jobs); design lint 89/148 PASS; diff-check PASS."
-next_action: "PDK-M02-S05: confirm dedicated Test DB and migration runner evidence from actual receipts; preserve other worktree changes."
-confidence: "PDK-M01-S05, PDK-M06-S05, and PDK-M15-S06 have local Runner evidence and independent review; issue-specific push for M15-S06 is pending isolation. PDK-M08-S01 implementation and local tests pass, but SQL runtime is blocked because current DB role lacks raw USAGE/CREATE. User said they will handle role via Admin psql; no DB role/grant changes made by agent. No other READY issue presently selected by dependency planner. Preserve remaining dirty work; no CI attestation."
+last_verified_test: "M08-S01 worktree overlay at HEAD 9c9910f: domain/storage go test and vet PASS; dedicated paddock_test integration 6/6 PASS (concurrent reverse-edge lock, REPEATABLE READ 40001, cycle/cross-root/ownership/attempt constraints); schema tests 5/5 PASS; design lint 89/148 PASS; diff-check PASS. DB fixtures cleaned. No CI attestation."
+next_action: "PDK-M02-S05: reconcile Test DB and migration runner receipts in its issue-specific state; preserve unrelated dirty work."
+confidence: "PDK-M01-S05 (1dbebbf), M06-S05 (ec2cdb2), and M15-S06 (9c9910f) are pushed. M08-S01 now has local Runner and PostgreSQL integration evidence plus independent review, including concurrent cycle serialization and REPEATABLE READ rejection. Dedicated M08 commit/push is being prepared; current worktree has unrelated dirty files preserved. Next Planner item M08-S02. No CI attestation."
 ```
 
 **Cursorは作業の検索ヒントであり、観測したGit/ファイル/Receiptより優先されない。** `verified_commit`は**Cursor自身を含む現在の書込みより前に、外部検証で確定したCommit**しか指せない。自己参照のHashは書かない。 通信断・プロセス停止後の再開手順は[method.md](method.md)の`CONTINUE/1`を正本とする。新しい作業を始める前にCursorを更新し、実装の途中で止まれば`[-]`を維持。最後に本当に実行した検査とHash/Commitだけを記載する。
@@ -354,10 +354,11 @@ confidence: "PDK-M01-S05, PDK-M06-S05, and PDK-M15-S06 have local Runner evidenc
 
 **中目標:** Active-Active Schedulerでも仕事の実行権が一意になる。
 
-- [ ] `PDK-M08-S01` — WorkOrder/Dependency/Attempt永続化。
+- [x] `PDK-M08-S01` — WorkOrder/Dependency/Attempt永続化。
   - `depends_on`: PDK-M01-S03, PDK-M03-S02
   - `acceptance`: 親子Tree・Root内DAG・Attempt試行履歴が追跡可能。
   - `evidence_expected`: DDL・DAG循環・cross-root拒否テスト。
+  - `current_evidence`: Added one-Root `WorkOrderGraph` validation, atomic pgx `PersistGraph`/repeatable-read `LoadRoot`, guarded additive up/down SQL for ownership/dependency/attempt tables, same-Root composite FKs, positive unique attempt sequence, advisory-lock serialized cycle triggers, immutable identity/contents on UPDATE while DELETE is permitted for retention cleanup, integration test, and static SQL contract tests. Runner on worktree overlay at HEAD `9c9910f5b8682a8ef7debe37e1474293e3a6aa0a`: `go test ./internal/governance/domain ./internal/storage/postgres -count=1` PASS; matching `go vet` PASS; `go test -tags=integration ./internal/storage/postgres -run '^TestWorkOrderStorePostgresIntegration$' -count=1 -v` PASS (6/6: READ COMMITTED concurrent reverse-edge serialization, REPEATABLE READ rejected with 40001, dependency-cycle rejection, cross-root rejection, ownership-cycle rejection, unique attempt sequence); integration-tag compile-only PASS; Python schema tests 5/5 PASS; design lint PASS 89/148; `git diff --check` PASS. Dedicated migration `sql/governance_work_orders.sql` applied to `paddock_test` PostgreSQL 18.6 after read-only identity/privilege/object preflight and explicit user approval. DB verifier confirmed four fixture categories (`wo_it_` Scope, Root, WorkOrder, Attempt) all have zero remaining rows; applied objects present. First DB run surfaced a cleanup-trigger conflict; with explicit user approval, the two history triggers were changed to reject UPDATE only and only the identified failed test fixture was removed. Final integration rerun passed and confirmed cleanup. Source SHA-256: graph.go `13bdae497607d8cd9607e7878e02ca63d05935ee8419ce4d3c1be4969adbe4ba`; work_order_test.go `038911c6065a9c9c0efba0458ea425d5be0841feb366e84746193784bf71d56c`; store.go `cf824406b5cbd850bd10308b269a35917f72281b885e4780a03aedabc985f2a6`; integration_test.go `7a46816a6d6bab9bdee1ee94130f27e85ccdcb7e655e96dc17316577267dc9e0`; up.sql `499d3be1715adb5c6b84a8e908cbb0302f9788cbf77149ad03765e33b728cfac`; down.sql `c6411073cb828023f5d280dbf3b7c5e31fd3735ee04d00234a01b9a72a1348e3`; schema test `127cc10b2ff8e2881dedf5d5714786d11da8c147397ea315d5483e60d9bbea3f`. No CI attestation claimed.
 - [ ] `PDK-M08-S02` — Worker Pull/Capability Filter/Slot予約。
   - `depends_on`: PDK-M08-S01
   - `acceptance`: Hard条件適合後にAuthority/Trust/Budget検査し、一つのSlotを原子的確保。

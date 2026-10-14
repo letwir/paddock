@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func order(id, root string, parent *WorkOrderID) WorkOrder {
 	return WorkOrder{ID: WorkOrderID(id), RootID: RootID(root), ParentID: parent}
@@ -28,6 +31,60 @@ func TestValidateWorkOrderTree(t *testing.T) {
 			err := ValidateWorkOrderTree(tt.orders)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ValidateWorkOrderTree() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestWorkOrderGraphValidate(t *testing.T) {
+	root := order("root", "root", nil)
+	childA := order("a", "root", parent("root"))
+	childB := order("b", "root", parent("root"))
+	valid := WorkOrderGraph{
+		Orders:       []WorkOrder{root, childA, childB},
+		Dependencies: []Dependency{{WorkOrderID: "b", DependsOnID: "a"}},
+		Attempts:     []Attempt{{ID: "attempt-1", WorkOrderID: "a", Number: 1}, {ID: "attempt-2", WorkOrderID: "a", Number: 2}},
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid graph rejected: %v", err)
+	}
+	tests := []struct {
+		name string
+		edit func(*WorkOrderGraph)
+	}{
+		{"empty graph", func(g *WorkOrderGraph) { g.Orders = nil }},
+		{"dependency cycle", func(g *WorkOrderGraph) {
+			g.Dependencies = append(g.Dependencies, Dependency{WorkOrderID: "a", DependsOnID: "b"})
+		}},
+		{"cross-root dependency", func(g *WorkOrderGraph) {
+			g.Orders = append(g.Orders, order("other", "other-root", nil))
+			g.Dependencies = append(g.Dependencies, Dependency{WorkOrderID: "root", DependsOnID: "other"})
+		}},
+		{"mixed roots", func(g *WorkOrderGraph) {
+			g.Orders = append(g.Orders, order("other", "other-root", nil))
+		}},
+		{"attempt references unknown order", func(g *WorkOrderGraph) {
+			g.Attempts = append(g.Attempts, Attempt{ID: "orphan", WorkOrderID: "missing", Number: 1})
+		}},
+		{"duplicate attempt number", func(g *WorkOrderGraph) {
+			g.Attempts = append(g.Attempts, Attempt{ID: "attempt-3", WorkOrderID: "a", Number: 1})
+		}},
+		{"duplicate attempt ID", func(g *WorkOrderGraph) {
+			g.Attempts = append(g.Attempts, Attempt{ID: "attempt-1", WorkOrderID: "b", Number: 1})
+		}},
+		{"attempt exceeds bigint", func(g *WorkOrderGraph) {
+			g.Attempts = append(g.Attempts, Attempt{ID: "attempt-max", WorkOrderID: "a", Number: uint64(math.MaxInt64) + 1})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			graph := valid
+			graph.Orders = append([]WorkOrder(nil), valid.Orders...)
+			graph.Dependencies = append([]Dependency(nil), valid.Dependencies...)
+			graph.Attempts = append([]Attempt(nil), valid.Attempts...)
+			tt.edit(&graph)
+			if err := graph.Validate(); err == nil {
+				t.Fatal("invalid graph accepted")
 			}
 		})
 	}
