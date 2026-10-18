@@ -1,0 +1,26 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-repair-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:05:27Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256_current_after_runtime": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d", "sha256_applied": "6eaf8292ecf7a885f0daf5e7a35e52ea076e02387631cf9a00f1ac131cae7f6a"},
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95"},
+    {"path": "internal/storage/postgres/spawn_store.go", "sha256": "ea48f7432709f3c5201080beb224f994c524bd7da33ac7647789a511e759a087"},
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "9e14edc92d0c34e625df1592869669b3bf5da0dc220d0bb7e1c788ae12597909"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "database": "paddock_test", "postgresql": "18.6", "ci": false},
+  "checks": [
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_m09_s02_s03_repair.sql", "exit_code": 0, "result": "Guarded combined repair applied in one transaction; COMMIT. Applied file SHA was 6eaf...; the later helper OUT-variable fix is source-only and not applied."},
+    {"command": "read-only catalog postcheck after repair", "exit_code": 0, "result": "spawn_fingerprint_context and store_work_order_checkpoint are migrator-owned SECURITY DEFINER with fixed search_path; app EXECUTE present; PUBLIC EXECUTE and direct app table privileges absent; functions have expected signatures."},
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestSpawnAdmissionIntegration$' -count=1 -v", "exit_code": 1, "result": "FAIL; SQLSTATE P0001: spawn digest context missing or null. The helper used RETURN QUERY, then inspected still-null RETURNS TABLE OUT variables. Exact S02 test cleanup was verified; all spawn_it_ fixture row counts returned zero."},
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestCheckpointDurabilityIntegration$' -count=1 -v", "exit_code": 0, "result": "PASS; valid L2 and new-store restore, stale quarantine/no payload, missing reserve denial, interrupted rollback, over-cap, payload/JCS tamper and exact byte accounting. Test emitted retained suffix 5357578d6bd31b768d903807."},
+    {"command": "read-only postcheck of S03 suffix 5357578d6bd31b768d903807", "exit_code": 0, "result": "Two checkpoints retained: valid row L2 stored_bytes=523; stale row QUARANTINED stored_bytes=501. STORAGE_BYTES/byte account granted=1048576, spent=1024, reserved=0; stored_bytes sum=1024. Each successful checkpoint has one RESERVE and one SETTLE_RESERVATION operation/journal. Failed candidate IDs left no checkpoint or budget operation. After the fixture expired its Lease, the app restore API returned QUARANTINED with NULL payload for both records, consistent with current revalidation."},
+    {"command": "read-only cleanup/retention check", "exit_code": 0, "result": "S02 spawn_it_ Scope/Root/WorkOrder/operation/fingerprint/Attempt/Lease/bundle counts are all zero. Earlier S03 setup/grant suffixes e62b5d1f18ee60786c1268cf and bf3299ccc0ac35bcd1dddef1 remain retained with no checkpoints and spent/reserved=0; successful S03 suffix remains retained as selected."}
+  ],
+  "authorization": {"source": "User explicitly authorized the combined guarded repair and the named S02/S03 fixtures.", "scope": "This run used that authorization. The latest helper OUT-variable source fix was made after the applied repair and has NOT been applied; any additional repair application/retry requires new explicit approval. No down/reset/drop, production, role change, or credential output."},
+  "verdict": "REPAIR_APPLIED_ONCE; S02_FIXTURE_FAILED_P0001; S03_FIXTURE_PASS_AND_READBACK_VERIFIED; S02_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["S02 context helper in the applied database still raises because its RETURNS TABLE output variables are not populated by RETURN QUERY; the current source fix uses SELECT INTO/RETURN NEXT and is un-applied.", "No S02 Spawn admission/cap/Lease acceptance case passed in PostgreSQL.", "No CI attestation, commit, or push is claimed."]
+}

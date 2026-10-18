@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/letwir/paddock/internal/governance/application"
@@ -121,9 +122,147 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 	if err := seedFixtures(ctx, pool, f); err != nil {
 		t.Fatalf("fixture setup failed: %v", err)
 	}
+	t.Run("AppendEvent envelope, uniqueness, and callback rollback", func(t *testing.T) {
+		caseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		appURL := os.Getenv("PADDOCK_APP_DB_URL")
+		if appURL == "" {
+			t.Fatal("PADDOCK_APP_DB_URL must be set to run the app-role event integration test")
+		}
+		appPool, err := openPullPool(caseCtx, appURL, true)
+		if err != nil {
+			t.Fatal("unable to connect as paddock_app")
+		}
+		t.Cleanup(appPool.Close)
+		var appDB, sessionUser, currentUser string
+		if err := appPool.QueryRow(caseCtx, `SELECT current_database(), session_user, current_user`).Scan(&appDB, &sessionUser, &currentUser); err != nil {
+			t.Fatalf("verify app connection identity: %v", err)
+		}
+		if appDB != "paddock_test" || sessionUser != "paddock_app" || currentUser != "paddock_app" {
+			t.Fatalf("unexpected app connection identity: database=%q session_user=%q current_user=%q", appDB, sessionUser, currentUser)
+		}
+		var hasAppendExecute, directDomainInsert, directOutboxInsert, anyOutboxPrivilege bool
+		if err := pool.QueryRow(caseCtx, `SELECT
+			has_function_privilege('paddock_app', 'raw.append_domain_event_and_outbox(text,text,text,bigint,text,text,bytea)', 'EXECUTE'),
+			has_table_privilege('paddock_app', 'raw.domain_events', 'INSERT'),
+			has_table_privilege('paddock_app', 'raw.event_outbox', 'INSERT'),
+			EXISTS (SELECT 1 FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) AS p(privilege) WHERE has_table_privilege('paddock_app', 'raw.event_outbox', p.privilege))`).Scan(&hasAppendExecute, &directDomainInsert, &directOutboxInsert, &anyOutboxPrivilege); err != nil {
+			t.Fatalf("inspect event app-role privileges: %v", err)
+		}
+		if !hasAppendExecute || directDomainInsert || directOutboxInsert || anyOutboxPrivilege {
+			t.Fatalf("event app-role privilege contract mismatch: append_execute=%t domain_insert=%t outbox_insert=%t any_outbox_privilege=%t", hasAppendExecute, directDomainInsert, directOutboxInsert, anyOutboxPrivilege)
+		}
+		aggregateID := prefix + "_aggregate"
+		eventID := prefix + "_event"
+		duplicateID, rollbackID := prefix+"_duplicate", prefix+"_rollback"
+		var eventCollisions int
+		if err := pool.QueryRow(caseCtx, `SELECT
+			(SELECT count(*) FROM raw.domain_events WHERE event_id=ANY($1::text[])) +
+			(SELECT count(*) FROM raw.event_outbox WHERE event_id=ANY($1::text[])) +
+			(SELECT count(*) FROM raw.domain_events WHERE aggregate_kind=$2 AND aggregate_id=$3 AND aggregate_version IN (1,2))`,
+			[]string{eventID, duplicateID, rollbackID}, "rollout", aggregateID).Scan(&eventCollisions); err != nil {
+			t.Fatalf("preflight generated event fixture IDs: %v", err)
+		}
+		if eventCollisions != 0 {
+			t.Fatalf("refusing event fixture: generated event IDs or aggregate/version pairs collide with %d existing rows", eventCollisions)
+		}
+		t.Cleanup(func() {
+			cleanCtx, cleanCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cleanCancel()
+			if _, err := pool.Exec(cleanCtx, `DELETE FROM raw.event_outbox WHERE event_id = ANY($1::text[])`, []string{eventID, duplicateID, rollbackID}); err != nil {
+				t.Errorf("event outbox cleanup failed: %v", err)
+			}
+			if _, err := pool.Exec(cleanCtx, `DELETE FROM raw.domain_events WHERE event_id = ANY($1::text[])`, []string{eventID, duplicateID, rollbackID}); err != nil {
+				t.Errorf("domain event cleanup failed: %v", err)
+			}
+		})
+		payload := []byte(`{"state":"CANARY"}`)
+		event, err := domain.NewEvent(eventID, "rollout", aggregateID, 1, "RolloutStarted", "event/1", payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		transactor := newTransactor(poolBeginner{pool: appPool})
+		if err := transactor.WithinTransaction(caseCtx, func(gov port.GovernanceTx) error {
+			return gov.AppendEvent(caseCtx, event)
+		}); err != nil {
+			t.Fatalf("append event: %v", err)
+		}
+		var gotKind, gotAggregate, gotType, gotSchema string
+		var gotVersion int64
+		var gotPayload []byte
+		if err := pool.QueryRow(caseCtx, `SELECT aggregate_kind, aggregate_id, aggregate_version, event_type, schema_version, payload FROM raw.domain_events WHERE event_id=$1`, eventID).Scan(&gotKind, &gotAggregate, &gotVersion, &gotType, &gotSchema, &gotPayload); err != nil {
+			t.Fatalf("read persisted event envelope: %v", err)
+		}
+		if gotKind != event.AggregateKind() || gotAggregate != aggregateID || gotVersion != 1 || gotType != event.Type() || gotSchema != event.SchemaVersion() || string(gotPayload) != string(payload) {
+			t.Fatalf("stored event envelope mismatch: kind=%q aggregate=%q version=%d type=%q schema=%q payload=%q", gotKind, gotAggregate, gotVersion, gotType, gotSchema, gotPayload)
+		}
+		var outboxCount int
+		if err := pool.QueryRow(caseCtx, `SELECT count(*) FROM raw.event_outbox WHERE event_id=$1`, eventID).Scan(&outboxCount); err != nil || outboxCount != 1 {
+			t.Fatalf("outbox count=%d err=%v, want one matching row", outboxCount, err)
+		}
+
+		duplicate, err := domain.NewEvent(duplicateID, "rollout", aggregateID, 1, "RolloutRetried", "event/1", []byte(`{}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = transactor.WithinTransaction(caseCtx, func(gov port.GovernanceTx) error {
+			return gov.AppendEvent(caseCtx, duplicate)
+		})
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+			t.Fatalf("duplicate aggregate version error=%v, want PostgreSQL unique_violation (23505)", err)
+		}
+		var duplicateCount int
+		if err := pool.QueryRow(caseCtx, `SELECT count(*) FROM raw.domain_events WHERE aggregate_kind=$1 AND aggregate_id=$2 AND aggregate_version=1`, "rollout", aggregateID).Scan(&duplicateCount); err != nil || duplicateCount != 1 {
+			t.Fatalf("duplicate version count=%d err=%v, want original only", duplicateCount, err)
+		}
+		for _, table := range []string{"raw.domain_events", "raw.event_outbox"} {
+			var count int
+			query := `SELECT count(*) FROM ` + table + ` WHERE event_id=$1`
+			if err := pool.QueryRow(caseCtx, query, duplicate.ID()).Scan(&count); err != nil || count != 0 {
+				t.Fatalf("duplicate event in %s count=%d err=%v, want absent", table, count, err)
+			}
+		}
+
+		rolledBack, err := domain.NewEvent(rollbackID, "rollout", aggregateID, 2, "RolloutAborted", "event/1", []byte(`{}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		callbackErr := errors.New("integration callback failure")
+		err = transactor.WithinTransaction(caseCtx, func(gov port.GovernanceTx) error {
+			if err := gov.AppendEvent(caseCtx, rolledBack); err != nil {
+				return err
+			}
+			return callbackErr
+		})
+		if !errors.Is(err, callbackErr) {
+			t.Fatalf("callback transaction error=%v, want callback failure", err)
+		}
+		var rollbackCount int
+		if err := pool.QueryRow(caseCtx, `SELECT (SELECT count(*) FROM raw.domain_events WHERE event_id=$1) + (SELECT count(*) FROM raw.event_outbox WHERE event_id=$1)`, rolledBack.ID()).Scan(&rollbackCount); err != nil || rollbackCount != 0 {
+			t.Fatalf("callback-error event/outbox rows=%d err=%v, want both rolled back", rollbackCount, err)
+		}
+	})
+
 	t.Run("SafetyService receipts in rollback-only transaction", func(t *testing.T) {
 		caseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
+		appURL := os.Getenv("PADDOCK_APP_DB_URL")
+		if appURL == "" {
+			t.Fatal("PADDOCK_APP_DB_URL must be set to run the SafetyService app-role integration test")
+		}
+		appPool, err := openPullPool(caseCtx, appURL, true)
+		if err != nil {
+			t.Fatal("unable to connect as paddock_app")
+		}
+		t.Cleanup(appPool.Close)
+		var appDB, sessionUser, currentUser string
+		if err := appPool.QueryRow(caseCtx, `SELECT current_database(), session_user, current_user`).Scan(&appDB, &sessionUser, &currentUser); err != nil {
+			t.Fatalf("verify SafetyService app connection identity: %v", err)
+		}
+		if appDB != "paddock_test" || sessionUser != "paddock_app" || currentUser != "paddock_app" {
+			t.Fatalf("unexpected SafetyService app connection identity: database=%q session_user=%q current_user=%q", appDB, sessionUser, currentUser)
+		}
 		var baselineMode string
 		var baselineActivation, baselineSecurity int64
 		if err := pool.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&baselineMode, &baselineActivation); err != nil {
@@ -132,7 +271,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&baselineSecurity); err != nil {
 			t.Fatalf("read pre-test security baseline: %v", err)
 		}
-		tx, err := pool.Begin(caseCtx)
+		tx, err := appPool.Begin(caseCtx)
 		if err != nil {
 			t.Fatalf("begin safety transaction: %v", err)
 		}
@@ -144,7 +283,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 				_ = tx.Rollback(rollbackCtx)
 			}
 		}()
-		gov := newGovernanceTx(tx)
+		gov := newSafetyGovernanceTx(tx)
 		snapshot, err := gov.LockScope(caseCtx, domain.ScopeID(f.scope))
 		if err != nil {
 			t.Fatalf("read safety snapshot: %v", err)
@@ -163,24 +302,37 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		service := application.NewSafetyService(outerTxTransactor{tx: tx}, quorum)
-		gate := application.NewSafetyGate(outerTxTransactor{tx: tx})
+		service := application.NewSafetyService(outerTxTransactor{tx: tx, safetyAPI: true}, quorum)
+		gate := application.NewSafetyGate(outerTxTransactor{tx: tx, safetyAPI: true})
 		makeSigs := func(action domain.SafetyAction, epoch domain.Epoch, id string, activation *[32]byte) []domain.SafetySignature {
 			var msg []byte
 			var e error
 			if activation == nil {
-				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id)
+				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id, "safety-fixture-nonce")
 			} else {
-				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id, *activation)
+				msg, e = domain.SafetyApprovalMessage(action, snapshot.ScopeID, epoch, id, "safety-fixture-nonce", *activation)
 			}
 			if e != nil {
 				t.Fatal(e)
 			}
 			return []domain.SafetySignature{{SignerID: signers[0].ID, Signature: ed25519.Sign(keys[0], msg)}, {SignerID: signers[1].ID, Signature: ed25519.Sign(keys[1], msg)}}
 		}
+		checkSafetyEvent := func(commandID, eventType string, version int64, wantPayload string) {
+			t.Helper()
+			var gotKind, gotAggregate, gotType, gotSchema string
+			var gotVersion int64
+			var gotPayload []byte
+			eventID := "safety/" + commandID
+			if err := tx.QueryRow(caseCtx, `SELECT aggregate_kind,aggregate_id,aggregate_version,event_type,schema_version,payload FROM raw.domain_events WHERE event_id=$1`, eventID).Scan(&gotKind, &gotAggregate, &gotVersion, &gotType, &gotSchema, &gotPayload); err != nil {
+				t.Fatalf("read safety event %q: %v", eventID, err)
+			}
+			if gotKind != "scope" || gotAggregate != string(snapshot.ScopeID) || gotVersion != version || gotType != eventType || gotSchema != "paddock.safety-event/1" || string(gotPayload) != wantPayload {
+				t.Fatalf("safety event mismatch: kind=%q aggregate=%q version=%d type=%q schema=%q payload=%s", gotKind, gotAggregate, gotVersion, gotType, gotSchema, gotPayload)
+			}
+		}
 		stopID := f.scope + "_stop"
 		stopSigs := makeSigs(domain.SafetyActionStop, snapshot.SecurityEpoch, stopID, nil)
-		stopped, err := service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, stopSigs)
+		stopped, err := service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, "safety-fixture-nonce", stopSigs)
 		if err != nil || stopped.State.Mode != domain.ScopeSafeStop || stopped.State.SecurityEpoch != snapshot.SecurityEpoch+1 {
 			t.Fatalf("Stop result=%+v err=%v", stopped, err)
 		}
@@ -195,31 +347,28 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("CheckHighRiskAction after Stop = %v, want ErrSafeStopped", err)
 		}
-		var mode string
-		var activationEpoch, securityEpoch int64
-		if err := tx.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&mode, &activationEpoch); err != nil {
-			t.Fatal(err)
+		stoppedSnapshot, err := newSafetyGovernanceTx(tx).LockScope(caseCtx, snapshot.ScopeID)
+		if err != nil {
+			t.Fatalf("read stopped Scope through app API: %v", err)
 		}
-		if err := tx.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&securityEpoch); err != nil {
-			t.Fatal(err)
+		if stoppedSnapshot.Mode != domain.ScopeSafeStop || stoppedSnapshot.ActivationEpoch != snapshot.ActivationEpoch || stoppedSnapshot.SecurityEpoch != snapshot.SecurityEpoch+1 {
+			t.Fatalf("stopped DB state mode=%s activation=%d security=%d", stoppedSnapshot.Mode, stoppedSnapshot.ActivationEpoch, stoppedSnapshot.SecurityEpoch)
 		}
-		if mode != "SAFE_STOPPED" || activationEpoch != int64(snapshot.ActivationEpoch) || securityEpoch != int64(snapshot.SecurityEpoch+1) {
-			t.Fatalf("stopped DB state mode=%s activation=%d security=%d", mode, activationEpoch, securityEpoch)
-		}
-		var stopReceipt port.CommandReceipt
-		if err := tx.QueryRow(caseCtx, `SELECT command_id,request_digest,status,response_bytes FROM raw.command_receipts WHERE command_id=$1`, stopID).Scan(&stopReceipt.CommandID, &stopReceipt.RequestDigest, &stopReceipt.Status, &stopReceipt.Response); err != nil {
-			t.Fatal(err)
+		checkSafetyEvent(stopID, "SafetyStopped", int64(stopped.State.SecurityEpoch), fmt.Sprintf(`{"previous_scope_activation_epoch":%d,"scope_activation_epoch":%d,"previous_security_epoch":%d,"security_epoch":%d}`, snapshot.ActivationEpoch, stopped.State.ScopeActivationEpoch, snapshot.SecurityEpoch, stopped.State.SecurityEpoch))
+		stopReceipt, stopReceiptFound, err := newSafetyGovernanceTx(tx).LookupCommandReceipt(caseCtx, stopID)
+		if err != nil || !stopReceiptFound {
+			t.Fatalf("lookup Stop receipt: found=%t err=%v", stopReceiptFound, err)
 		}
 		if stopReceipt.Status != "SUCCEEDED" || len(stopReceipt.Response) == 0 {
 			t.Fatalf("invalid stop receipt: %+v", stopReceipt)
 		}
-		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, stopSigs); err != nil {
+		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, "safety-fixture-nonce", stopSigs); err != nil {
 			t.Fatalf("Stop replay: %v", err)
 		}
 		changed := append([]domain.SafetySignature(nil), stopSigs...)
 		changed[0].Signature = append([]byte(nil), changed[0].Signature...)
 		changed[0].Signature[0] ^= 1
-		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, changed); err == nil {
+		if _, err = service.Stop(caseCtx, snapshot.ScopeID, snapshot.SecurityEpoch, stopID, "safety-fixture-nonce", changed); err == nil {
 			t.Fatal("changed Stop request unexpectedly accepted")
 		}
 		activation := domain.AuthorityState{Scope: snapshot.ScopeID, ScopeActivationEpoch: snapshot.ActivationEpoch + 1, SecurityEpoch: stopped.State.SecurityEpoch + 1, Mode: domain.ScopeActive, DatabaseAvailable: true, Roots: stopped.State.Roots}
@@ -229,7 +378,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		}
 		releaseID := f.scope + "_release"
 		releaseSigs := makeSigs(domain.SafetyActionRelease, stopped.State.SecurityEpoch, releaseID, &digest)
-		released, err := service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, activation, releaseSigs)
+		released, err := service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, "safety-fixture-nonce", activation, releaseSigs)
 		if err != nil || released.State.Mode != domain.ScopeActive || released.State.ScopeActivationEpoch != activation.ScopeActivationEpoch {
 			t.Fatalf("Release result=%+v err=%v", released, err)
 		}
@@ -247,30 +396,83 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrStaleGrant) {
 			t.Fatalf("CheckHighRiskAction after Release with stale grant = %v, want ErrStaleGrant", err)
 		}
-		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, activation, releaseSigs); err != nil {
+		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, "safety-fixture-nonce", activation, releaseSigs); err != nil {
 			t.Fatalf("Release replay: %v", err)
 		}
 		altered := activation
 		altered.ScopeActivationEpoch++
-		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, altered, releaseSigs); err == nil {
+		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, "safety-fixture-nonce", altered, releaseSigs); err == nil {
 			t.Fatal("changed Release activation unexpectedly accepted")
 		}
-		var releaseStatus string
-		var response []byte
-		if err := tx.QueryRow(caseCtx, `SELECT status,response_bytes FROM raw.command_receipts WHERE command_id=$1`, releaseID).Scan(&releaseStatus, &response); err != nil {
+		releaseReceipt, releaseReceiptFound, err := newSafetyGovernanceTx(tx).LookupCommandReceipt(caseCtx, releaseID)
+		if err != nil || !releaseReceiptFound || releaseReceipt.Status != "SUCCEEDED" || len(releaseReceipt.Response) == 0 {
+			t.Fatalf("invalid release receipt found=%t receipt=%+v err=%v", releaseReceiptFound, releaseReceipt, err)
+		}
+		releasedSnapshot, err := newSafetyGovernanceTx(tx).LockScope(caseCtx, snapshot.ScopeID)
+		if err != nil {
+			t.Fatalf("read released Scope through app API: %v", err)
+		}
+		if releasedSnapshot.Mode != domain.ScopeActive || releasedSnapshot.ActivationEpoch != activation.ScopeActivationEpoch || releasedSnapshot.SecurityEpoch != released.State.SecurityEpoch || releasedSnapshot.SecurityEpoch != stopped.State.SecurityEpoch+1 {
+			t.Fatalf("released DB state mode=%s activation=%d security=%d; want mode=ACTIVE activation=%d security=%d", releasedSnapshot.Mode, releasedSnapshot.ActivationEpoch, releasedSnapshot.SecurityEpoch, activation.ScopeActivationEpoch, released.State.SecurityEpoch)
+		}
+		checkSafetyEvent(releaseID, "SafetyReleased", int64(released.State.SecurityEpoch), fmt.Sprintf(`{"previous_scope_activation_epoch":%d,"scope_activation_epoch":%d,"previous_security_epoch":%d,"security_epoch":%d}`, stopped.State.ScopeActivationEpoch, released.State.ScopeActivationEpoch, stopped.State.SecurityEpoch, released.State.SecurityEpoch))
+
+		// Force the final Event append to violate the unique aggregate version after
+		// Scope, Security Epoch, and Receipt writes. A savepoint lets the test inspect
+		// that the failed command left none of its own rows while preserving this
+		// deliberate colliding Event fixture until the outer transaction is rolled back.
+		faultCommandID := f.scope + "_event_failure"
+		faultEventID := "safety/" + faultCommandID
+		fixtureEventID := "failure-fixture/" + faultCommandID
+		faultVersion := released.State.SecurityEpoch + 1
+		var faultCollisions int
+		if err := pool.QueryRow(caseCtx, `SELECT
+			(SELECT count(*) FROM raw.command_receipts WHERE command_id=$1) +
+			(SELECT count(*) FROM raw.domain_events WHERE event_id=ANY($2::text[])) +
+			(SELECT count(*) FROM raw.domain_events WHERE aggregate_kind='scope' AND aggregate_id=$3 AND aggregate_version=$4)`,
+			faultCommandID, []string{faultEventID, fixtureEventID}, snapshot.ScopeID, int64(faultVersion)).Scan(&faultCollisions); err != nil || faultCollisions != 0 {
+			t.Fatalf("refusing safety event failure fixture: collisions=%d err=%v", faultCollisions, err)
+		}
+		failureFixture, err := domain.NewEvent(fixtureEventID, "scope", string(snapshot.ScopeID), int64(faultVersion), "SafetyFailureFixture", "paddock.safety-event/1", []byte(`{}`))
+		if err != nil {
 			t.Fatal(err)
 		}
-		if releaseStatus != "SUCCEEDED" || len(response) == 0 {
-			t.Fatalf("invalid release receipt status=%s", releaseStatus)
+		if err := gov.AppendEvent(caseCtx, failureFixture); err != nil {
+			t.Fatalf("seed event unique-version failure fixture: %v", err)
 		}
-		if err := tx.QueryRow(caseCtx, `SELECT mode,activation_epoch FROM raw.policy_scopes WHERE scope_id=$1`, f.scope).Scan(&mode, &activationEpoch); err != nil {
-			t.Fatalf("read released scope state: %v", err)
+		if _, err := tx.Exec(caseCtx, `SAVEPOINT safety_event_failure`); err != nil {
+			t.Fatalf("create event failure savepoint: %v", err)
 		}
-		if err := tx.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&securityEpoch); err != nil {
-			t.Fatalf("read released security epoch: %v", err)
+		faultSignatures := makeSigs(domain.SafetyActionStop, released.State.SecurityEpoch, faultCommandID, nil)
+		_, faultErr := service.Stop(caseCtx, snapshot.ScopeID, released.State.SecurityEpoch, faultCommandID, "safety-fixture-nonce", faultSignatures)
+		var faultPGErr *pgconn.PgError
+		if !errors.As(faultErr, &faultPGErr) || faultPGErr.Code != "23505" {
+			t.Fatalf("fault-injected Stop error=%v, want event unique_violation (23505)", faultErr)
 		}
-		if mode != "ACTIVE" || activationEpoch != int64(activation.ScopeActivationEpoch) || securityEpoch != int64(released.State.SecurityEpoch) || securityEpoch != int64(stopped.State.SecurityEpoch+1) {
-			t.Fatalf("released DB state mode=%s activation=%d security=%d; want mode=ACTIVE activation=%d security=%d", mode, activationEpoch, securityEpoch, activation.ScopeActivationEpoch, released.State.SecurityEpoch)
+		if _, err := tx.Exec(caseCtx, `ROLLBACK TO SAVEPOINT safety_event_failure`); err != nil {
+			t.Fatalf("rollback failed safety transition to savepoint: %v", err)
+		}
+		if _, err := tx.Exec(caseCtx, `RELEASE SAVEPOINT safety_event_failure`); err != nil {
+			t.Fatalf("release safety event failure savepoint: %v", err)
+		}
+		failedScopeSnapshot, err := newSafetyGovernanceTx(tx).LockScope(caseCtx, snapshot.ScopeID)
+		if err != nil {
+			t.Fatalf("read Scope after injected Event failure through app API: %v", err)
+		}
+		if failedScopeSnapshot.Mode != domain.ScopeActive || failedScopeSnapshot.ActivationEpoch != released.State.ScopeActivationEpoch || failedScopeSnapshot.SecurityEpoch != released.State.SecurityEpoch {
+			t.Fatalf("failed safety transition persisted state: mode=%s activation=%d security=%d", failedScopeSnapshot.Mode, failedScopeSnapshot.ActivationEpoch, failedScopeSnapshot.SecurityEpoch)
+		}
+		_, faultReceiptFound, err := newSafetyGovernanceTx(tx).LookupCommandReceipt(caseCtx, faultCommandID)
+		if err != nil || faultReceiptFound {
+			t.Fatalf("failed command Receipt found=%t err=%v, want absent", faultReceiptFound, err)
+		}
+		var failedEventRows int
+		if err := tx.QueryRow(caseCtx, `SELECT count(*) FROM raw.domain_events WHERE event_id=$1`, faultEventID).Scan(&failedEventRows); err != nil || failedEventRows != 0 {
+			t.Fatalf("failed command Event rows=%d err=%v, want zero", failedEventRows, err)
+		}
+		var collisionEventRows int
+		if err := tx.QueryRow(caseCtx, `SELECT count(*) FROM raw.domain_events WHERE event_id=$1`, fixtureEventID).Scan(&collisionEventRows); err != nil || collisionEventRows != 1 {
+			t.Fatalf("failure fixture Event rows=%d err=%v, want one", collisionEventRows, err)
 		}
 		if err := tx.Rollback(caseCtx); err != nil {
 			t.Fatalf("rollback safety transaction: %v", err)
@@ -287,12 +489,18 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if finalMode != baselineMode || finalActivation != baselineActivation || finalSecurity != baselineSecurity {
 			t.Fatalf("rollback did not restore baseline: mode=%s activation=%d security=%d; want mode=%s activation=%d security=%d", finalMode, finalActivation, finalSecurity, baselineMode, baselineActivation, baselineSecurity)
 		}
-		var receiptCount int
-		if err := pool.QueryRow(caseCtx, `SELECT count(*) FROM raw.command_receipts WHERE command_id = ANY($1::text[])`, []string{stopID, releaseID}).Scan(&receiptCount); err != nil {
-			t.Fatalf("check receipts after rollback: %v", err)
+		var receiptCount, eventCount, outboxCount int
+		eventIDs := []string{"safety/" + stopID, "safety/" + releaseID, faultEventID, fixtureEventID}
+		if err := pool.QueryRow(caseCtx, `SELECT
+			(SELECT count(*) FROM raw.command_receipts WHERE command_id=ANY($1::text[])),
+			(SELECT count(*) FROM raw.domain_events WHERE event_id=ANY($2::text[])),
+			(SELECT count(*) FROM raw.event_outbox WHERE event_id=ANY($2::text[]))`,
+			[]string{stopID, releaseID, faultCommandID}, eventIDs).Scan(&receiptCount, &eventCount, &outboxCount); err != nil {
+			t.Fatalf("read final rollback row counts: %v", err)
 		}
-		if receiptCount != 0 {
-			t.Fatalf("command receipts remain after rollback: count=%d", receiptCount)
+		t.Logf("post-rollback safety fixture counts: receipts=%d events=%d outbox=%d", receiptCount, eventCount, outboxCount)
+		if receiptCount != 0 || eventCount != 0 || outboxCount != 0 {
+			t.Fatalf("safety fixture rows remain after rollback: receipts=%d events=%d outbox=%d", receiptCount, eventCount, outboxCount)
 		}
 	})
 
@@ -661,9 +869,15 @@ type fixture struct{ bundle, scope, root, otherRoot, otherScope, otherScopeRoot,
 
 // outerTxTransactor adapts an already-open transaction without taking ownership
 // of its commit. The integration test always performs the final rollback.
-type outerTxTransactor struct{ tx pgx.Tx }
+type outerTxTransactor struct {
+	tx        pgx.Tx
+	safetyAPI bool
+}
 
 func (o outerTxTransactor) WithinTransaction(ctx context.Context, fn func(port.GovernanceTx) error) error {
+	if o.safetyAPI {
+		return fn(newSafetyGovernanceTx(o.tx))
+	}
 	return fn(newGovernanceTx(o.tx))
 }
 

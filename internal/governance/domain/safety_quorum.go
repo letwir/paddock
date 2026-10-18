@@ -4,9 +4,12 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+
+	"github.com/letwir/paddock/internal/canonical"
 )
 
 var ErrInvalidApproval = errors.New("invalid safety approval")
@@ -52,33 +55,41 @@ type SafetySignature struct {
 
 // SafetyApprovalMessage exposes signing bytes only; it never signs and contains
 // no private-key capability. The optional activation digest is required for release.
-func SafetyApprovalMessage(action SafetyAction, scope ScopeID, expectedEpoch Epoch, commandID string, activationDigest ...[32]byte) ([]byte, error) {
+func SafetyApprovalMessage(action SafetyAction, scope ScopeID, expectedEpoch Epoch, commandID, nonce string, activationDigest ...[32]byte) ([]byte, error) {
 	if action != SafetyActionStop && action != SafetyActionRelease {
 		return nil, fmt.Errorf("%w: unknown action", ErrInvalidApproval)
 	}
-	if scope.Validate() != nil || validateID(commandID) != nil {
-		return nil, fmt.Errorf("%w: invalid scope or command ID", ErrInvalidApproval)
+	if scope.Validate() != nil || validateID(commandID) != nil || validateID(nonce) != nil {
+		return nil, fmt.Errorf("%w: invalid scope, command ID, or nonce", ErrInvalidApproval)
 	}
 	if action == SafetyActionRelease && len(activationDigest) != 1 || action == SafetyActionStop && len(activationDigest) != 0 {
 		return nil, fmt.Errorf("%w: activation binding mismatch", ErrInvalidApproval)
 	}
-	b := []byte("PADDOCK-SAFETY-APPROVAL\x00v2\x00")
-	put := func(s string) {
-		var n [4]byte
-		binary.BigEndian.PutUint32(n[:], uint32(len(s)))
-		b = append(b, n[:]...)
-		b = append(b, s...)
-	}
-	put(string(action))
-	put(string(scope))
-	put(commandID)
-	var e [8]byte
-	binary.BigEndian.PutUint64(e[:], uint64(expectedEpoch))
-	b = append(b, e[:]...)
+	payload := struct {
+		Action           SafetyAction `json:"action"`
+		Scope            ScopeID      `json:"scope"`
+		SecurityEpoch    Epoch        `json:"security_epoch"`
+		ActivationDigest string       `json:"activation_digest,omitempty"`
+	}{Action: action, Scope: scope, SecurityEpoch: expectedEpoch}
 	if action == SafetyActionRelease {
-		b = append(b, activationDigest[0][:]...)
+		payload.ActivationDigest = fmt.Sprintf("%x", activationDigest[0])
 	}
-	return b, nil
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: encode payload", ErrInvalidApproval)
+	}
+	codec := canonical.NewJCSCodec()
+	canonicalPayload, err := codec.CanonicalizeJSON(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("%w: canonicalize payload", ErrInvalidApproval)
+	}
+	message, err := canonical.Envelope(codec, canonical.DomainApproval, canonical.Context{
+		SchemaVersion: "paddock.approval/1", Audience: "governance", RequestID: commandID, Nonce: nonce,
+	}, canonicalPayload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: construct envelope", ErrInvalidApproval)
+	}
+	return message, nil
 }
 
 // ActivationDigest deterministically binds every AuthorityState field. Root entries
@@ -129,7 +140,7 @@ func ActivationDigest(s AuthorityState) ([32]byte, error) {
 	return sha256.Sum256(b), nil
 }
 
-func (q SafetyQuorum) verify(state AuthorityState, action SafetyAction, expectedEpoch Epoch, commandID string, digest *[32]byte, signatures []SafetySignature) error {
+func (q SafetyQuorum) verify(state AuthorityState, action SafetyAction, expectedEpoch Epoch, commandID, nonce string, digest *[32]byte, signatures []SafetySignature) error {
 	if !state.DatabaseAvailable {
 		return ErrDatabaseUnavailable
 	}
@@ -142,9 +153,9 @@ func (q SafetyQuorum) verify(state AuthorityState, action SafetyAction, expected
 	var msg []byte
 	var err error
 	if digest == nil {
-		msg, err = SafetyApprovalMessage(action, state.Scope, expectedEpoch, commandID)
+		msg, err = SafetyApprovalMessage(action, state.Scope, expectedEpoch, commandID, nonce)
 	} else {
-		msg, err = SafetyApprovalMessage(action, state.Scope, expectedEpoch, commandID, *digest)
+		msg, err = SafetyApprovalMessage(action, state.Scope, expectedEpoch, commandID, nonce, *digest)
 	}
 	if err != nil {
 		return err
@@ -164,11 +175,11 @@ func (q SafetyQuorum) verify(state AuthorityState, action SafetyAction, expected
 }
 
 // VerifySafetyApproval verifies an approval only; use Stop/Release for transitions.
-func (q SafetyQuorum) VerifySafetyApproval(state AuthorityState, action SafetyAction, expectedEpoch Epoch, commandID string, signatures []SafetySignature) error {
+func (q SafetyQuorum) VerifySafetyApproval(state AuthorityState, action SafetyAction, expectedEpoch Epoch, commandID, nonce string, signatures []SafetySignature) error {
 	if action == SafetyActionRelease {
 		return fmt.Errorf("%w: release requires activation-bound transition", ErrInvalidApproval)
 	}
-	return q.verify(state, action, expectedEpoch, commandID, nil, signatures)
+	return q.verify(state, action, expectedEpoch, commandID, nonce, nil, signatures)
 }
 
 type SafetyTransitionResult struct {
@@ -177,11 +188,11 @@ type SafetyTransitionResult struct {
 }
 
 // Stop authenticates a scoped command against the current epoch then advances SecurityEpoch exactly once.
-func (q SafetyQuorum) Stop(state AuthorityState, expectedScope ScopeID, expectedEpoch Epoch, commandID string, signatures []SafetySignature) (SafetyTransitionResult, error) {
+func (q SafetyQuorum) Stop(state AuthorityState, expectedScope ScopeID, expectedEpoch Epoch, commandID, nonce string, signatures []SafetySignature) (SafetyTransitionResult, error) {
 	if state.Scope != expectedScope {
 		return SafetyTransitionResult{}, ErrInvalidApproval
 	}
-	if err := q.verify(state, SafetyActionStop, expectedEpoch, commandID, nil, signatures); err != nil {
+	if err := q.verify(state, SafetyActionStop, expectedEpoch, commandID, nonce, nil, signatures); err != nil {
 		return SafetyTransitionResult{}, err
 	}
 	if state.Mode != ScopeActive {
@@ -196,7 +207,7 @@ func (q SafetyQuorum) Stop(state AuthorityState, expectedScope ScopeID, expected
 
 // Release is a separate authenticated transition. The approval binds the complete
 // proposed activation, preventing arbitrary policy replacement or cross-command replay.
-func (q SafetyQuorum) Release(state, activation AuthorityState, expectedScope ScopeID, expectedEpoch Epoch, commandID string, signatures []SafetySignature) (SafetyTransitionResult, error) {
+func (q SafetyQuorum) Release(state, activation AuthorityState, expectedScope ScopeID, expectedEpoch Epoch, commandID, nonce string, signatures []SafetySignature) (SafetyTransitionResult, error) {
 	if !state.DatabaseAvailable {
 		return SafetyTransitionResult{}, ErrDatabaseUnavailable
 	}
@@ -223,7 +234,7 @@ func (q SafetyQuorum) Release(state, activation AuthorityState, expectedScope Sc
 	if err != nil {
 		return SafetyTransitionResult{}, err
 	}
-	if err := q.verify(state, SafetyActionRelease, expectedEpoch, commandID, &digest, signatures); err != nil {
+	if err := q.verify(state, SafetyActionRelease, expectedEpoch, commandID, nonce, &digest, signatures); err != nil {
 		return SafetyTransitionResult{}, err
 	}
 	return SafetyTransitionResult{State: cloneAuthority(activation), CommandID: commandID}, nil

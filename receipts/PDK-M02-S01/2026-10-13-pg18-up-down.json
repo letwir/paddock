@@ -1,0 +1,88 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S01",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "conversation-2026-10-13-PDK-M02-S01",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-13T18:35:10Z",
+  "source": {
+    "git_commit": "f4e66bcb4ada48be5a53bb8083dc4dad73a140c7",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_DIRTY_DIFF_NOT_CAPTURED",
+    "worktree_status_sha256_pre_receipt": "5cd662f3c3b1b631c81757723e647c76ce08603db80e79fee8074d76b6e4c3e4"
+  },
+  "environment": {
+    "database": "paddock_test",
+    "postgresql_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+    "dsn_variable": "PADDOCK_DB_URL",
+    "dsn_value_recorded": false
+  },
+  "targets": [
+    {"path": "sql/init.sql", "sha256": "31be5c80afe447a0a9eb7f88b3ec32b94c0bf463ff629d7df245c47f69427ec3"},
+    {"path": "sql/down.sql", "sha256": "8aa6fd4bf04fca0673a7600eaf5774e7cabe0ade4d31feeb51cec9e87e65104a"},
+    {"path": "tests/test_m02_initial_migration.py", "sha256": "3a1074c6a72253b2beede3d4253206ead98948985f31e9bdca299ab7c92a6a73"}
+  ],
+  "checks": [
+    {
+      "command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/down.sql",
+      "exit_code": 0,
+      "result": "PASS; BEGIN/guard/constraint removal/11 table drops/COMMIT observed"
+    },
+    {
+      "command": "read-only catalog query: current_database(), server_version, raw base-table count",
+      "exit_code": 0,
+      "result": "paddock_test; PostgreSQL 18.6; raw base tables=0 after down"
+    },
+    {
+      "command": "scripts/init_test_db.sh --apply",
+      "exit_code": 0,
+      "result": "PASS; database guard, 11 CREATE TABLE statements, seed insert, COMMIT observed"
+    },
+    {
+      "command": "read-only catalog query: expected raw base table names",
+      "exit_code": 0,
+      "result": "11 expected base tables present; missing=NONE"
+    },
+    {
+      "command": "scripts/init_test_db.sh --check",
+      "exit_code": 0,
+      "result": "PASS; paddock_test PostgreSQL 18.6 raw_relations=25; read-only"
+    },
+    {
+      "command": "pg_dump \"$PADDOCK_DB_URL\" --schema-only --schema=raw --no-owner --no-privileges | sha256sum",
+      "exit_code": 0,
+      "result": "schema-only dump SHA-256 5fa0b4643eddf99ce2018dfe1681f674da9c03875d886225122184b4e2f80001"
+    },
+    {
+      "command": "python3 -m unittest tests.test_m02_initial_migration -v",
+      "exit_code": 0,
+      "result": "PASS; 5 tests"
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 148 edges"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "authorization": {
+    "source": "Current-task user explicitly authorized down/recreate of the current PADDOCK_DB_URL target after database inventory confirmation",
+    "scope": "Drop/recreate exactly the 11 named raw tables and their data; no schema/database drop",
+    "data_impact": "Rows in those 11 tables were destroyed and recreated"
+  },
+  "verdict": "LOCAL_RUNNER_PASS; independent verifier review pending; no CI attestation",
+  "remaining_risks": [
+    "Worktree was dirty and no clean Git tree/revision receipt was available.",
+    "Schema dump was hashed but not retained as a file.",
+    "CI attestation and Verifier-of-Record are absent; not claimed."
+  ]
+}

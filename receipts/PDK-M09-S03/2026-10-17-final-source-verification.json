@@ -1,0 +1,30 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-final-source", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:11:36Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "sql/governance_checkpoints.sql", "sha256": "86b9a6fe4f1ab22b32185dc72770be6d272c490e5c960f0f6ad2fea320f6bf15"},
+    {"path": "internal/storage/postgres/checkpoint_integration_test.go", "sha256": "0bc506eb8dcea2fc43d3d5c5722fddb57f986ac60ecd2c47cf5c9af8212b45cc"},
+    {"path": "tests/test_m09_checkpoint_sql.py", "sha256": "42cba7b75f7f2f7cdeffa263422b6c432b4fdc36cc9aba6f10e6ae48894ab3af"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "1e902dad21eda53675a2c0453b62e74c6015c1683a5ba495292920cab8e404d3"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql", "exit_code": 0, "result": "PASS; 33 M09 source-contract tests"},
+    {"command": "python3 -m unittest tests.test_m09_repair_sql", "exit_code": 0, "result": "PASS; 8 guarded repair static-contract tests"},
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only, no integration body"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "tracked and no-index whitespace checks; gofmt", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable source finding in the repair SQL after the digest OUT-variable correction. The revised fixture uses the user-selected second identity-checked app pool boundary.", "scope": "source only; no DB application or runtime after the separate-pool source change"},
+  "runtime_status": {"applied_database_state": "The original S03 migration and combined repair version (SHA 6eaf8292ecf7a885f0daf5e7a35e52ea076e02387631cf9a00f1ac131cae7f6a) are applied in paddock_test; the S03 store function body in that repair passed the previous integration run. The current combined repair source contains the corrected S02 helper, not yet applied.", "last_runner": "TestCheckpointDurabilityIntegration passed with the same-pool new-store variant. A source update now opens a separate app pgxpool and verifies identity, but that revised fixture has only compile/static verification and requires another authorized DB run."},
+  "authorization": {"design_selection": "User selected a separate app pgxpool as the different-Runner boundary; a subprocess is not required for this Issue.", "scope": "Source verification only for the separate-pool revision. Any DB rerun requires separate explicit approval. S03 append-only fixture rows remain retained."},
+  "verdict": "LOCAL_SOURCE_TESTED; PRIOR_S03_RUNTIME_PASS_RECORDED; REVISED_POOL_RUNTIME_UNVERIFIED; S03_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["The prior S03 run verified the same-pool new-store source; the revised second-pool restore path has not been run against PostgreSQL.", "Current restore after Lease expiry dynamically quarantines and hides payload; exact behavior was observed in the prior run.", "No CI attestation, commit, or push is claimed."]
+}

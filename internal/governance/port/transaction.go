@@ -28,7 +28,7 @@ type ScopeSnapshot struct {
 // receipts with a valid response may be returned by LookupCommandReceipt.
 type CommandReceipt struct {
 	CommandID     string
-	RequestDigest string
+	RequestDigest domain.Digest
 	Status        string
 	Response      []byte
 }
@@ -69,6 +69,10 @@ type Transactor interface {
 // call ValidateTargets after LockRollout (or after LockScope for a new rollout)
 // before any Scope CAS. It locks all same-scope Roots in deterministic order.
 type GovernanceTx interface {
+	// InsertPolicyBundle persists a validated content-addressed bundle and its
+	// externally supplied signer ID/signature atomically. It performs no key
+	// verification or signing.
+	InsertPolicyBundle(ctx context.Context, bundle domain.CanonicalBundle, signerKeyID string, signature []byte) error
 	// DatabaseTime returns PostgreSQL wall-clock time within this transaction.
 	// Callers must use it, rather than a worker-supplied timestamp, for deadlines.
 	DatabaseTime(ctx context.Context) (time.Time, error)
@@ -80,4 +84,6 @@ type GovernanceTx interface {
 	CompareAndSwapSecurityEpoch(ctx context.Context, expected, next domain.Epoch) error
 	LookupCommandReceipt(ctx context.Context, commandID string) (CommandReceipt, bool, error)
 	InsertCommandReceipt(ctx context.Context, receipt CommandReceipt) error
+	// AppendEvent persists the event envelope and its outbox row in this transaction.
+	AppendEvent(ctx context.Context, event domain.Event) error
 }

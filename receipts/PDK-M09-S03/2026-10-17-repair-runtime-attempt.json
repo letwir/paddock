@@ -1,0 +1,25 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-repair-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:05:27Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256_current_after_runtime": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d", "sha256_applied": "6eaf8292ecf7a885f0daf5e7a35e52ea076e02387631cf9a00f1ac131cae7f6a"},
+    {"path": "sql/governance_checkpoints.sql", "sha256": "86b9a6fe4f1ab22b32185dc72770be6d272c490e5c960f0f6ad2fea320f6bf15"},
+    {"path": "internal/storage/postgres/checkpoint_integration_test.go", "sha256": "a24a03c51bf7973573e55c02758d8eb4622ca760076d3d7bb4d62857ec6a7e56"},
+    {"path": "tests/test_m09_checkpoint_sql.py", "sha256": "42cba7b75f7f2f7cdeffa263422b6c432b4fdc36cc9aba6f10e6ae48894ab3af"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "database": "paddock_test", "postgresql": "18.6", "ci": false},
+  "checks": [
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_m09_s02_s03_repair.sql", "exit_code": 0, "result": "Guarded combined repair applied in one transaction; COMMIT. Applied file SHA was 6eaf...; the later helper OUT-variable fix is source-only and not applied."},
+    {"command": "read-only catalog postcheck after repair", "exit_code": 0, "result": "checkpoint store function is migrator-owned SECURITY DEFINER with fixed search_path; app EXECUTE present; PUBLIC EXECUTE and direct table privileges absent; immutable checkpoint triggers remain enabled."},
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestCheckpointDurabilityIntegration$' -count=1 -v", "exit_code": 0, "result": "PASS; valid L2 and new-store restore, stale quarantine/no payload, missing reserve denial, interrupted transaction rollback, over-cap rejection, payload and noncanonical JCS rejection, and exact byte charge. Retained suffix 5357578d6bd31b768d903807."},
+    {"command": "read-only postcheck of successful S03 fixture suffix 5357578d6bd31b768d903807", "exit_code": 0, "result": "Stored checkpoint rows are L2 (523 bytes) and QUARANTINED (501 bytes); sum 1024. STORAGE_BYTES/byte account grant=1048576, spent=1024, reserved=0. Exactly one reserve/settlement and journal record pair per successful checkpoint; failed candidate operations absent. Current restore after Lease expiry returns QUARANTINED and NULL payload for both."},
+    {"command": "read-only postcheck of retained earlier S03 setup/grant suffixes e62b5d1f18ee60786c1268cf and bf3299ccc0ac35bcd1dddef1", "exit_code": 0, "result": "Scope/Root/WorkOrder/Attempt/Lease/Storage account and GRANT operation/journal remain; each account spent=0,reserved=0 and has no checkpoint rows. No cleanup/delete performed."}
+  ],
+  "authorization": {"source": "User explicitly authorized the combined guarded repair and the named S02/S03 fixtures, including retention of append-only S03 rows.", "scope": "This run used that authorization. The latest helper OUT-variable source fix is not applied; any additional repair application requires new explicit approval. No down/reset/drop, production, role change, or credential output."},
+  "verdict": "REPAIR_APPLIED_ONCE; S03_FIXTURE_PASS_AND_READBACK_VERIFIED; ISSUE_RUNTIME_PASS_OBSERVED",
+  "remaining_risks": ["This successful S03 run used the applied store function from repair SHA 6eaf..., which matches the current S03 store body; no separate process was used, but restore was performed through a new CheckpointStore instance on the same app pool.", "The later S02 helper OUT-variable source fix is not applied; repair has not been rerun after that change.", "No CI attestation, commit, or push is claimed."]
+}

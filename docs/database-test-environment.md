@@ -13,7 +13,10 @@
 | Variable | Role | Handling |
 |---|---|---|
 | `PADDOCK_ADMIN_DSN` | Maintenance database connection, used only for intentional creation via `sql/create_database.sql`. | Operator-injected; never log/store its value. |
-| `PADDOCK_DB_URL` | Connection to `paddock_test`, used by the initializer and tests; canonical test variable. | Operator-injected outside the repository; never echo/store its value. |
+| `PADDOCK_DB_URL` | Privileged connection to `paddock_test` for the initializer and isolated integration-test fixture setup, readback, and cleanup. It is not the application connection. | Operator-injected outside the repository; never echo, print, or log its value. |
+| `PADDOCK_APP_DB_URL` | Operator-injected application connection. It must log in as and have effective `current_user` `paddock_app` in `paddock_test`; used only for application entrypoint checks such as Pull readiness, capability configuration, and reservation. | Injected outside the repository; never echo, print, or log its value. |
+
+The privileged fixture connection can perform fixture SQL and read back persisted test results. The app connection is intentionally limited to the expected application functions and has no direct WorkOrder-table access; the integration test checks those grants using the privileged connection's catalog view. The `paddock_app` credential is a trusted-Coordinator-only credential and must never be given to Workers or external callers. Coordinator Authority/Trust/Budget/Permit gates run before the database function call; those gates are not validated or enforced by the database function itself. These variable descriptions do not indicate that either value is configured, and this document grants no database access or permission to run tests.
 
 ## Flow DB-02 — Create database (only if absent)
 

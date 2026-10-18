@@ -19,6 +19,13 @@ func (f *fakeGovernanceTx) LookupCommandReceipt(context.Context, string) (Comman
 	return CommandReceipt{}, false, nil
 }
 func (f *fakeGovernanceTx) InsertCommandReceipt(context.Context, CommandReceipt) error { return nil }
+func (f *fakeGovernanceTx) InsertPolicyBundle(context.Context, domain.CanonicalBundle, string, []byte) error {
+	return nil
+}
+func (f *fakeGovernanceTx) AppendEvent(context.Context, domain.Event) error {
+	f.receivers = append(f.receivers, f)
+	return nil
+}
 
 func TestDatabaseTimeDelegatesResultAndError(t *testing.T) {
 	want := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)

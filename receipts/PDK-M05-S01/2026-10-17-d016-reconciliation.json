@@ -1,0 +1,22 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S01",
+  "runner": {"kind": "local", "identity": "Main Reconciliation", "run_id": "continue-2026-10-17-M05-S01-d016", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T09:57:11Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets_reviewed": [
+    {"path": "receipts/PDK-M05-S01/2026-10-17-runtime-verification.json", "sha256": "27e264b5b969f27109b24c6486419e5534dcb55ecc8fe776ee8555a56a6a72f2"},
+    {"path": "sql/governance_domain_events_schema.sql", "sha256": "a9b57c7c14b4ddf88cfb45e88e9c2bdc46c25c6f2f4720e51d8d848603c108ca"},
+    {"path": "sql/init.sql", "sha256": "86dd89f70830c3b47d7c6710b225f9cdd2ea64b219d237cd771fd891cc7a9461"},
+    {"path": "tests/test_m05_events_schema_migration.py", "sha256": "693ee58e3a1acc53f0f7dea88efc6f6da368b842b9e11b8f7498ae526f862cf6"},
+    {"path": "internal/storage/postgres/governance_tx.go", "sha256": "e7bee053bdf1a3238de4e8b8f35735c0560f46d61533f907d59b6ab9de156a81"},
+    {"path": "internal/storage/postgres/governance_event_test.go", "sha256": "5187ab88376b3791f3c77ddbac76295ae77ff83461efbfacec253df7a2a7584b"},
+    {"path": "internal/storage/postgres/integration_test.go", "sha256": "528c7953d28d422f40a3f97f38d65d210ee5c21ebee9d8fc05c6b8be4320ac89"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagents", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "Both final reviews found no actionable source/receipt gap. Verifiers checked the app-only migration/ACL boundary, target hashes and Main observations, and confirmed M05/M03-S04 scope split. Neither verifier accessed the DB or reproduced live behavior.", "scope": "source, receipt and acceptance review only"},
+  "main_reconciliation": {"acceptance": "The one-shot authorized preflight found an empty existing Event table and matching guarded schema prerequisites. The migration committed; postcheck verified schema version constraint, function owner/security/path, app-only execute, app Event SELECT-only/no direct writes and no Outbox privileges. The named app-pool Event/Outbox subtest passed envelope/readback, duplicate aggregate-version SQLSTATE 23505, callback rollback and exact cleanup. Main compared those Runner results with the selected acceptance and independent reviews.", "scope_split": "Only Event+Outbox atomic append is claimed for M05-S01. Atomic state transition + Receipt + Event/Outbox remains M03-S04; no broad parent integration suite is claimed.", "limitations": ["A first compile-only command omitted `paddock_test` tag and failed before DB connection; corrected combined tags ran the one approved test body.", "A malformed exploratory read-only LIKE query failed without mutation; corrected read-only preflight passed.", "Existing legacy Event rows still cause migration refusal; no backfill or legacy version policy exists.", "Dirty worktree and unavailable full diff hash; no CI attestation, commit or push."]},
+  "issue_state": "DONE",
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; APP_ROLE_EVENT_OUTBOX_PASS; NO_CI_ATTESTATION",
+  "next_action": "Continue with next dependency-ready Issue; no further M05 DB operation is required. Preserve M09 append-only fixtures."
+}

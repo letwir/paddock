@@ -3,7 +3,7 @@
 > AUTO-GENERATED. **DO NOT EDIT**. Source: `Issues.md`.
 > Generator: `python3 scripts/lint_design.py --emit-summary`.
 > 中目標への集約は表示専用。**依存DAGは小目標IDでのみ成立**。
-> Issues.md SHA-256: `1600bda8b405447b17a14b5b2e36cf3f2e57422f5be1b6820014491f33ea0922`
+> Issues.md SHA-256: `7d2b36552085c39223961dd1e791d8f8f04d7b23ce05e5a5f3681f712a32b605`
 
 **小目標: 89件 / 依存辺: 148本 / 中目標: 16領域。**
 
@@ -42,36 +42,36 @@
 | `PDK-M01-S04` | `[x]` | `PDK-M01-S02` |
 | `PDK-M01-S05` | `[x]` | `PDK-M00-S05`, `PDK-M01-S06` |
 | `PDK-M01-S06` | `[x]` | `PDK-M01-S01`, `PDK-M00-S06` |
-| `PDK-M02-S01` | `[ ]` | `PDK-M01-S05`, `PDK-M02-S05` |
-| `PDK-M02-S02` | `[ ]` | `PDK-M02-S01` |
-| `PDK-M02-S03` | `[ ]` | `PDK-M02-S01` |
-| `PDK-M02-S04` | `[ ]` | `PDK-M02-S02`, `PDK-M02-S03`, `PDK-M02-S06` |
-| `PDK-M02-S05` | `[ ]` | `PDK-M00-S02`, `PDK-M00-S06` |
-| `PDK-M02-S06` | `[ ]` | `PDK-M02-S01`, `PDK-M01-S06` |
-| `PDK-M03-S01` | `[ ]` | `PDK-M01-S02`, `PDK-M02-S06` |
-| `PDK-M03-S02` | `[ ]` | `PDK-M03-S01`, `PDK-M02-S02` |
-| `PDK-M03-S03` | `[ ]` | `PDK-M03-S01` |
-| `PDK-M03-S04` | `[ ]` | `PDK-M03-S02`, `PDK-M05-S01` |
-| `PDK-M03-S05` | `[ ]` | `PDK-M03-S01`, `PDK-M06-S07` |
-| `PDK-M03-S06` | `[ ]` | `PDK-M03-S01` |
+| `PDK-M02-S01` | `[x]` | `PDK-M01-S05`, `PDK-M02-S05` |
+| `PDK-M02-S02` | `[x]` | `PDK-M02-S01` |
+| `PDK-M02-S03` | `[x]` | `PDK-M02-S01` |
+| `PDK-M02-S04` | `[x]` | `PDK-M02-S02`, `PDK-M02-S03`, `PDK-M02-S06` |
+| `PDK-M02-S05` | `[x]` | `PDK-M00-S02`, `PDK-M00-S06` |
+| `PDK-M02-S06` | `[x]` | `PDK-M02-S01`, `PDK-M01-S06` |
+| `PDK-M03-S01` | `[x]` | `PDK-M01-S02`, `PDK-M02-S06` |
+| `PDK-M03-S02` | `[x]` | `PDK-M03-S01`, `PDK-M02-S02` |
+| `PDK-M03-S03` | `[x]` | `PDK-M03-S01` |
+| `PDK-M03-S04` | `[x]` | `PDK-M03-S02`, `PDK-M05-S01` |
+| `PDK-M03-S05` | `[x]` | `PDK-M03-S01`, `PDK-M06-S07` |
+| `PDK-M03-S06` | `[x]` | `PDK-M03-S01` |
 | `PDK-M04-S01` | `[ ]` | `PDK-M03-S02`, `PDK-M06-S02` |
-| `PDK-M04-S02` | `[ ]` | `PDK-M03-S05`, `PDK-M03-S02` |
+| `PDK-M04-S02` | `[x]` | `PDK-M03-S05`, `PDK-M03-S02` |
 | `PDK-M04-S03` | `[ ]` | `PDK-M04-S01`, `PDK-M04-S02` |
 | `PDK-M04-S04` | `[ ]` | `PDK-M04-S01` |
 | `PDK-M04-S05` | `[ ]` | `PDK-M04-S02` |
 | `PDK-M04-S06` | `[ ]` | `PDK-M04-S05`, `PDK-M03-S03` |
-| `PDK-M05-S01` | `[ ]` | `PDK-M02-S01` |
-| `PDK-M05-S02` | `[ ]` | `PDK-M05-S01` |
-| `PDK-M05-S03` | `[ ]` | `PDK-M05-S02`, `PDK-M03-S01` |
-| `PDK-M05-S04` | `[ ]` | `PDK-M05-S03` |
-| `PDK-M05-S05` | `[ ]` | `PDK-M05-S01`, `PDK-M00-S08` |
+| `PDK-M05-S01` | `[x]` | `PDK-M02-S01` |
+| `PDK-M05-S02` | `[x]` | `PDK-M05-S01` |
+| `PDK-M05-S03` | `[x]` | `PDK-M05-S02`, `PDK-M03-S01` |
+| `PDK-M05-S04` | `[x]` | `PDK-M05-S03` |
+| `PDK-M05-S05` | `[x]` | `PDK-M05-S01`, `PDK-M00-S08` |
 | `PDK-M06-S01` | `[ ]` | `PDK-M01-S01`, `PDK-M02-S01`, `PDK-M06-S07`, `PDK-M06-S08` |
 | `PDK-M06-S02` | `[ ]` | `PDK-M06-S01` |
 | `PDK-M06-S03` | `[ ]` | `PDK-M06-S02` |
 | `PDK-M06-S04` | `[ ]` | `PDK-M06-S02`, `PDK-M06-S03` |
 | `PDK-M06-S05` | `[x]` | `PDK-M00-S06`, `PDK-M02-S06` |
 | `PDK-M06-S06` | `[ ]` | `PDK-M06-S05`, `PDK-M06-S01` |
-| `PDK-M06-S07` | `[-]` | `PDK-M00-S06` |
+| `PDK-M06-S07` | `[*]` | `PDK-M00-S06` |
 | `PDK-M06-S08` | `[x]` | `PDK-M00-S06` |
 | `PDK-M07-S01` | `[ ]` | `PDK-M04-S01`, `PDK-M06-S02` |
 | `PDK-M07-S02` | `[ ]` | `PDK-M07-S01`, `PDK-M06-S03` |
@@ -81,13 +81,13 @@
 | `PDK-M07-S06` | `[ ]` | `PDK-M07-S02`, `PDK-M03-S06` |
 | `PDK-M07-S07` | `[ ]` | `PDK-M01-S06`, `PDK-M07-S01`, `PDK-M06-S05`, `PDK-M02-S06` |
 | `PDK-M08-S01` | `[x]` | `PDK-M01-S03`, `PDK-M03-S02` |
-| `PDK-M08-S02` | `[ ]` | `PDK-M08-S01` |
-| `PDK-M08-S03` | `[ ]` | `PDK-M08-S02` |
-| `PDK-M08-S04` | `[ ]` | `PDK-M08-S03` |
-| `PDK-M08-S05` | `[ ]` | `PDK-M08-S03`, `PDK-M03-S06` |
-| `PDK-M09-S01` | `[ ]` | `PDK-M08-S01` |
-| `PDK-M09-S02` | `[ ]` | `PDK-M09-S01` |
-| `PDK-M09-S03` | `[ ]` | `PDK-M08-S03`, `PDK-M09-S01` |
+| `PDK-M08-S02` | `[x]` | `PDK-M08-S01` |
+| `PDK-M08-S03` | `[x]` | `PDK-M08-S02` |
+| `PDK-M08-S04` | `[~]` | `PDK-M08-S03` |
+| `PDK-M08-S05` | `[x]` | `PDK-M08-S03`, `PDK-M03-S06` |
+| `PDK-M09-S01` | `[x]` | `PDK-M08-S01` |
+| `PDK-M09-S02` | `[x]` | `PDK-M09-S01` |
+| `PDK-M09-S03` | `[x]` | `PDK-M08-S03`, `PDK-M09-S01` |
 | `PDK-M09-S04` | `[ ]` | `PDK-M09-S01`, `PDK-M08-S04` |
 | `PDK-M10-S01` | `[ ]` | `PDK-M06-S01` |
 | `PDK-M10-S02` | `[ ]` | `PDK-M10-S01`, `PDK-M08-S03` |

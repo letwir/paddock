@@ -1,0 +1,27 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S04",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S04-runner-source-final", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:47:03Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "scripts/m02_s04_rebuild_test.sh", "sha256": "bfa0413ad4bba1ea52ae5acaf90e196efb32b2932f51e15ab2b3b4c8f5198f2a", "mode": "0700"},
+    {"path": "tests/test_m02_rebuild_runner.py", "sha256": "decbe3e0d44b5f55cb88646caafadeca2c6d7b172af712d72b2723dd5d92094c"},
+    {"path": "sql/governance_roles.sql", "sha256": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742"},
+    {"path": "tests/test_m02_roles.py", "sha256": "b94c8fd3537fdf519a5b6d81c5c91bd706327429657b9c0a917a5fd60a732366"}
+  ],
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m02_rebuild_runner -v", "exit_code": 0, "result": "PASS; 10 static source contracts including executable mode 0700; runner not invoked by tests"},
+    {"command": "python3 -m unittest tests.test_m02_roles -v", "exit_code": 0, "result": "PASS; 11 role source contracts including psql sentinel guard"},
+    {"command": "bash -n scripts/m02_s04_rebuild_test.sh", "exit_code": 0, "result": "PASS"},
+    {"command": "scripts/m02_s04_rebuild_test.sh --help; scripts/m02_s04_rebuild_test.sh (no args)", "exit_code": 0, "result": "PASS; no setup or database effect"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "tracked and no-index whitespace checks", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "Final review of the current runner SHA bfa0413... and static tests found no actionable source issue. The M02 role missing-variable sentinel fix is reviewed and statically covered. Verifier did not execute runner or DB.", "scope": "source only"},
+  "runner_attempt_receipt": "receipts/PDK-M02-S04/2026-10-17-runner-attempt.json",
+  "authorization": {"design_selection": "User selected an isolated local temporary PostgreSQL cluster design.", "execution": "No separate --run approval was recorded; a prior attempt is disclosed in the linked attempt receipt and was not authorized by design selection alone. No retry is included in this source verification."},
+  "verdict": "LOCAL_SOURCE_TESTED; ATTEMPT_FAILED_BEFORE_ROLE_DDL; UP_DOWN_UP_NOT_VERIFIED",
+  "remaining_risks": ["The M02 up/down/up chain has not completed in PostgreSQL.", "The role script fix is statically checked but not applied/runtime-tested.", "A repeated runner execution requires fresh explicit user authorization; no CI, commit, or push is claimed."]
+}

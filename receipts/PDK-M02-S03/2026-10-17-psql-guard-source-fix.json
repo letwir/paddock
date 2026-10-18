@@ -1,0 +1,23 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S03-psql-guard-fix", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:32:34Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED"},
+  "targets": [
+    {"path": "sql/governance_roles.sql", "sha256": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742"},
+    {"path": "tests/test_m02_roles.py", "sha256": "b94c8fd3537fdf519a5b6d81c5c91bd706327429657b9c0a917a5fd60a732366"}
+  ],
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m02_roles -v", "exit_code": 0, "result": "PASS; 11/11 static role SQL contracts including missing-variable sentinel guard"},
+    {"command": "python3 -m unittest tests.test_m02_rebuild_runner -v", "exit_code": 0, "result": "PASS; 8/8 static isolated runner contracts"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 edges"},
+    {"command": "bash -n scripts/m02_s04_rebuild_test.sh; runner --help; runner no-argument path", "exit_code": 0, "result": "PASS; syntax and no-op paths only"}
+  ],
+  "finding_and_fix": {"observed_failure": "The isolated M02-S04 runner attempt reached governance_roles.sql and psql 18.6 rejected unsupported \\error at line 12 before role transfer/grant DDL.", "correction": "Missing psql variables now receive distinctive sentinel values via supported \\set; the existing SQL guard rejects non-exact names before ALTER/GRANT/REVOKE DDL.", "runtime": "Source correction has not been applied to a database and is not runtime-verified."},
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "No actionable source gap in sentinel handling, SQL exact-role guard, or guard-before-DDL ordering; no DB/test execution by Verifier.", "scope": "source only; no psql runtime"},
+  "authorization": {"scope": "Local source/static correction only. No DB connection, role script application, role/ACL mutation, or database write."},
+  "verdict": "LOCAL_SOURCE_FIX_TESTED; SCRIPT_APPLICATION_UNVERIFIED; LIVE_CATALOG_ACCEPTANCE_UNCHANGED",
+  "remaining_risks": ["The existing live role state was not changed by the runner attempt; the roles script was not applied.", "The psql 18.6 apply path for the corrected source remains unverified; any rerun requires separate explicit authorization.", "No CI attestation, commit, or push is claimed."]
+}

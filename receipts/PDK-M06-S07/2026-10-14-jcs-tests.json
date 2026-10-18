@@ -1,0 +1,54 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S07",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-14-PDK-M06-S07",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-14",
+  "source": {
+    "git_commit": "c38b818578702bbc0bc40240dcd03341952c852e",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; unrelated and mixed local changes remain"
+  },
+  "targets": [
+    {"path": "go.mod", "sha256": "4f9620671a5f17099b018dec4bd72bc7fbc9570b31f961db9735adcc3a1abb71"},
+    {"path": "go.sum", "sha256": "585c3054410434941243942a4a7060860433637e47d68942c721f196b499eb99"},
+    {"path": "internal/canonical/api_test.go", "sha256": "f28ace9c319173d3f1cec922f2d6c068e9887dac469d7cd7686988ba7966de57"},
+    {"path": "internal/canonical/canonical.go", "sha256": "f9957a58f9573b637fcd125da9f33ae12b10abf6d501b349cf84a57cbd4a0629"},
+    {"path": "internal/canonical/canonical_test.go", "sha256": "6bdf54224ee146ddf3b75726e34f42b08cfcfbc96e5451c2b4e80b83ef73429a"},
+    {"path": "internal/canonical/jcs.go", "sha256": "50b6f320fe2d26737f4a69af6f8e50b2082a8cabdb2de81f045382f32e69b044"},
+    {"path": "docs/canonicalization.md", "sha256": "425244200ab4dfa8a5957d24fd78632db0ae7a5907759d7fc30407cbb84f073d"},
+    {"path": "scripts/check-canonical-portability.sh", "sha256": "850610fd374c208212340166e2f66cf5caa39e0d45db6d0b969a873c980b8ef9"},
+    {"path": "Issues.md", "sha256": "999a48c4f036feb612a11c90de15ba1698fe2ca948a6d644c8fda2a709b2837d"}
+  ],
+  "environment": {"go": "go1.27.1", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all repository Go packages"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS; locale warnings about unavailable ja_JP.UTF-8 only"},
+    {"command": "go test -tags=integration ./internal/storage/postgres -run '^$' -count=1", "exit_code": 0, "result": "PASS compile-only; no integration tests executed and no database connected"},
+    {"command": "./scripts/check-canonical-portability.sh", "exit_code": 0, "result": "PASS cross-compile only for windows/arm64, linux/arm64, android/arm64 with CGO_ENABLED=0; no target runtime execution"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 edges; Issues.md sha256 999a48c4f036feb612a11c90de15ba1698fe2ca948a6d644c8fda2a709b2837d"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"},
+    {"command": "go test ./internal/canonical -count=1 (independent verifier)", "exit_code": 0, "result": "PASS; separate verifier session; cross-protocol source review completed"}
+  ],
+  "independent_review": {
+    "kind": "separately_dispatched verifier subagent",
+    "result": "PASS with limitation: only three directed cross-protocol cases (one direction per unordered pair); no CI attestation",
+    "scope": "canonical implementation, API, vectors, domain separation, Issue evidence",
+    "note": "Verifier reviewed source hashes recorded above except the final Runner receipt itself."
+  },
+  "authorization": {"source": "Current-task user authorized portable JCS dependency adoption and requested continuation/push workflow", "scope": "Local source/tests/dependency/documentation and validation only; no DB, no remote settings, no commit or push performed"},
+  "verdict": "LOCAL_TESTED; dirty worktree; no CI attestation; no remote push",
+  "remaining_risks": [
+    "Source files are uncommitted in a mixed dirty worktree; git commit is only the base revision, not the tested source snapshot.",
+    "Portability checks compile test binaries only; Windows and Linux runtime behavior was not executed.",
+    "Only one direction per unordered protocol pair is covered.",
+    "RFC vectors are focused regression vectors, not exhaustive RFC Appendix B coverage or an independent cryptographic audit.",
+    "No CI attestation is available or claimed."
+  ]
+}

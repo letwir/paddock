@@ -1,0 +1,62 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M04-S02",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-17-M04-S02-commit-ack-loss",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-17T12:09:49Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated tracked and untracked changes remain"
+  },
+  "targets": [
+    {"path": "internal/storage/postgres/commit_ack_loss_integration_test.go", "sha256": "528d0e421c43e03abe6b0a03b2b538fc97e8c60dbda946ab60434a99a04aa55c"},
+    {"path": "Issues.md", "sha256": "c57d8c7fa05fd85c7f52646f8d08a22e08704836756f08020a1884bad4a255f8"},
+    {"path": "docs/issue-dependencies.generated.md", "sha256": "30d1ee15b16ee62ec0271b5e5fadd4ffb7988b89401ce39d247b4a9f661af7bd"}
+  ],
+  "selected_design": {
+    "receipt_contract": "Reuse M03-S05 RFC 8785/JCS-normalized domain.Digest and existing SafetyService receipt path. Same command ID and same request returns the durable response; same ID with a changed signature/request is denied before a second CAS.",
+    "commit_ack_loss_test": "The real Safety Transactor completes PostgreSQL Commit; a wrapper returns a synthetic lost-ack error only after that successful commit. A new transaction retries the same Stop request and verifies the persisted response and no second Scope/Security Epoch advance.",
+    "cleanup_effect": "A valid Release restores the fixture Scope. Command Receipt/Event/Outbox and Scope/Root/Rollout fixtures are cleaned. Do not rewind global Security Epoch; the dedicated paddock_test value remains at baseline+2 (Stop and Release)."
+  },
+  "database_preflight": {
+    "read_only": true,
+    "observations": [
+      "scripts/init_test_db.sh --check previously confirmed paddock_test / PostgreSQL 18.6 / raw_relations=73; no DDL in that check.",
+      "Current PADDOCK_DB_URL identity: paddock_test / current_user=session_user=paddock_migrator.",
+      "Current PADDOCK_APP_DB_URL identity: paddock_test / current_user=session_user=paddock_app.",
+      "Existing Safety API ACL preflight: 8 functions present; all migrator-owned SECURITY DEFINER with fixed search_path; app EXECUTE for all 8; M09 Root direct table privileges false; app Event SELECT true and Event INSERT/Outbox SELECT false."
+    ],
+    "credentials_printed": false
+  },
+  "runner_checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all untagged Go packages."},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS."},
+    {"command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only, no DB body."},
+    {"command": "python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m05_events_schema_migration -q", "exit_code": 0, "result": "PASS; 18 static tests."},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 dependency edges."},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS."},
+    {"command": "python3 scripts/continue_plan.py", "exit_code": 1, "result": "Planner refused because DONE PDK-M08-S05 has runner_evidence but no current_evidence. M04-S02 was selected from the authoritative explicit depends_on DAG; both dependencies are [x]. No unrelated Issue was altered."},
+    {"command": "go test -tags='integration paddock_test' -run '^TestPostgresSafetyReceiptReplayAfterCommitAcknowledgementLoss$' ./internal/storage/postgres -count=1 -v", "exit_code": 0, "result": "PASS; one test body. A Stop committed, the wrapper reported simulated lost acknowledgement, retry with identical command/request returned the durable Receipt result, a changed signature under the same ID was rejected, and persisted Scope/Security Epoch/Receipt/Event/Outbox counts remained unchanged by replay. A cleanup Release restored the Scope; global Security Epoch advanced monotonically by exactly +2 as selected. Test logged final cleanup counts receipts=0, events=0, outbox=0; existing parent cleanupFixtures also verified fixture row absence with no errors."}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only Verifier subagent",
+    "result": "One medium finding claimed fixture-table cleanup lacked final readback.",
+    "main_reconciliation": "Main read `internal/storage/postgres/integration_test.go:936-969`; cleanupFixtures commits deletion of exact fixture Scope/Root/Rollout/Target/Bundle rows and reads their combined count, failing unless zero. This resolves the report; no actionable gap remains. Verifier did not access DB or run test body."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_VERIFICATION",
+  "limitations": [
+    "The lost acknowledgement was simulated by returning an error after the real driver Commit returned success; no network fault/proxy caused an actual pgx Commit error.",
+    "The test was confined to the named fixture; no other PostgreSQL integration tests ran.",
+    "CI attestation is absent.",
+    "Worktree is dirty; full diff hash unavailable.",
+    "No commit or push occurred."
+  ],
+  "verdict": "PASS_LOCAL_DB_D016; CI_ATTESTATION_ABSENT",
+  "next_action": "Select the next dependency-ready Issue from explicit depends_on. The continue_plan.py M08-S05 evidence-field discrepancy remains documented; no unrelated Issue was modified."
+}

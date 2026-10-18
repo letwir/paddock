@@ -24,14 +24,14 @@ func safetyFixture(t *testing.T) (SafetyQuorum, []string, []ed25519.PrivateKey, 
 	state := AuthorityState{Scope: "scope-a", ScopeActivationEpoch: 4, SecurityEpoch: 7, Mode: ScopeActive, DatabaseAvailable: true, Roots: map[RootID]RootAuthority{"root-b": {Policy: PolicyBinding{Digest: digestOf('b')}, AuthorizationEpoch: 3}, "root-a": {Policy: PolicyBinding{SafeBaseline: true}, AuthorizationEpoch: 2}}}
 	return q, ids, priv, state
 }
-func signSafety(t *testing.T, action SafetyAction, scope ScopeID, epoch Epoch, command string, digest *[32]byte, ids []string, priv []ed25519.PrivateKey) []SafetySignature {
+func signSafety(t *testing.T, action SafetyAction, scope ScopeID, epoch Epoch, command, nonce string, digest *[32]byte, ids []string, priv []ed25519.PrivateKey) []SafetySignature {
 	t.Helper()
 	var msg []byte
 	var err error
 	if digest == nil {
-		msg, err = SafetyApprovalMessage(action, scope, epoch, command)
+		msg, err = SafetyApprovalMessage(action, scope, epoch, command, nonce)
 	} else {
-		msg, err = SafetyApprovalMessage(action, scope, epoch, command, *digest)
+		msg, err = SafetyApprovalMessage(action, scope, epoch, command, nonce, *digest)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func signSafety(t *testing.T, action SafetyAction, scope ScopeID, epoch Epoch, c
 func TestAuthenticatedStopQuorumAndReplay(t *testing.T) {
 	q, ids, priv, state := safetyFixture(t)
 	for _, signers := range [][]string{{ids[0], ids[1]}, {ids[0], ids[1], ids[2]}} {
-		result, err := q.Stop(state, "scope-a", 7, "stop-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", nil, signers, priv))
+		result, err := q.Stop(state, "scope-a", 7, "stop-1", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", "nonce-1", nil, signers, priv))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,20 +60,20 @@ func TestAuthenticatedStopQuorumAndReplay(t *testing.T) {
 			t.Fatal("input mutated")
 		}
 	}
-	if _, err := q.Stop(state, "scope-a", 7, "stop-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", nil, ids[:2], priv)); err != nil {
+	if _, err := q.Stop(state, "scope-a", 7, "stop-1", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", "nonce-1", nil, ids[:2], priv)); err != nil {
 		t.Fatalf("pure transition retry from old snapshot should authenticate; persistence owns receipt/replay: %v", err)
 	}
-	stopped, err := q.Stop(state, "scope-a", 7, "stop-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", nil, ids[:2], priv))
+	stopped, err := q.Stop(state, "scope-a", 7, "stop-1", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", "nonce-1", nil, ids[:2], priv))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = q.Stop(stopped.State, "scope-a", 7, "stop-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", nil, ids[:2], priv)); err == nil {
+	if _, err = q.Stop(stopped.State, "scope-a", 7, "stop-1", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop-1", "nonce-1", nil, ids[:2], priv)); err == nil {
 		t.Fatal("old-epoch stop approval replay accepted")
 	}
 }
 func TestStopRejectsInvalidApprovalsAndState(t *testing.T) {
 	q, ids, priv, state := safetyFixture(t)
-	valid := signSafety(t, SafetyActionStop, "scope-a", 7, "cmd", nil, ids[:2], priv)
+	valid := signSafety(t, SafetyActionStop, "scope-a", 7, "cmd", "nonce-1", nil, ids[:2], priv)
 	badSig := append([]SafetySignature(nil), valid...)
 	badSig[0].Signature[0] ^= 1
 	unknown := append([]SafetySignature(nil), valid...)
@@ -92,18 +92,18 @@ func TestStopRejectsInvalidApprovalsAndState(t *testing.T) {
 	}(), "scope-a", 7, "cmd", valid}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := q.Stop(tc.s, tc.scope, tc.epoch, tc.cmd, tc.sig); err == nil {
+			if _, err := q.Stop(tc.s, tc.scope, tc.epoch, tc.cmd, "nonce-1", tc.sig); err == nil {
 				t.Fatal("accepted invalid stop")
 			}
 		})
 	}
-	if _, err := q.Stop(func() AuthorityState { s := state; s.SecurityEpoch = Epoch(math.MaxUint64); return s }(), "scope-a", Epoch(math.MaxUint64), "cmd", signSafety(t, SafetyActionStop, "scope-a", Epoch(math.MaxUint64), "cmd", nil, ids[:2], priv)); err == nil {
-		t.Fatal("accepted epoch overflow")
+	if _, err := SafetyApprovalMessage(SafetyActionStop, "scope-a", Epoch(math.MaxUint64), "cmd", "nonce-1"); err == nil {
+		t.Fatal("accepted epoch outside the RFC 8785 safe integer range")
 	}
 }
 func TestAuthenticatedReleaseBindsActivationDeterministically(t *testing.T) {
 	q, ids, priv, state := safetyFixture(t)
-	stopped, err := q.Stop(state, "scope-a", 7, "stop", signSafety(t, SafetyActionStop, "scope-a", 7, "stop", nil, ids[:2], priv))
+	stopped, err := q.Stop(state, "scope-a", 7, "stop", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop", "nonce-1", nil, ids[:2], priv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,8 +113,8 @@ func TestAuthenticatedReleaseBindsActivationDeterministically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sig := signSafety(t, SafetyActionRelease, "scope-a", 8, "release", &digest, ids[:2], priv)
-	result, err := q.Release(stopped.State, activation, "scope-a", 8, "release", sig)
+	sig := signSafety(t, SafetyActionRelease, "scope-a", 8, "release", "nonce-1", &digest, ids[:2], priv)
+	result, err := q.Release(stopped.State, activation, "scope-a", 8, "release", "nonce-1", sig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,22 +131,22 @@ func TestAuthenticatedReleaseBindsActivationDeterministically(t *testing.T) {
 	}
 	altered := activation
 	altered.Roots = map[RootID]RootAuthority{"root-a": activation.Roots["root-a"], "root-b": {Policy: PolicyBinding{Digest: digestOf('d')}, AuthorizationEpoch: 4}}
-	if _, err = q.Release(stopped.State, altered, "scope-a", 8, "release", sig); err == nil {
+	if _, err = q.Release(stopped.State, altered, "scope-a", 8, "release", "nonce-1", sig); err == nil {
 		t.Fatal("approval accepted changed activation")
 	}
-	if _, err = q.Release(result.State, activation, "scope-a", 9, "release", sig); err == nil {
+	if _, err = q.Release(result.State, activation, "scope-a", 9, "release", "nonce-1", sig); err == nil {
 		t.Fatal("old approval replay accepted")
 	}
 }
 func TestReleaseRejectsBadApprovalAndActivation(t *testing.T) {
 	q, ids, priv, state := safetyFixture(t)
-	stopped, err := q.Stop(state, "scope-a", 7, "stop", signSafety(t, SafetyActionStop, "scope-a", 7, "stop", nil, ids[:2], priv))
+	stopped, err := q.Stop(state, "scope-a", 7, "stop", "nonce-1", signSafety(t, SafetyActionStop, "scope-a", 7, "stop", "nonce-1", nil, ids[:2], priv))
 	if err != nil {
 		t.Fatal(err)
 	}
 	base := AuthorityState{Scope: "scope-a", ScopeActivationEpoch: 5, SecurityEpoch: 9, Mode: ScopeActive, DatabaseAvailable: true, Roots: map[RootID]RootAuthority{"root-a": {Policy: PolicyBinding{Digest: digestOf('a')}, AuthorizationEpoch: 3}}}
 	d, _ := ActivationDigest(base)
-	valid := signSafety(t, SafetyActionRelease, "scope-a", 8, "release", &d, ids[:2], priv)
+	valid := signSafety(t, SafetyActionRelease, "scope-a", 8, "release", "nonce-1", &d, ids[:2], priv)
 	bad := []struct {
 		name                string
 		current, activation AuthorityState
@@ -161,7 +161,7 @@ func TestReleaseRejectsBadApprovalAndActivation(t *testing.T) {
 	}(), "scope-a", 8, "release", valid}}
 	for _, tc := range bad {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := q.Release(tc.current, tc.activation, tc.scope, tc.epoch, tc.cmd, tc.sig); err == nil {
+			if _, err := q.Release(tc.current, tc.activation, tc.scope, tc.epoch, tc.cmd, "nonce-1", tc.sig); err == nil {
 				t.Fatal("accepted invalid release")
 			}
 		})
@@ -170,24 +170,27 @@ func TestReleaseRejectsBadApprovalAndActivation(t *testing.T) {
 	max.SecurityEpoch = Epoch(math.MaxUint64)
 	next := base
 	next.SecurityEpoch = Epoch(math.MaxUint64)
-	if _, err = q.Release(max, next, "scope-a", Epoch(math.MaxUint64), "release", nil); err == nil {
+	if _, err = q.Release(max, next, "scope-a", Epoch(math.MaxUint64), "release", "nonce-1", nil); err == nil {
 		t.Fatal("accepted overflow")
 	}
 }
 func TestSafetyMessageContextAndQuorumConfiguration(t *testing.T) {
 	q, ids, priv, state := safetyFixture(t)
-	msg, err := SafetyApprovalMessage(SafetyActionStop, "scope-a", 7, "cmd")
+	msg, err := SafetyApprovalMessage(SafetyActionStop, "scope-a", 7, "cmd", "nonce-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	sig := []SafetySignature{{ids[0], ed25519.Sign(priv[0], msg)}, {ids[1], ed25519.Sign(priv[1], msg)}}
-	if err = q.VerifySafetyApproval(state, SafetyActionStop, 7, "other", sig); err == nil {
+	if err = q.VerifySafetyApproval(state, SafetyActionStop, 7, "other", "nonce-1", sig); err == nil {
 		t.Fatal("command not bound")
 	}
-	if err = q.VerifySafetyApproval(state, SafetyActionRelease, 7, "cmd", sig); err == nil {
+	if err = q.VerifySafetyApproval(state, SafetyActionRelease, 7, "cmd", "nonce-1", sig); err == nil {
 		t.Fatal("action not bound")
 	}
-	if _, err = SafetyApprovalMessage(SafetyActionRelease, "scope-a", 7, "cmd"); err == nil {
+	if err = q.VerifySafetyApproval(state, SafetyActionStop, 7, "cmd", "wrong-nonce", sig); err == nil {
+		t.Fatal("nonce not bound")
+	}
+	if _, err = SafetyApprovalMessage(SafetyActionRelease, "scope-a", 7, "cmd", "nonce-1"); err == nil {
 		t.Fatal("release message omitted activation digest")
 	}
 	bad := []SafetySigner{{"a", make([]byte, ed25519.PublicKeySize)}, {"a", make([]byte, ed25519.PublicKeySize)}, {"c", make([]byte, ed25519.PublicKeySize)}}

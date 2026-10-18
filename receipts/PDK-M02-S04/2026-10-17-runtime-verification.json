@@ -1,0 +1,34 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S04",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S04-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:58:26Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "scripts/m02_s04_rebuild_test.sh", "sha256": "bfa0413ad4bba1ea52ae5acaf90e196efb32b2932f51e15ab2b3b4c8f5198f2a", "mode": "0700"},
+    {"path": "tests/test_m02_rebuild_runner.py", "sha256": "decbe3e0d44b5f55cb88646caafadeca2c6d7b172af712d72b2723dd5d92094c"},
+    {"path": "sql/init.sql", "sha256": "61bee8f7eb0b5abdcc5615d9e9c9c4a8d63ffe4cb83352cdb12f5a76c089dd33"},
+    {"path": "sql/governance_constraints.sql", "sha256": "ff1d6b0b6a82ce50b731e512eccd6e6f66f7f3b886b16cbe324c798c119b5808"},
+    {"path": "sql/governance_roles.sql", "sha256": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742"},
+    {"path": "sql/governance_safety_constraints.sql", "sha256": "c2a6fe68aa5bcf9bb1dfc0eca392c82df64736051aa0c32ec8a7fe3124d3b303"},
+    {"path": "sql/governance_safety_constraints_down.sql", "sha256": "9f420c133f0ccf365b4ec432ee3e1b204a1e3aead665d29efd97b32a48b697aa"},
+    {"path": "sql/down.sql", "sha256": "8aa6fd4bf04fca0673a7600eaf5774e7cabe0ade4d31feeb51cec9e87e65104a"},
+    {"path": "sql/governance_roles.sql psql guard tests", "sha256": "b94c8fd3537fdf519a5b6d81c5c91bd706327429657b9c0a917a5fd60a732366"}
+  ],
+  "environment": {"os": "android", "arch": "arm64", "go": "go1.27.1", "postgresql_binary": "installed local psql/initdb/pg_ctl; server initialized by runner", "ci": false},
+  "authorized_execution": {"user_selection": "User explicitly authorized exactly one corrected run of scripts/m02_s04_rebuild_test.sh --run at the stated runner/roles-source hashes, confined to a private .build/m02-s04.* temporary cluster; no retry if it fails.", "target_isolation": "The runner unset PADDOCK_DB_URL/PADDOCK_APP_DB_URL/PADDOCK_ADMIN_DSN/PG connection variables and used a private Unix socket with TCP disabled; existing populated paddock_test and M09 append-only fixtures were not targeted."},
+  "checks": [
+    {"command": "scripts/m02_s04_rebuild_test.sh --run", "outer_exit_code": 0, "result": "PASS; runner completed M02 up/down/up and all catalog assertions. Per-step output recorded below."},
+    {"step_exit_codes": {"initdb": 0, "pg_ctl-start": 0, "create-private-database": 0, "provision-private-roles": 0, "up-init": 0, "up-governance-constraints": 0, "up-governance-roles": 0, "up-safety-constraints": 0, "first-up-assertions": 0, "down-safety": 0, "down-base": 0, "down-assertions": 0, "reup-init": 0, "reup-governance-constraints": 0, "reup-governance-roles": 0, "reup-safety-constraints": 0, "reup-assertions": 0}, "result": "PASS. Re-up init emitted NOTICE SQLSTATE 42P06 that raw already existed; no SQL error. Roles migration sentinel fix executed successfully in the private cluster."},
+    {"command": "python3 -m unittest tests.test_m02_roles tests.test_m02_rebuild_runner -v", "exit_code": 0, "result": "PASS; 11 role static tests + 10 rebuild-runner static tests = 21; rerun after the runtime to validate final static-source anchors"},
+    {"command": "bash -n scripts/m02_s04_rebuild_test.sh; runner --help; runner no-argument path", "exit_code": 0, "result": "PASS; syntax/no-op paths"},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges after refreshing generated summary"}
+  ],
+  "cleanup": {"temporary_cluster_path": ".build/m02-s04.ouS6o6XBSd", "result": "Runner trap stopped the local cluster and removed only the exact temporary directory. Main read-only `find .build -maxdepth 1 -mindepth 1 -name 'm02-s04.*'` returned no paths."},
+  "scope_incident": {"prior_attempt": "A previous invocation occurred without a separately recorded --run approval, failed at unsupported psql \\error before role DDL/down, and was outside the permitted effect scope. It was disclosed in receipts/PDK-M02-S04/2026-10-17-runner-attempt.json; cleanup was confirmed and current paddock_test was not targeted.", "remediation": "governance_roles.sql now uses fail-closed sentinel \\set assignments and static tests require this. The corrected, explicitly authorized invocation above passed. No further runner invocation was made."},
+  "independent_review": {"status": "COMPLETED", "kind": "separately dispatched read-only verifier subagent", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "No actionable source/acceptance gap. Verifier reviewed runner hash, M02-only migration/down order, exact step exit codes, catalog assertions, cleanup, prior failed attempt disclosure and current static tests. Verifier did not run tests or access a database.", "scope": "receipt/source review only; no independent DB reproduction"},
+  "main_reconciliation": {"decision": "The authorized corrected runner completed the selected M02 up/down/up chain in the private local cluster; every recorded step exited zero and postconditions passed. The earlier unapproved attempt is separately disclosed, failed before role DDL/down, and did not target the populated PADDOCK database; exact temp cluster cleanup was readback-confirmed. Main compared the Verifier report with Runner observations and acceptance.", "limitations": ["The test uses a disposable local cluster; this is not CI or production evidence.", "Dirty worktree/full diff hash unavailable; no commit/push.", "The earlier out-of-scope attempt remains recorded as a process deviation; no further runner invocation occurred."]},
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; TEMP_CLUSTER_UP_DOWN_UP_PASS; NO_CI_ATTESTATION",
+  "remaining_risks": ["No CI attestation or trusted CI receipt; no commit or push.", "The first earlier attempt was outside explicit run authorization; it is recorded transparently and did not reach down or target the populated DB.", "No claim is made about M08/M09 migrations or any database outside the private temporary cluster."]
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S02-d016-reconcile", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:25:45Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95"},
+    {"path": "internal/storage/postgres/spawn_store.go", "sha256": "ea48f7432709f3c5201080beb224f994c524bd7da33ac7647789a511e759a087"},
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "ff7285dd21ccb4f8bcb52419088f2e4a85fb9b2607a9afb2ea12a5b587a6258b"},
+    {"path": "tests/test_m09_spawn_policy_sql.py", "sha256": "3dd38289a635aef173744c9d71eb6f139b395aaa7f8566e32b256927a79afdb3"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "1e902dad21eda53675a2c0453b62e74c6015c1683a5ba495292920cab8e404d3"}
+  ],
+  "checks": [
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestSpawnAdmissionIntegration$' -count=1 -v", "exit_code": 0, "result": "PASS; reverse-order semantic DAG/key renaming/repeat cap, replay/conflict, depth/descendant caps, concurrent live-child cap one winner, DB-clock deadline, configured and unconfigured Root Lease first/retry cases"},
+    {"command": "read-only post-run exact Spawn fixture cleanup query", "exit_code": 0, "result": "zero `spawn_it_` Scope/Root/WorkOrder/Spawn operations/fingerprints/Attempts/Leases/test bundle rows"},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql", "exit_code": 0, "result": "PASS; 41 focused M09/repair static tests"},
+    {"command": "go test ./... -count=1; go vet ./...; tagged compile-only", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "Reviewed S02 acceptance, source, final DB receipt and cleanup evidence; no actionable finding. The verifier did not reproduce DB behavior."},
+  "main_reconciliation": {"decision": "Runner checks cover the selected S02 acceptance. The helper repair, function-only app boundary, Root-lock recheck, concurrent cap and no-policy Lease path were reconciled with source/receipt; exact cleanup is readback-confirmed. Marked DONE under D-016 local verification.", "limitations": ["Dirty worktree; full dirty-diff hash unavailable", "No CI attestation or trusted CI receipt", "No commit or push"]},
+  "issue_state": "DONE",
+  "authorization": {"scope": "The user explicitly authorized the combined guarded repair and the named S02/S03 fixture runs on paddock_test. No down/reset/drop, production access, role change, credential output, or unrelated tests."},
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; NO_CI_ATTESTATION",
+  "next_action": "Continue with the next dependency-ready Issue only after Cursor update; no additional S02 DB operation is needed."
+}

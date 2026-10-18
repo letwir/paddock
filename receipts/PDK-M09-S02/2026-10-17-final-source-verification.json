@@ -1,0 +1,31 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-final-source", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:11:36Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95"},
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "internal/storage/postgres/spawn_store.go", "sha256": "ea48f7432709f3c5201080beb224f994c524bd7da33ac7647789a511e759a087"},
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "9e14edc92d0c34e625df1592869669b3bf5da0dc220d0bb7e1c788ae12597909"},
+    {"path": "tests/test_m09_spawn_policy_sql.py", "sha256": "3dd38289a635aef173744c9d71eb6f139b395aaa7f8566e32b256927a79afdb3"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "1e902dad21eda53675a2c0453b62e74c6015c1683a5ba495292920cab8e404d3"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql", "exit_code": 0, "result": "PASS; 33 M09 source-contract tests"},
+    {"command": "python3 -m unittest tests.test_m09_repair_sql", "exit_code": 0, "result": "PASS; 8 guarded repair static-contract tests"},
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only, no integration body"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "tracked and no-index whitespace checks; gofmt", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable source finding after the OUT-variable correction; SELECT INTO, NOT FOUND/null denial, RETURN NEXT, security boundary, Go call, and repair replacement were reviewed.", "scope": "current S02/repair source only; current database still has previous helper version"},
+  "runtime_status": {"applied_database_state": "The original S02 migration and one combined repair version (SHA 6eaf8292ecf7a885f0daf5e7a35e52ea076e02387631cf9a00f1ac131cae7f6a) are applied in paddock_test. The current helper fix (SHA bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95) is not applied.", "last_runner": "TestSpawnAdmissionIntegration failed SQLSTATE P0001 because the applied helper's RETURN QUERY left OUT variables null. Exact spawn_it_ cleanup was verified at zero rows."},
+  "authorization": {"scope": "Source verification only for the current fix. The earlier explicit repair authorization was used once; another repair application and S02 fixture rerun require new explicit approval."},
+  "verdict": "LOCAL_SOURCE_TESTED; CURRENT_S02_HELPER_NOT_APPLIED; S02_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["Root cap/admission, replay, DAG, DB-clock and Lease-attempt runtime acceptance remain unverified.", "No CI attestation, commit, or push is claimed."]
+}

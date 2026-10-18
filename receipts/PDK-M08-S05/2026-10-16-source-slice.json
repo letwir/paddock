@@ -1,0 +1,45 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M08-S05",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-16-M08-M09-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-16",
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated/untracked changes remain"
+  },
+  "targets": [
+    {"path":"internal/governance/domain/work_order_policy.go","sha256":"496223955efdb9ae87c697934b36228d66f061093487c3a68ca27c2ae327550e"},
+    {"path":"internal/governance/domain/work_order_policy_test.go","sha256":"1c7fcfd186add61a3c9799ba5f3e89ec53263dbdf00894ff27f18de938558879"},
+    {"path":"internal/governance/application/online_authorization_cache.go","sha256":"522ec3a8d36724ec322676460458f7b8d0ee60ec55b88bc7296bba72248fa243"},
+    {"path":"internal/governance/application/online_authorization_cache_test.go","sha256":"1b25704ef323253e5546abcfa82706d2563ea196c22fa3b15886bd309bea5c54"},
+    {"path":"internal/storage/postgres/offline_policy.go","sha256":"32b955d62a25e421c8e95a45c51387517fe62397d165a4c6336e38c541df5d14"},
+    {"path":"sql/governance_offline_policy.sql","sha256":"f910eb4e50064261eed7bcce89dfc17495be2ea2fdd23c779828492e7b27487d"},
+    {"path":"tests/test_m08_offline_policy_sql.py","sha256":"7a9ecbc2d1a20ab54a74b148dda12ee1cb565c54a013fc32345ab21e01753c06"},
+    {"path":"internal/storage/postgres/offline_policy_integration_test.go","sha256":"7371eb14783d229f86ab01f7f4d7fd828cd14605acc65f249825544f74d3201b"}
+  ],
+  "environment":{"go":"go1.27.1","os":"android","arch":"arm64","postgresql":"18.6 (Debian 18.6-1.pgdg13+2)","ci":false},
+  "checks":[
+    {"command":"go test ./... -count=1","exit_code":0,"result":"PASS; all Go packages"},
+    {"command":"go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"python3 -m unittest tests.test_m08_offline_policy_sql tests.test_m08_lease_sql tests.test_m08_pull_sql tests.test_m09_budget_sql -v","exit_code":0,"result":"PASS; 29/29 static SQL contract tests"},
+    {"command":"go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; tagged PostgreSQL integration test package compile-only"},
+    {"command":"python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues/148 edges"},
+    {"command":"git diff --check","exit_code":0,"result":"PASS"},
+    {"command":"scripts/init_test_db.sh --check","exit_code":0,"result":"PASS; paddock_test PostgreSQL 18.6 raw_relations=62; read-only"},
+    {"command":"psql guarded sql/governance_offline_policy.sql","exit_code":0,"result":"PASS; COMMIT as paddock_migrator in paddock_test; no DSN emitted"},
+    {"command":"go test -tags=paddock_test ./internal/storage/postgres -run '^TestOfflinePolicySnapshotIntegration$' -count=1 -v","exit_code":0,"result":"PASS; 6.46s; app configure, LOW/HIGH/deny snapshot, fencing mismatch and expired Lease denial; exact fixture cleanup"},
+    {"command":"go test -tags=paddock_test ./internal/storage/postgres -count=1 -v","exit_code":0,"result":"PASS; full PostgreSQL integration suite 38.913s, including M08 snapshot, M09 budget, Pull concurrency, event/outbox and transaction tests"},
+    {"command":"read-only paddock_test postcheck","exit_code":0,"result":"PASS; M08 offline/pull fixture counts all zero; app can EXECUTE snapshot/budget functions but cannot SELECT raw.work_orders or raw.budget_accounts; M09 retained ledger reconciles"}
+  ],
+  "independent_review": {
+    "kind":"separately dispatched verifier subagent",
+    "result":"Independent read-only receipt/source review found no actionable mismatch; all recorded target hashes match current files, and the Main Runner's paddock_test evidence corresponds to the integration source. Main compared the review with Runner observations and resolved receipt findings.",
+    "scope":"M08-S05 receipt, selected acceptance, domain/application/PostgreSQL source, integration test and fixture cleanup claims; verifier did not reconnect to DB or rerun tests"
+  },
+  "authorization":{"source":"User selected M08-S04/S05 + M09-S01 paddock_test runtime scope and authorized existing injected DB connection vars for paddock_test only.","scope":"guarded additive migrations, bounded test fixtures/readback/cleanup; no down/reset/drop, production/llm-memory, credential display, or external effect dispatch"},
+  "verdict":"D-016_LOCAL_DONE; CI_ATTESTATION_NONE; DB_RUNTIME_RECORDED_BY_MAIN_RUNNER",
+  "remaining_risks":["No CI attestation; local Runner and independent receipt/source review only.","M08-S04 has no concrete external-effect dispatch adapter; authorization-to-effect atomicity/TOCTOU remains unresolved and is not claimed.","This receipt verifies the bounded M08-S05 snapshot/cache acceptance, not end-to-end external action delivery."]
+}

@@ -1,0 +1,164 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S05",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-M05-S05-policy",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-18T07:58:47Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_STAGED_PUSH_SNAPSHOT",
+    "branch": "main",
+    "dirty": true,
+    "dirty_status_entries": 471,
+    "dirty_diff_sha256": "NOT_CAPTURED; selected candidate index contains 166 completed/dependency-support paths; unrelated/WIP paths remain unstaged"
+  },
+  "selected_policy": {
+    "d019_schema": "schema_version uses canonical event/<positive-major>; event/1 is major 1. Unknown positive majors fail closed to a compatibility quarantine classification without downcast or business effect.",
+    "d019_retention": "Published Outbox 7 days from published_at; ordinary source Event 90 days from created_at; processed Inbox at least 90 days from processed_at and retained while Outbox is pending or replay remains open; pending Outbox never expires automatically; terminal DLQ/quarantine audit and source Event 365 days; Outbox cleanup precedes referenced Event cleanup; no partition/archive in PoC.",
+    "d020_replay": "Consumer-side same-ID replay within a strict 30-day window after terminal producer DLQ or compatibility quarantine; existing Inbox gates repeat effects; Outbox state/attempt counters are not changed.",
+    "d021_audit": "Only trusted paddock_app Coordinator service identity requests replay; check current handler major support at execution; payload-free audit fields include unique replay_request_id, consumer/event/schema/source, DB time, sanitized outcome, and session_user; denied attempts are recorded. No human identity attribution is claimed.",
+    "d022_boundary": "Consumer-side replay remains distinct from manual Outbox redrive even after terminal claim 40. It does not claim/publish, reset, mutate, or make a terminal Outbox row publishable again."
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/event_schema_policy.go",
+      "sha256": "d34620f07280c000dec64623786d78e41be5c9ecde2ca37638ffb2244562a6e4"
+    },
+    {
+      "path": "internal/governance/domain/event_schema_policy_test.go",
+      "sha256": "6818ce1f997b21912eba50b065dba6bc0189b711bf4fb877bd4828c3194c2da8"
+    },
+    {
+      "path": "decisions.md",
+      "sha256": "ff9e42003a62899fc6c20a8bc5fee887a2f9781c474dcf02c6fe1c49ff4525ef"
+    },
+    {
+      "path": "Issues.md",
+      "sha256": "7d2b36552085c39223961dd1e791d8f8f04d7b23ce05e5a5f3681f712a32b605"
+    },
+    {
+      "path": "docs/issue-dependencies.generated.md",
+      "sha256": "d50997822cec6a498480eb69aef209f6759251b4f4d9ea86b71242bd1f240dac"
+    }
+  ],
+  "runner_checks": [
+    {
+      "command": "Initial focused policy tests after replay-audit addition",
+      "exit_code": 1,
+      "result": "FAIL; audit constructor returned a typed denial value where Go required an error. Corrected to a wrapped error before final verification."
+    },
+    {
+      "command": "go test ./internal/governance/domain -run 'EventSchema|CompatibilityQuarantine|Retention|ConsumerReplay' -count=1",
+      "exit_code": 0,
+      "result": "PASS; focused S05 policy boundary tests."
+    },
+    {
+      "command": "go test ./... -count=1",
+      "exit_code": 0,
+      "result": "PASS; all untagged Go packages."
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; PostgreSQL integration package compile-only; no test body or database access."
+    },
+    {
+      "command": "gofmt -d internal/governance/domain/event_schema_policy.go internal/governance/domain/event_schema_policy_test.go",
+      "exit_code": 0,
+      "result": "PASS; no output."
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 edges; Issues SHA-256 d1f92c5aa31e83106d21bf79ca1f28801d6c7e7b11cbfd6cdffde99b2bdde45c."
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "python3 scripts/continue_plan.py after evidence-key reconciliation",
+      "exit_code": 0,
+      "result": "PASS; selected next dependency-ready PDK-M14-S01 (first_ready_incomplete). The completed Issue records now use the planner-required current_evidence key."
+    },
+    {
+      "command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py (final Cursor/Issue reconciliation)",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 edges; Issues SHA-256 0525a22d19e6d4e31aee852c84c2a9ed1dfad713daeee86173a3cfe6afc4aff3."
+    },
+    {
+      "command": "python3 scripts/continue_plan.py",
+      "exit_code": 0,
+      "result": "PASS; selected next dependency-ready PDK-M14-S01 (`first_ready_incomplete`) after normalizing completed Issue evidence to `current_evidence`."
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -q after disposable link-fixture repairs",
+      "exit_code": 0,
+      "result": "PASS; 184/184 Python tests. The fixture copies linked local targets; S04 WIP cursor simulation sets a non-NOT_STARTED execution state; S08 negative link mutation now targets current README router links."
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -q (push-scope audit regression)",
+      "exit_code": 0,
+      "result": "PASS; 184/184 Python tests, including repaired disposable lint/continue fixtures."
+    },
+    {
+      "command": "Candidate snapshot: go test ./... -count=1",
+      "exit_code": 0,
+      "result": "PASS; all untagged packages with completed candidate sources and the explicitly authorized shared M08-S04 domain/Gateway dependency; M13-S01 WIP and temporary/nested repo files excluded."
+    },
+    {
+      "command": "Candidate snapshot: go vet ./...",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "Candidate snapshot: go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; compile-only, no DB test body."
+    },
+    {
+      "command": "Candidate snapshot: python3 -m unittest discover -s tests -q",
+      "exit_code": 0,
+      "result": "PASS; 184/184."
+    },
+    {
+      "command": "Candidate snapshot: python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 148 dependency edges for the completed-only Issue snapshot."
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "result": "No actionable findings.",
+    "scope": "Reviewed PDK-M05-S05 acceptance in Issues.md, D-019–D-022 in decisions.md, and complete event_schema_policy.go plus event_schema_policy_test.go. Confirmed schema parsing, fail-closed classification, quarantine key/first timestamp, retention deadlines/holds, strict replay window, source expiry/support denial, trusted service audit contract, and no Outbox mutation.",
+    "limitations": "Verifier did not run tests, inspect Git diff/status, or access a database. No database quarantine/replay API, retention worker, or runtime enforcement is implemented or claimed. Main reconciled review with Runner observations and Issue acceptance. CI attestation absent."
+  },
+  "database_execution": {
+    "migration_applied": false,
+    "cleanup_worker_run": false,
+    "integration_body_run": false,
+    "approval_status": "No database action was requested or authorized for M05-S05; only local pure policy source/tests were in scope.",
+    "residual": "D-019–D-022 are policy contracts. Database quarantine persistence, fixed-path replay capability, audit persistence, and scheduled retention cleanup remain future implementation/runtime issues and are not established by this Issue's pure-domain tests."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_RUNNER_AND_INDEPENDENT_REVIEW",
+  "limitations": [
+    "Pure policy model only; no database schema/API/retention worker or runtime enforcement was implemented or tested.",
+    "Trusted CI attestation absent; no CI attestation is claimed.",
+    "Verifier did not run tests, inspect Git diff/status, or access DB.",
+    "Broad unrelated worktree changes remain; full dirty diff hash unavailable.",
+    "No commit or push has been performed.",
+    "Full Python suite required repairs to disposable test fixtures because Issue/README local links evolved; fixtures now copy referenced local files. These fixture tests are included in the full suite and separately source-reviewed."
+  ],
+  "verdict": "POLICY_AND_BOUNDARY_TESTS_PASS; INDEPENDENT_SOURCE_REVIEW_NO_FINDINGS; DONE_D016_LOCAL; NO_DB_EFFECTS; NO_CI_ATTESTATION",
+  "next_action": "After commit/push result is verified, proceed to dependency-ready PDK-M14-S01. M08-S04 remains [~]; M13-S01 WIP source/record and all temporary/nested-repository artifacts were excluded from this snapshot."
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S03-d016-reconcile", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:25:45Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "sql/governance_checkpoints.sql", "sha256": "86b9a6fe4f1ab22b32185dc72770be6d272c490e5c960f0f6ad2fea320f6bf15"},
+    {"path": "internal/storage/postgres/checkpoint_integration_test.go", "sha256": "0bc506eb8dcea2fc43d3d5c5722fddb57f986ac60ecd2c47cf5c9af8212b45cc"},
+    {"path": "tests/test_m09_checkpoint_sql.py", "sha256": "42cba7b75f7f2f7cdeffa263422b6c432b4fdc36cc9aba6f10e6ae48894ab3af"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "1e902dad21eda53675a2c0453b62e74c6015c1683a5ba495292920cab8e404d3"}
+  ],
+  "checks": [
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestCheckpointDurabilityIntegration$' -count=1 -v", "exit_code": 0, "result": "PASS; valid L2 upload and restore through a distinct identity-checked app pgxpool, stale Lease quarantine/no payload, missing-reserve denial, interrupted transaction rollback, over-cap and tamper rejection, exact byte accounting"},
+    {"command": "read-only post-run checkpoint/budget readback for suffix 71e902c86404fd5be0897105", "exit_code": 0, "result": "L2=523 bytes; QUARANTINED=501 bytes; total=1024; STORAGE_BYTES/byte grant=1048576, spent=1024, reserved=0; exact reserve/settle operation and journal pairs; failed candidates absent"},
+    {"command": "read-only post-run checkpoint/budget readback for suffix eeda7fabfdd5b5a1c2963bf5", "exit_code": 0, "result": "L2=523 bytes; QUARANTINED=501 bytes; total=1024; STORAGE_BYTES/byte grant=1048576, spent=1024, reserved=0; exact reserve/settle operation and journal pairs; failed candidates absent"},
+    {"command": "read-only restore after fixture Lease expiry", "exit_code": 0, "result": "Both stored rows dynamically return QUARANTINED with NULL payload after Lease expiry; the fixture verified L2 payload restoration through the separate pool before expiry"},
+    {"command": "read-only retained fixture audit", "exit_code": 0, "result": "Suffixes e62b5d1f18ee60786c1268cf and bf3299ccc0ac35bcd1dddef1 retain setup/grant only with zero spend/checkpoints; 5357578d6bd31b768d903807, 71e902c86404fd5be0897105, and eeda7fabfdd5b5a1c2963bf5 each retain two checkpoints and 1024 spent, reserved=0. No cleanup/delete performed."},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql", "exit_code": 0, "result": "PASS; 41 focused M09/repair static tests"},
+    {"command": "go test ./... -count=1; go vet ./...; tagged compile-only", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "Reviewed S03 acceptance, source and final DB receipt; confirmed user-selected separate app-pool boundary and found no actionable gap. The verifier did not reproduce DB behavior."},
+  "main_reconciliation": {"decision": "Runner acceptance and post-run budget/retention readbacks match the selected S03 contract, including the user-selected different-Runner boundary as a distinct app pool. Marked DONE under D-016 local verification.", "limitations": ["Dirty worktree; full dirty-diff hash unavailable", "No CI attestation or trusted CI receipt", "No commit or push"]},
+  "issue_state": "DONE",
+  "authorization": {"scope": "The user explicitly authorized the combined guarded repair and the revised separate-pool S03 fixture, including append-only row retention. No down/reset/drop, production access, role change, credential output, or unrelated tests."},
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; NO_CI_ATTESTATION",
+  "next_action": "Continue with the next dependency-ready Issue only after Cursor update; do not delete retained checkpoint or budget fixtures."
+}

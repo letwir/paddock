@@ -1,0 +1,27 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S02-expanded-fixture-source", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:21:19Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "ff7285dd21ccb4f8bcb52419088f2e4a85fb9b2607a9afb2ea12a5b587a6258b"},
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95"},
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "internal/storage/postgres/spawn_store.go", "sha256": "ea48f7432709f3c5201080beb224f994c524bd7da33ac7647789a511e759a087"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only, no DB test body"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql -q", "exit_code": 0, "result": "PASS; 41 M09 source and repair static tests"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "tracked/no-index whitespace checks and gofmt", "exit_code": 0, "result": "PASS"}
+  ],
+  "source_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable finding. Reviewed reverse-order DAG, empty dependency arrays, Root-serialized simultaneous live-child cap (one winner), unconfigured-root first Lease/retry denial, exact collision checks and cleanup.", "scope": "source only; current database helper remains the earlier OUT-variable version"},
+  "authorization": {"scope": "Source verification only. The currently applied database helper still needs the corrected OUT-variable implementation; applying it and rerunning S02 requires separate explicit approval. No DB operation was performed during this verification."},
+  "verdict": "LOCAL_SOURCE_TESTED; EXPANDED_FIXTURE_NOT_RUN; S02_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["The expanded concurrency and unconfigured-root cases have not run in PostgreSQL.", "The corrected helper source is not installed in the current paddock_test database.", "No CI attestation, commit, or push is claimed."]
+}

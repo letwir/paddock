@@ -1,7 +1,7 @@
 # PADDOCK — decisions.md
 
 > SIGMA/1: PIDGEN/text · Project state / Decision SSOT
-> Snapshot: 2026-10-13 · Revision: design-review/2 · Status: DESIGN_ONLY · Repo: **PADDOCK (independent)**
+> Snapshot: 2026-10-17 · Revision: design-review/3 · Status: DESIGN_ONLY · Repo: **PADDOCK (independent)**
 > Provenance: 2026-10-12の設計対話から転記。**未署名の転記記録であり、Gitコミットや人間承認署名の代用品ではない**。Git導入後、保護された承認コミットにより固定する（PDK-M00-S07）。既存 `.HARNESS` は表記・運用上の参照のみ。
 
 ## 0. 読み方・正本性
@@ -33,6 +33,13 @@
 | D-013 | PostgreSQLアクセス | **A: pgx Native**。ORM/sqlc必須化せず、明示SQLとpgxでTransactionを制御する | M02, M03 |
 | D-014 | Repository Boundary | **新規の独立したPADDOCKリポジトリ**。`.HARNESS`は参照・流用のみ、黙示的な認可/規則継承なし | M00 |
 | D-015 | Canonicalization/Signature Envelope | **RFC 8785 JCS**をBundle/Approval/Commandのcanonical bytesに採用。Domain Separation、schema version、anti-replayは引き続き必須。実装済みとは主張しない（S07 verifierまで未確認） | PDK-M06-S07 |
+| D-016 | Local Issue DONE verification | Runnerが受入検査を実行してExit Code・Hash・対象Revisionを記録し、実装者と別のVerifier subagentが独立レビューし、Mainが指摘・全受入条件を照合したLocal Issueは、信頼済みCIなしでも`[x]`にできる。CI attestation/Verifier-of-Recordとは主張せず、CI不在と残余リスクを明記する | method.md §2, §4.1 |
+| D-017 | Scope safety-state representation | `policy_scopes.mode='SAFE_STOPPED'`はScopeが組込みdeny-all Safe Baselineに退避したことを意味し、専用のScope safe_baseline列は追加しない。`FROZEN`はRollbackに限り、対応するlive rolloutが`ROLLING_BACK`でなければならない | PDK-M02-S06 |
+| D-018 | Event Dispatcher | **Polling + NOTIFY wake-up hint**。PostgreSQL Outbox remains the durable source; Polling is the recovery path for disconnected/missed notifications; External Broker is not selected for the PoC | PDK-M05-S02, PDK-M05-S03, PDK-M05-S04 |
+| D-019 | Event schema evolution and retention (O-009) | **PoC bounded, unpartitioned**. `schema_version` is `event/<positive-major>` (`event/1` is major 1); unknown majors fail closed/quarantine with no downcast or effect. Explicit replay is permitted only within 30 days after terminal DLQ/compatibility quarantine and only once a supporting consumer exists. Retain processed Inbox keys for 90 days minimum and never expire while the source Outbox is pending or replay window is open; successfully published Outbox rows 7 days from `published_at`; ordinary Event rows 90 days from `created_at`; terminal DLQ/compatibility audit and source Event 365 days. Pending Outbox rows never expire automatically. No table partitioning or archive for the PoC. | PDK-M05-S05 |
+| D-020 | Consumer replay and compatibility quarantine | **Consumer-side replay, immutable Outbox status**. Persist a payload-free compatibility quarantine keyed by `(consumer_id,event_id)` with `schema_version`, sanitized `error_code`, and `quarantined_at`; keep source Event by reference. A fixed-search-path, read-only SECURITY DEFINER capability verifies replay eligibility before returning the Event: terminal producer DLQ requires `published_at IS NULL`, `dead_lettered_at IS NOT NULL`, and `clock_timestamp() < dead_lettered_at + interval '30 days'`; compatibility quarantine requires the matching quarantine row, a currently supported major, and `clock_timestamp() < quarantined_at + interval '30 days'`. At or after the exact 30-day boundary replay is denied. Replay uses the existing Inbox transaction/dedupe; it never resets or mutates Outbox attempt/redrive/published/DLQ fields. Append a bounded replay audit record. Retain quarantine/source Event 365 days per D-019. | PDK-M05-S05 |
+| D-021 | Replay authorization and audit | **Trusted Coordinator service only**. Only a `paddock_app` session may request consumer-side replay through the fixed API; this identifies the trusted service principal, not an individual human. Check the current Consumer handler's supported major at replay execution time. Append payload-free audit fields: unique `replay_request_id`, `consumer_id`, `event_id`, `schema_version`, source kind, database request timestamp, sanitized outcome code, and `session_user`; record denied attempts too. Compatibility quarantine is unique on `(consumer_id,event_id)` and preserves its first `quarantined_at`; duplicate unsupported deliveries do not move the 30-day anchor. | PDK-M05-S05 |
+| D-022 | Consumer replay versus Outbox redrive | Consumer-side replay allowed by D-020 within D-019's window remains permitted even after M05-S03 reaches terminal claim 40. It is not a manual Outbox redrive: it does not claim/publish, reset attempts, alter any Outbox field, or make the terminal Event publishable again. M05-S03's no-manual-redrive limit applies to Outbox dispatch only. | PDK-M05-S05 |
 
 ### D-014 / Repository Boundary — ACCEPTED (2026-10-12の独立Repo化依頼)
 
@@ -41,6 +48,36 @@ PADDOCKは**新規独立リポジトリ**。`letwir/config/.HARNESS` 内で実�
 ### D-015 / Canonicalization/Signature Envelope — ACCEPTED (2026-10-13の現在タスクでの明示選択)
 
 ユーザーは現在のタスクで **RFC 8785 JCS** を選択した。Bundle/Approval/Commandのcanonical bytesにJCSを用いる。用途間の再利用を防ぐDomain Separation、署名対象のschema version、anti-replayは引き続き必須とする。これは設計判断の記録であり、実装が存在するとの主張ではない。実装はS07 verifierで確認されるまで未確認。
+
+### D-016 / Local Issue DONE verification — ACCEPTED (2026-10-13の現在タスクでの明示選択)
+
+ユーザーは信頼済みCIが未整備の作業段階では、ローカルのRunner実測と実装者から分離されたVerifier subagentレビューを組み合わせて、小目標をDONEにできる方針を選択した。`[x]`には、Runnerが受入検査を実際に実行しExit Code・Hash・対象Revisionを記録すること、実装者とは別のVerifier subagentが受入条件・証拠・差分を独立にレビューすること、Mainが指摘と受入条件を照合し未解決事項を調停することが必要。CI不在と残余リスクを明示し、ローカルVerifierをCI attestationまたは将来のVerifier of Recordと称してはならない。Verifierの自己申告のみではDONEにしない。この決定は既存D-001〜D-015を変更しない。
+
+### D-017 / Scope safety-state representation — ACCEPTED (2026-10-13の現在タスクでの明示選択)
+
+ユーザーは`policy_scopes.mode='SAFE_STOPPED'`をScopeが組込みdeny-all Safe Baselineに退避した状態として扱い、Scope専用の`safe_baseline`列を追加しないことを選択した。また`FROZEN` modeはRollback中に限り許可し、対応する`live_rollout_id`が同一Scopeの`ROLLING_BACK` rolloutを指すことを要求した。これはScope-level DB表現の決定であり、埋込みbaselineの実装内容やRollback transactionの正しさを証明するものではない。
+
+### D-018 / Event Dispatcher — ACCEPTED (2026-10-17の現在タスクでの明示選択)
+
+ユーザーはO-001に対して**Polling + NOTIFY**を選択した。PollingでPostgreSQL Outboxを継続的に読む方式を耐久配送の正本とし、NOTIFYは同一DBに接続中のDispatcherを起こす低遅延ヒントとして扱う。通知payloadにEvent内容や秘密データを載せず、ConsumerはOutboxを読み取る。Listener切断・再接続・missed/coalesced notificationの後もPollingでpending rowを回収し、at-least-once配送とConsumer Inboxによる重複吸収を維持する。起動時はLISTENをcommitした後にOutbox状態を確認してから通知だけに依存する。NOTIFYはtransaction commit後にのみ配送され、transaction abort時には届かない。Listener transactionは短く保ち、notification queue枯渇時は発生元transactionのcommitが失敗し得るため、状態・Event・Outboxは同じtransactionでrollbackされ、同じCommand IDで調停する。通知queueを配送正本やcommit成功証明には使わない。外部BrokerはPoCでは選択しない。PostgreSQL仕様参照: [NOTIFY](https://www.postgresql.org/docs/18/sql-notify.html), [LISTEN startup race](https://www.postgresql.org/docs/18/sql-listen.html). 対象IssueはM05-S02からM05-S03/S04への契約引継ぎであり、実装・性能・外部運用が検証済みとの主張ではない。
+
+### D-019 / Event Schema Evolution and Retention — ACCEPTED (2026-10-18の現在タスクでの明示選択)
+
+ユーザーはO-009についてPoC向けの**bounded, unpartitioned**方針を選択した。Event `schema_version` は `event/<positive-major>` とし、現行fixture表記 `event/1` はmajor 1として扱う。Unknown majorはConsumer側でfail-closedし、compatibility quarantineに留めてInbox/業務効果を作らず、downcastや自動変換を行わない。DLQ後の明示Replayはterminal DLQまたはcompatibility quarantineから30日以内に限り、対応Consumerが利用可能になった後、同一Event IDで行う。M05-S03の自動retry/一度限りの自動redrive上限は変更しない。
+
+保持起点と境界は次の通り。成功Outbox rowは `published_at` から7日、通常Domain Eventは `created_at` から90日、処理済みInbox keyは `processed_at` から最低90日保持する。Inbox keyは関連Outboxが未配送の間、またはReplay windowが開いている間は最低保持期間を超えても削除しない。Pending Outboxは期限で自動削除しない。Terminal DLQ/compatibility audit recordとsource EventはDLQ/quarantine開始から365日保持し、source Eventは監査保持が終わるまで残す。期限後の削除はOutboxを先、参照されるDomain Eventを後に行う。PoCではpartitioning/cold archiveを導入せず、上記expiry/replay境界より古いReplayは拒否する。これは設計判断であり、retention worker・compatibility quarantine実装やDB cleanupが存在するとの主張でも、その実行許可でもない。Partition/archive再検討は実データ量・運用要件を観測した別Decisionを要する。
+
+### D-020 / Consumer Replay and Compatibility Quarantine — ACCEPTED (2026-10-18の現在タスクでの明示選択)
+
+ユーザーはD-019のDLQ後Replayを**Consumer-side replay**とし、producer Outboxのterminal状態は不変に保つことを選択した。Unknown-major Eventはpayloadを複製しないcompatibility quarantine ledgerに `(consumer_id,event_id,schema_version,sanitized error_code,quarantined_at)` として記録し、元payloadは `raw.domain_events` をsource-of-truthとして参照する。Replay可能なterminal DLQは既存Outbox状態から判定する。固定search-pathのread-only SECURITY DEFINER capabilityがterminal DLQ/compatibility quarantineとD-019の30日windowを検証してsource Eventを返し、対応Consumerが同一Event IDを既存Inbox transactionへ渡す。Inbox既処理なら効果は再適用しない。Replayは `attempt_count`, `redrive_count`, `published_at`, `dead_lettered_at` を変更せず、D-018のOutbox正本とM05-S03のterminal 40-claim/no-Outbox-redrive上限を維持する。各Replay要求の監査はpayloadなしのappend-only recordとする。Quarantine/auditとsource EventはD-019の365日間保持される。Replay audit recordは要求時刻とsanitized outcomeをpayloadなしでappend-only記録し、要求時刻から365日保持する。source Event保持が終了した後はReplayを拒否する。Replay capabilityはOutbox rowを更新/削除せず、Inbox keyを介して同一Event IDをConsumer側で再処理する。これは設計判断であり、table/function/replay implementationやDB accessが既に存在/許可されるとの主張ではない。
+
+### D-021 / Replay Authorization and Audit — ACCEPTED (2026-10-18の現在タスクでの明示選択)
+
+ユーザーはReplayの実行主体を**trusted Coordinator `paddock_app` service**に限定した。これはDB service identityを示すだけで個人のhuman attributionや署名済みApprovalがあるとは主張しない。Consumerのschema-major supportはReplay実行時点の現行handlerで検査する。Replay auditは `replay_request_id` を一意IDとして `consumer_id,event_id,schema_version,source_kind,requested_at,outcome_code,session_user` をpayloadなしでappend-only記録する。拒否されたReplay要求もsanitized outcomeで記録する。Compatibility quarantineは `(consumer_id,event_id)` 一意とし、初回の`quarantined_at`を保持し、重複unsupported deliveryでwindowを延長しない。監査・保持境界はD-019/D-020に従う。これは設計判断であり、Replay API、human approval、service-side enforcementが実装済みとの主張ではない。
+
+### D-022 / Consumer Replay versus Outbox Redrive — ACCEPTED (2026-10-18の明示的な意味境界)
+
+D-020のConsumer-side replayはM05-S03がterminal claim 40に達した後もD-019の30日window内で許可される。これは**manual Outbox redriveではない**。再生CapabilityはOutbox claim/publishを行わず、attempt/redrive counters、`published_at`、`dead_lettered_at`を一切変更せず、terminal Eventを再びpublishableにしない。M05-S03のno-manual-redrive制約はOutbox Dispatcherの再配送に適用され、D-020のtrusted consumer-side replayを禁止しない。
 
 ## 2. システム境界と責務（DESIGN_BASELINE）
 
@@ -78,7 +115,7 @@ GUI/CUI/APIは同じ契約を利用する。GUIはRTS/配車場的な監視・�
 - Eventは確定事実の追記記録。Workerの`completed`という自己申告は確定イベントではない。
 - 状態更新・Domain Event・Outbox挿入・Command Receipt確定は可能な限り**同一DB Transaction**。
 - At-least-once配送、順不同・重複を許す。Consumer Inboxで冪等化。WorkOrder単位に`aggregate_version`を単調増加させる。全体順序は保証しない。
-- Outbox Dispatcherの具体方式（Pollingのみ / Polling+NOTIFY / 外部Broker）は **OPEN**。現時点の推薦はPollingであり、採用決定ではない。
+- Outbox DispatcherはD-018でPolling+NOTIFY wake-up hintを選択。耐久配送の正本はOutboxで、定期Pollingは必須の回復経路。
 - Event EnvelopeとPolicy DSL、Approval Certificate、Command/Verification Receiptは`schema_version`を必須とし、未知の非互換版は拒否する設計案。Event/Outboxの保持・パーティション・再送/Inbox保護期間はO-009で決める。
 - `LISTEN/NOTIFY`を導入する場合も起床ヒントとし、永続配送の正本にしない。
 - 外部API等への副作用は別の`operation_id`/Idempotency Key、Gateway、結果照合、必要時補償処理で保護。Exactly-onceを無条件に主張しない。
@@ -179,15 +216,13 @@ GUI/CUI/APIは同じ契約を利用する。GUIはRTS/配車場的な監視・�
 
 | ID | 論点 | 現状 | Issue |
 |---|---|---|---|
-| O-001 | Event Dispatcher | Polling / Polling+NOTIFY / 外部Brokerから**未選択**。Pollingは推薦のみ | PDK-M05-S02 |
 | O-002 | Approval公開鍵の管理・鍵更新 | PoC専用Key Fixtureと本番Trust Anchorを分離して未決項目を閉じる | PDK-M06-S08 |
-| O-003 | DSN・PostgreSQL version・Migration tool | Test DB環境/秘密値非記載/Migration Runner方式が未確定 | PDK-M02-S05 |
+| O-003 | DSN・PostgreSQL version・Migration tool | このPoC構成で確定: 観測したTest DBはPostgreSQL 18.6、canonical injected variableは`PADDOCK_DB_URL`、psql-native guarded runnerは`--check`（read-only）と明示的な`--apply`を提供。自動drop/recreateなし、`raw`が populated なら拒否。空DBへのapplyは未検証。これは一般的なPostgreSQL互換性保証ではない | PDK-M02-S05 |
 | O-004 | Worker Sandbox実装 | WASM/WASI・VM等は設計案。Termux PRootは安全な隔離境界とみなさない | PDK-M12-S01 |
 | O-005 | UI/CUI、NAYA実モデル | PoC以降 | PDK-M13-S01, PDK-M13-S03 |
 | O-006 | Token閾値/Lease秒数/Trust統計閾値 | 例示値のみ。Gateway認可キャッシュ最大staleness、HOLD/Monitoring期限も未決 | PDK-M07-S06, PDK-M08-S05, PDK-M11-S03 |
 | O-007 | 公開先・CI・GitHubリポジトリ名 | 新規独立Repoであること以外は未決。Decision保護/Verifier of Recordの設計も必要 | PDK-M00-S07, PDK-M14-S04 |
 | O-008 | Canonicalization/Signature Envelope | RFC 8785 JCSを選択済み（D-015）。Domain Separation、schema version、anti-replayは引き続き必須 | PDK-M06-S07 |
-| O-009 | Event/Outbox retention・schema evolution | 保持期間・partition/archival/consumer replay対応を未決 | PDK-M05-S05 |
 | O-010 | 安全停止の解除・人間鍵とTrust Rootの更新 | Safety Planeでの失効・復旧が必要。運用鍵/復旧Quorumは未決 | PDK-M00-S06, PDK-M06-S05 |
 
 ## 9. Main Design Review / 検証前の必須補強（DESIGN_BASELINE）
@@ -213,3 +248,10 @@ GUI/CUI/APIは同じ契約を利用する。GUIはRTS/配車場的な監視・�
 - 2026-10-12: D-001〜D-013を会話内の明示選択として整理。D-014独立Repo境界を追加。実装完了を示す記録ではない。
 - 2026-10-12: 設計レビューに基づきSafety Plane、Safe Baseline、Root別Epoch、監視liveness、Threat Model等を**DESIGN_BASELINE**として追記。正式なACCEPTED Decisionは増やしていない。Git承認Commitは未確定。
 - 2026-10-13: 現在タスクでのユーザー明示選択に基づきD-015を追記。RFC 8785 JCSをBundle/Approval/Commandのcanonical bytesに採用し、Domain Separation・schema version・anti-replayを必須として保持。実装はS07 verifierまで未確認。
+- 2026-10-13: 現在タスクでのユーザー明示選択に基づきD-016を追記。Local Runner実測+別Verifier subagentレビュー+Main照合を満たすIssueはCI不在でも[x]にできる。CI attestation/Verifier-of-Recordとは主張しない。D-001〜D-015は変更なし。
+- 2026-10-13: 現在タスクでのユーザー明示選択に基づきD-017を追記。Scope mode SAFE_STOPPEDは組込みdeny-all Safe Baselineを表し、追加safe_baseline列は不要。FROZENはRollback限定で対応RolloutはROLLING_BACK。
+- 2026-10-17: 現在タスクでのユーザー明示選択に基づきD-018を追記しO-001を解決。Polling+NOTIFY wake-up hintを選択し、Outbox polling fallbackを耐久配送の正本として維持。D-001〜D-017は変更なし。
+- 2026-10-18: 現在タスクでのユーザー明示選択に基づきD-019を追記しO-009を解決。PoC bounded unpartitioned schema/retention/replay policyを記録。D-001〜D-018は変更なし。
+- 2026-10-18: 別の現在タスク選択でD-020を追加し、D-019 replay semanticsをConsumer-side replay/immutable Outbox statusに確定。M05-S03 terminal retry/redrive limitsとD-018 Outbox durable truthは維持。D-001〜D-019は変更なし。
+- 2026-10-18: 追加の現在タスク選択でD-021を追記しReplay caller、support-check time, quarantine cardinality, replay audit fieldsを固定。D-001〜D-020は変更なし。
+- 2026-10-18: 明示的な意味境界としてD-022を追記し、D-020 consumer-side replayはOutbox redriveではなくM05-S03 terminal limitを変更しないことを確認。D-001〜D-021は変更なし。

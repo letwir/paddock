@@ -26,6 +26,36 @@ class S03TrackingContractTests(unittest.TestCase):
         shutil.copy2(SOURCE / "docs" / "bootstrap-safety.md", self.root / "docs" / "bootstrap-safety.md")
         (self.root / "scripts").mkdir()
         shutil.copy2(SOURCE / "scripts" / "lint_design.py", self.root / "scripts" / "lint_design.py")
+        issues = self.root / "Issues.md"
+        copied_issues = issues.read_text(encoding="utf-8")
+        copied_issues, count = re.subn(
+            r"^last_receipt:.*$",
+            "last_receipt: NONE",
+            copied_issues,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        if count != 1:
+            raise AssertionError("copied Cursor must contain exactly one first last_receipt line")
+        issues.write_text(copied_issues, encoding="utf-8")
+        self.copy_local_markdown_targets()
+
+    def copy_local_markdown_targets(self):
+        link_re = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+        for name in LINTER.NAME_FILES:
+            source_doc = SOURCE / name
+            fixture_doc = self.root / name
+            for link in link_re.findall(fixture_doc.read_text(encoding="utf-8")):
+                if link.startswith(("https://", "http://", "#", "mailto:")):
+                    continue
+                target = link.split("#", 1)[0].strip("<>")
+                if not target or ".." in Path(target).parts:
+                    continue
+                src = source_doc.parent / target
+                dst = fixture_doc.parent / target
+                if src.is_file() and not dst.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
 
     def tearDown(self):
         self.temp.cleanup()

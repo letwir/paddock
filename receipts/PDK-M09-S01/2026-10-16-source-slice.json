@@ -1,0 +1,40 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S01",
+  "runner": {"kind":"local","identity":"Main Runner","run_id":"continue-2026-10-16-M08-M09-runtime","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-16",
+  "source":{"git_commit":"2f1dcfe143c3ef66e33d82c003e2432256b11518","git_tree":"UNAVAILABLE_DIRTY_WORKTREE","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED; broad unrelated/untracked changes remain"},
+  "targets":[
+    {"path":"internal/governance/domain/budget.go","sha256":"4cbea8eedfbd847c28329def99c478a67778f9c3efb210b60549ff26621cd850"},
+    {"path":"internal/governance/domain/budget_test.go","sha256":"264e7d14d74d15986b839757b95f3c3057d5633702fc19b472bbc6fd82ecff61"},
+    {"path":"internal/storage/postgres/budget_store.go","sha256":"dcaf9e708cd097f61af2a551ac58d15e6758d2381d7e2f89a686beba735b2e17"},
+    {"path":"sql/governance_budget.sql","sha256":"aec566f4ef75ae1eeb954de9bd5bc1d081e85e6fa965d74c897e1716bc8c1be3"},
+    {"path":"tests/test_m09_budget_sql.py","sha256":"01109f9ab755b31def82654555e233977e1c2c89d291f1e9859f56d7282af341"},
+    {"path":"internal/storage/postgres/budget_integration_test.go","sha256":"7bc267306cd669a5057c2d82cfa97086f622b64520732723f2abb5b518956b73"},
+    {"path":"internal/storage/postgres/pull_integration_test.go","sha256":"0fdbf2ba2a70211244dd86ff09fa37a1a5b5718df33dd98fe451f8c2952b97de"}
+  ],
+  "environment":{"go":"go1.27.1","os":"android","arch":"arm64","postgresql":"18.6 (Debian 18.6-1.pgdg13+2)","ci":false},
+  "checks":[
+    {"command":"go test ./... -count=1","exit_code":0,"result":"PASS; all Go packages"},
+    {"command":"go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; tagged integration package compile-only"},
+    {"command":"python3 -m unittest tests.test_m08_offline_policy_sql tests.test_m08_lease_sql tests.test_m08_pull_sql tests.test_m09_budget_sql -v","exit_code":0,"result":"PASS; 29/29 static SQL contracts"},
+    {"command":"python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues/148 edges"},
+    {"command":"git diff --check","exit_code":0,"result":"PASS"},
+    {"command":"scripts/init_test_db.sh --check","exit_code":0,"result":"PASS; paddock_test PostgreSQL 18.6 raw_relations=62; read-only"},
+    {"command":"psql guarded sql/governance_budget.sql (initial apply)","exit_code":0,"result":"PASS; COMMIT as paddock_migrator on paddock_test; no DSN emitted"},
+    {"command":"psql duplicate full budget migration","exit_code":3,"result":"STOPPED transactionally at existing raw.budget_unit_valid(text); read-only postcheck confirms no new schema change"},
+    {"command":"go test -tags=paddock_test ./internal/storage/postgres -run '^TestBudgetLedgerAcceptance$' -count=1 -v (initial attempts)","exit_code":1,"result":"Exposed replay column ambiguity, then allocation rowtype defect; SQLSTATE/source failures recorded without secret messages. Partial m09_it_ fixtures retained per policy."},
+    {"command":"guarded CREATE OR REPLACE raw.budget_apply correction","exit_code":0,"result":"PASS; transaction target paddock_test/current user paddock_migrator, corrected qualified replay columns and allocation row type; read-only owner/app privilege checks PASS"},
+    {"command":"go test -tags=paddock_test ./internal/storage/postgres -run '^TestBudgetLedgerAcceptance$' -count=1 -v (corrected)","exit_code":0,"result":"PASS; concurrent one-winner delegation, exact allocation/replay, reserve+settle/refund, release, over-limit/cross-unit rejection and journal reconciliation. New fixture retained; operation_count=8,event_count=10."},
+    {"command":"go test -tags=paddock_test ./internal/storage/postgres -count=1 -v","exit_code":0,"result":"PASS; full PostgreSQL integration suite 38.913s."},
+    {"command":"read-only M09 postcheck","exit_code":0,"result":"PASS; 5 m09_it_ scopes/roots, 8 budget accounts, 40 journal rows, 4 allocations SETTLED, 0 OPEN, 0 invariant violations, 0 journal/counter mismatches. M08 fixture cleanup counts all 0."},
+    {"command":"read-only app role check","exit_code":0,"result":"PASS; current_database=paddock_test/current_user=paddock_app; snapshot/budget function EXECUTE true; direct work_orders/budget_accounts SELECT false."}
+  ],
+  "independent_review":{"kind":"separately dispatched verifier subagent","result":"Read-only review found no actionable discrepancy in the M09 receipt, selected implementation contract, SQL/integration sources, retained fixture inventory, or recorded postcheck. Main compared this report with Runner output and reconciled it.","scope":"M09-S01 receipt/source/Issue reconciliation; no DB reconnection or test rerun"},
+  "authorization":{"source":"User explicitly selected combined M08-S04/S05 + M09-S01 guarded migration/runtime verification on paddock_test and authorized existing injected connection variables for that database only.","scope":"Additive guarded migrations, named integration fixtures, readback and retention of unique m09_it_ append-only data; no down/reset/drop, production/llm-memory, credential display/storage, or external effects."},
+  "verdict":"D-016_LOCAL_DONE; PADDOCK_TEST_RUNTIME_PASS; CI_ATTESTATION_NONE; APPEND_ONLY_FIXTURES_RETAINED",
+  "retained_fixtures":{"scopes_roots":["m09_it_scope_05ce84b70ef1282709fef7d4 / m09_it_root_05ce84b70ef1282709fef7d4 (scope/root only, no budget rows)","m09_it_scope_a884e25b765100790721bcad / m09_it_root_a884e25b765100790721bcad","m09_it_scope_0e4b6803950c14b71b7a2282 / m09_it_root_0e4b6803950c14b71b7a2282","m09_it_scope_e6109b92c8d99e85e51ba7ef / m09_it_root_e6109b92c8d99e85e51ba7ef","m09_it_scope_72b9567f1f1a4805117ea468 / m09_it_root_72b9567f1f1a4805117ea468"],"budget_summary":"Four scopes contain budget accounts: 8 accounts total, 40 journal rows, four allocations SETTLED, no open allocations. All account invariants hold and journal deltas reconcile. Retained intentionally; no cleanup/delete because append-only journal."},
+  "remaining_risks":["No CI attestation; evidence is local Runner execution plus independent read-only receipt/source review.","One duplicate full migration attempt failed transactionally and caused no change; the corrected function was applied only via guarded CREATE OR REPLACE.","Five m09_it_ scope/root fixtures and append-only journal/account records remain intentionally retained and disclosed; no deletion/reset was performed."]
+}

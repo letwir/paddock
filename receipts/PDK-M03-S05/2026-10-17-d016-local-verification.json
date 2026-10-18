@@ -1,0 +1,38 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M03-S05",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M03-S05-d016", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T06:59:07Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "internal/governance/domain/canonical_input.go", "sha256": "85a4831fc0781daf038b630591f89509e9db561d4d4814695607b2cd640ac5b0"},
+    {"path": "internal/governance/domain/canonical_input_test.go", "sha256": "322b11c7d8a01be8dc721b1c5c4d134f8d648b0d70a63ef9f00401b4bb920dcb"},
+    {"path": "internal/governance/domain/safety_quorum.go", "sha256": "381d44ab40b7a7a9cd17865e068b17721c8ac2dce6fd9e32f38cb8a372900c9d"},
+    {"path": "internal/governance/domain/safety_quorum_test.go", "sha256": "66350e48cbdbb7295fc5ce2f08cec2ced6bcef66db2c8ad503c2fa7cf91b1bc6"},
+    {"path": "internal/governance/domain/safety_test.go", "sha256": "b8fea58a4e8cdf1bcc9e8ced1a3481baeb91fb15ef2e8c0f4b5d3de0e52df6c4"},
+    {"path": "internal/governance/port/transaction.go", "sha256": "c21d2a91836f8586920e00e06627bf3a66f557102a65074d57763f39b05534e2"},
+    {"path": "internal/governance/port/transaction_test.go", "sha256": "c0626658779b3b17b0e908367a59492cf15a74228f1f37fbd74664979a5eabff"},
+    {"path": "internal/governance/application/safety.go", "sha256": "81ed1789c05d83eed20eeeb1caec9d903db738a2fbb05e0476b6215aabf972a"},
+    {"path": "internal/governance/application/safety_test.go", "sha256": "6ab1759f62788fcb8a2afb47326883e9da3999bcbc6a6ac15eaad1aa8cf73a69"},
+    {"path": "internal/governance/application/safety_gate_test.go", "sha256": "7dadd628f40b85c6c4ac4a82e52d2727412c21073b368a6273cb4bdc1fac1c78"},
+    {"path": "internal/storage/postgres/governance_tx.go", "sha256": "740015348e34d61a478e5cdc42813b2dbc02ffb14928bebf2279a77d1aa7206b"},
+    {"path": "internal/storage/postgres/governance_event_test.go", "sha256": "179c0c7298223dc5d3f65a32481a4b81cb4688191ac9b02de1a762065a5db4ff"},
+    {"path": "internal/storage/postgres/integration_test.go", "sha256": "f2750328b2ce112450e9074a5474df4b6bd4a2677c57236549491775e8be5cfc"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "runner_checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all untagged Go packages"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only for both tagged PostgreSQL test sets; no test bodies/DB"},
+    {"command": "python3 -m unittest tests.test_m02_roles tests.test_m02_rebuild_runner tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql -q", "exit_code": 0, "result": "PASS; 62 existing M02/M09 source static tests"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 dependency edges"},
+    {"command": "gofmt and tracked/no-index whitespace checks for exact M03 allowlist", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "No actionable source finding after the Bundle context persistence gap was resolved by the user-selected content-derived requestID/nonce. Reviewed JCS, content vs envelope digest, Approval/Command separation, nonce retry binding, typed receipt, transaction-bound Bundle insertion, rollback, and current callsites.", "scope": "source and acceptance review only; no tests, DB, or runtime reproduction"},
+  "main_reconciliation": {"selected_design_applied": "Domain-owned immutable JCS Request/Bundle values; RequestDigest is SHA-256 of DomainCommand Envelope and typed domain.Digest; Bundle content digest hashes JCS payload, while Bundle request ID and nonce derive deterministically from persisted content digest and schema, so existing row fields reconstruct DomainBundle signing bytes; explicit stable caller nonce remains required for command/approval retries; GovernanceTx persists Bundle in the same transaction using existing schema.", "acceptance": "Canonical-equivalent JSON variants produce identical digests; changed context/content changes the expected domain-separated bytes; Approval and Command use separate domains; CommandReceipt validates typed digest; Bundle INSERT binds existing columns and propagates errors transactionally. Main compared full Go/static/compiler observations with the separate Verifier review.", "limitations": ["No DB migration/runtime or external signing-key verification is in scope or claimed.", "No CI attestation; worktree is dirty and full diff hash unavailable.", "No commit or push."]},
+  "authorization": {"scope": "Local source implementation and tests only. No SQL/schema/migration changes, database connection, external key/LLM/network access, or external side effects."},
+  "issue_state": "DONE",
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; NO_CI_ATTESTATION",
+  "next_action": "Proceed to the next dependency-ready Issue after Cursor refresh; no M03-S05 DB action is required by the selected contract."
+}

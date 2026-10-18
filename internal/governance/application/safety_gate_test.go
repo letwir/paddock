@@ -55,6 +55,12 @@ func (*gateTransactor) LookupCommandReceipt(context.Context, string) (port.Comma
 func (*gateTransactor) InsertCommandReceipt(context.Context, port.CommandReceipt) error {
 	return errors.New("unexpected receipt insert")
 }
+func (*gateTransactor) InsertPolicyBundle(context.Context, domain.CanonicalBundle, string, []byte) error {
+	return errors.New("unexpected policy bundle insert")
+}
+func (*gateTransactor) AppendEvent(context.Context, domain.Event) error {
+	return errors.New("unexpected event append")
+}
 
 func gateState(mode domain.ScopeMode, epoch domain.Epoch) port.ScopeSnapshot {
 	return port.ScopeSnapshot{ScopeID: "scope", ActivationEpoch: 1, SecurityEpoch: epoch, Mode: mode, Roots: map[domain.RootID]domain.RootAuthority{"root-a": {Policy: domain.PolicyBinding{Digest: testDigest()}, AuthorizationEpoch: 3}}}

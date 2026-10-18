@@ -1,0 +1,54 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S02",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-17-M05-S02-d018",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-17T12:42:50Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated tracked and untracked changes remain"
+  },
+  "targets": [
+    {"path": "decisions.md", "sha256": "33b1d47459294cef73f931df4b8d4ce7d1b0107f76bd310a5cea70f761682bab"},
+    {"path": "Issues.md", "sha256": "9620862daa7c20d56a3f93f8c139c7c82ed12c2b9940af039a24551c7310e2ad"},
+    {"path": "docs/issue-dependencies.generated.md", "sha256": "03d592f3f03e3adb0f0f65951051fa1c9ccfe76bde2303de5e07716654d2c3c2"},
+    {"path": "tests/test_s08_acceptance.py", "sha256": "67c4cd80e7ce85a50a1904cd5302f285dcd6c402b5cdeed9b9e90da921755abb"}
+  ],
+  "selected_design": {
+    "decision_id": "D-018",
+    "resolved_open_id": "O-001",
+    "choice": "Polling + NOTIFY wake-up hint; PostgreSQL Outbox is durable truth; periodic Polling recovers disconnected/missed/coalesced notifications; external Broker not selected for the PoC.",
+    "failure_semantics": "NOTIFY follows transaction commit and is absent on abort; queue exhaustion may fail the emitting transaction; Outbox/State remain atomic; consumers use Inbox idempotency; notification is not delivery/commit proof.",
+    "references": ["https://www.postgresql.org/docs/18/sql-notify.html", "https://www.postgresql.org/docs/18/sql-listen.html"],
+    "existing_decisions": "D-001..D-017 unchanged."
+  },
+  "runner_checks": [
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 149 dependency edges; D IDs sequential through D-018 and OPEN resolvers valid."},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS."},
+    {"command": "python3 -m unittest tests.test_lint_design tests.test_s08_acceptance -q", "exit_code": 1, "result": "FAIL in existing temp-fixture setup: copied Issues/README references point to omitted receipt/README edition files; test_s08_acceptance also initially used the now-resolved O-001 anchor. Its negative-test anchor was updated to still-open O-002; the suite was not claimed as passing because the broader fixture setup remains broken. These tests do not affect the actual design linter result."},
+    {"command": "Dispatcher/PostgreSQL integration test body", "exit_code": null, "result": "NOT RUN; M05-S02 is a design-decision/documentation Issue only. No dispatcher implementation or DB operation was executed."}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only Verifier subagent",
+    "result": "No findings.",
+    "scope": "D-018 decision register/section, O-001 resolution, Issue linkage, and PostgreSQL 18 NOTIFY/LISTEN transaction/startup/failure semantics.",
+    "database_access": false,
+    "main_reconciliation": "Main compared the review with D-018, official PostgreSQL documentation, and Runner lint output. No discrepancy remains."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_VERIFICATION",
+  "limitations": [
+    "D-018 selects architecture only; no dispatcher implementation or performance/runtime behavior is claimed.",
+    "CI attestation is absent.",
+    "The temporary-copy Python mutation test suite has pre-existing missing-link/README fixture setup errors; the production design linter itself passes.",
+    "Worktree is broadly dirty and full diff hash is unavailable.",
+    "No commit or push occurred."
+  ],
+  "verdict": "PASS_LOCAL_D016_DESIGN_SELECTION; NO_RUNTIME_CLAIM",
+  "next_action": "Proceed to next dependency-ready Issue PDK-M05-S03 after source preflight; its DB/runtime scope requires separate exact approval."
+}

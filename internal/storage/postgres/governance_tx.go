@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -28,14 +29,58 @@ type rolloutKey struct {
 	rollout domain.RolloutID
 }
 
-func (g *governanceTx) LookupCommandReceipt(ctx context.Context, commandID string) (port.CommandReceipt, bool, error) {
+// InsertPolicyBundle stores the canonical bundle envelope and externally
+// supplied signature in the current transaction. It does not verify or create
+// signatures.
+func (g *governanceTx) InsertPolicyBundle(ctx context.Context, bundle domain.CanonicalBundle, signerKeyID string, signature []byte) error {
+	if err := bundle.Validate(); err != nil {
+		return fmt.Errorf("insert policy bundle: invalid bundle: %w", err)
+	}
+	if signerKeyID == "" || strings.TrimSpace(signerKeyID) != signerKeyID {
+		return errors.New("insert policy bundle: signer key ID must be nonempty and trimmed")
+	}
+	if len(signature) == 0 {
+		return errors.New("insert policy bundle: signature must be nonempty")
+	}
+	_, err := g.tx.Exec(ctx, `INSERT INTO raw.policy_bundles
+		(bundle_digest,canonical_bytes,schema_version,signer_key_id,signature)
+		VALUES ($1, $2, $3, $4, $5)`,
+		string(bundle.Digest()), bundle.CanonicalBytes(), bundle.SchemaVersion(), signerKeyID, append([]byte(nil), signature...))
+	if err != nil {
+		return fmt.Errorf("insert policy bundle: %w", err)
+	}
+	return nil
+}
+
+// AppendEvent appends an event envelope and its dispatchable outbox row through
+// the database function using the transaction bound to this GovernanceTx.
+func (g *governanceTx) AppendEvent(ctx context.Context, event domain.Event) error {
+	if err := event.Validate(); err != nil {
+		return fmt.Errorf("append event/outbox: invalid domain event: %w", err)
+	}
+	payload := append([]byte(nil), event.Payload()...)
+	_, err := g.tx.Exec(ctx, `SELECT raw.append_domain_event_and_outbox($1, $2, $3, $4, $5, $6, $7)`,
+		event.ID(), event.AggregateKind(), event.AggregateID(), event.AggregateVersion(),
+		event.Type(), event.SchemaVersion(), payload)
+	if err != nil {
+		return fmt.Errorf("append event/outbox: %w", err)
+	}
+	return nil
+}
+
+func (g *safetyGovernanceTx) LookupCommandReceipt(ctx context.Context, commandID string) (port.CommandReceipt, bool, error) {
 	var r port.CommandReceipt
-	err := g.tx.QueryRow(ctx, `SELECT command_id, request_digest, status, response_bytes FROM raw.command_receipts WHERE command_id = $1`, commandID).Scan(&r.CommandID, &r.RequestDigest, &r.Status, &r.Response)
+	var requestDigest string
+	err := g.tx.QueryRow(ctx, `SELECT command_id, request_digest, status, response_bytes FROM raw.safety_lookup_command_receipt($1)`, commandID).Scan(&r.CommandID, &requestDigest, &r.Status, &r.Response)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return port.CommandReceipt{}, false, nil
 	}
 	if err != nil {
 		return port.CommandReceipt{}, false, fmt.Errorf("lookup command receipt: %w", err)
+	}
+	r.RequestDigest, err = domain.ParseDigest(requestDigest)
+	if err != nil {
+		return port.CommandReceipt{}, false, fmt.Errorf("lookup command receipt: malformed request digest: %w", err)
 	}
 	if r.Status != "SUCCEEDED" || len(r.Response) == 0 {
 		return port.CommandReceipt{}, false, fmt.Errorf("invalid or incomplete command receipt %q", commandID)
@@ -43,11 +88,11 @@ func (g *governanceTx) LookupCommandReceipt(ctx context.Context, commandID strin
 	return r, true, nil
 }
 
-func (g *governanceTx) InsertCommandReceipt(ctx context.Context, r port.CommandReceipt) error {
-	if r.CommandID == "" || len(r.RequestDigest) != 64 || r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+func (g *safetyGovernanceTx) InsertCommandReceipt(ctx context.Context, r port.CommandReceipt) error {
+	if r.CommandID == "" || r.RequestDigest.Validate() != nil || r.Status != "SUCCEEDED" || len(r.Response) == 0 {
 		return errors.New("invalid completed command receipt")
 	}
-	_, err := g.tx.Exec(ctx, `INSERT INTO raw.command_receipts (command_id, request_digest, status, response_bytes, completed_at) VALUES ($1, $2, $3, $4, clock_timestamp())`, r.CommandID, r.RequestDigest, r.Status, r.Response)
+	_, err := g.tx.Exec(ctx, `SELECT raw.safety_insert_command_receipt($1, $2, $3, $4)`, r.CommandID, string(r.RequestDigest), r.Status, r.Response)
 	if err != nil {
 		return fmt.Errorf("insert command receipt: %w", err)
 	}
@@ -77,7 +122,7 @@ func newGovernanceTx(tx transaction) *governanceTx {
 	}
 }
 
-func (g *governanceTx) LockScope(ctx context.Context, id domain.ScopeID) (port.ScopeSnapshot, error) {
+func (g *safetyGovernanceTx) LockScope(ctx context.Context, id domain.ScopeID) (port.ScopeSnapshot, error) {
 	if err := id.Validate(); err != nil {
 		return port.ScopeSnapshot{}, fmt.Errorf("lock scope: %w", err)
 	}
@@ -85,98 +130,101 @@ func (g *governanceTx) LockScope(ctx context.Context, id domain.ScopeID) (port.S
 		return cloneScope(snapshot), nil
 	}
 
-	var snapshot port.ScopeSnapshot
-	var mode string
-	var baseline, live pgtype.Text
-	err := g.tx.QueryRow(ctx, `
-SELECT scope_id, activation_epoch, mode, baseline_bundle_digest, live_rollout_id
-FROM raw.policy_scopes
-WHERE scope_id = $1
-FOR UPDATE`, string(id)).Scan(&snapshot.ScopeID, &snapshot.ActivationEpoch, &mode, &baseline, &live)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return port.ScopeSnapshot{}, ErrScopeNotFound
-	}
+	rows, err := g.tx.Query(ctx, `SELECT * FROM raw.safety_lock_scope($1)`, string(id))
 	if err != nil {
 		return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q: %w", id, err)
 	}
-	snapshot.Mode = domain.ScopeMode(mode)
-	if err := snapshot.Mode.Validate(); err != nil {
-		return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q mode: %w", id, err)
-	}
-	if baseline.Valid {
-		digest := domain.Digest(baseline.String)
-		if err := digest.Validate(); err != nil {
-			return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q baseline: %w", id, err)
-		}
-		snapshot.BaselineBundle = &digest
-	}
-	if live.Valid {
-		rolloutID := domain.RolloutID(live.String)
-		if err := rolloutID.Validate(); err != nil {
-			return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q live rollout: %w", id, err)
-		}
-		snapshot.LiveRolloutID = &rolloutID
-	}
-
-	// KEY SHARE protects the singleton row's identity without conflicting with
-	// updates to its non-key security_epoch column. CAS below resolves concurrent
-	// epoch advances; FOR SHARE here would deadlock when two Scope transactions
-	// both upgrade their shared locks to update the singleton row.
-	if err := g.tx.QueryRow(ctx, `
-SELECT security_epoch
-FROM raw.security_generation
-WHERE singleton_id = true
-FOR KEY SHARE`).Scan(&snapshot.SecurityEpoch); err != nil {
-		return port.ScopeSnapshot{}, fmt.Errorf("read/lock global security epoch: %w", err)
-	}
-
-	snapshot.Roots = make(map[domain.RootID]domain.RootAuthority)
-	rows, err := g.tx.Query(ctx, `
-SELECT root_id, authorization_epoch, effective_bundle_digest, safe_baseline
-FROM raw.roots
-WHERE scope_id = $1
-ORDER BY root_id`, string(id))
-	if err != nil {
-		return port.ScopeSnapshot{}, fmt.Errorf("read roots for scope %q: %w", id, err)
-	}
+	snapshot := port.ScopeSnapshot{Roots: make(map[domain.RootID]domain.RootAuthority)}
+	var sawScope, missingRoot bool
 	for rows.Next() {
-		var rootID string
-		var epoch domain.Epoch
-		var digest pgtype.Text
-		var safeBaseline bool
-		if err := rows.Scan(&rootID, &epoch, &digest, &safeBaseline); err != nil {
+		var got port.ScopeSnapshot
+		var mode string
+		var baseline, live, rootID, rootDigest pgtype.Text
+		var rootEpoch pgtype.Int8
+		var safeBaseline pgtype.Bool
+		if err := rows.Scan(&got.ScopeID, &got.ActivationEpoch, &mode, &baseline, &live,
+			&got.SecurityEpoch, &rootID, &rootEpoch, &rootDigest, &safeBaseline); err != nil {
 			rows.Close()
-			return port.ScopeSnapshot{}, fmt.Errorf("scan root for scope %q: %w", id, err)
+			return port.ScopeSnapshot{}, fmt.Errorf("scan safety Scope snapshot %q: %w", id, err)
 		}
-		id := domain.RootID(rootID)
-		if err := id.Validate(); err != nil {
+		got.Mode = domain.ScopeMode(mode)
+		if !sawScope {
+			if got.ScopeID != id {
+				rows.Close()
+				return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q: returned mismatched identity", id)
+			}
+			if err := got.Mode.Validate(); err != nil {
+				rows.Close()
+				return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q mode: %w", id, err)
+			}
+			if baseline.Valid {
+				digest := domain.Digest(baseline.String)
+				if err := digest.Validate(); err != nil {
+					rows.Close()
+					return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q baseline: %w", id, err)
+				}
+				got.BaselineBundle = &digest
+			}
+			if live.Valid {
+				rolloutID := domain.RolloutID(live.String)
+				if err := rolloutID.Validate(); err != nil {
+					rows.Close()
+					return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q live rollout: %w", id, err)
+				}
+				got.LiveRolloutID = &rolloutID
+			}
+			snapshot.ScopeID = got.ScopeID
+			snapshot.ActivationEpoch = got.ActivationEpoch
+			snapshot.Mode = got.Mode
+			snapshot.BaselineBundle = got.BaselineBundle
+			snapshot.LiveRolloutID = got.LiveRolloutID
+			snapshot.SecurityEpoch = got.SecurityEpoch
+			sawScope = true
+		} else if got.ScopeID != snapshot.ScopeID || got.ActivationEpoch != snapshot.ActivationEpoch ||
+			got.Mode != snapshot.Mode || got.SecurityEpoch != snapshot.SecurityEpoch {
+			rows.Close()
+			return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q: inconsistent rows from safety API", id)
+		}
+		if !rootID.Valid {
+			missingRoot = true
+			continue
+		}
+		root := domain.RootID(rootID.String)
+		if err := root.Validate(); err != nil {
 			rows.Close()
 			return port.ScopeSnapshot{}, fmt.Errorf("invalid root identifier: %w", err)
 		}
-		binding := domain.PolicyBinding{SafeBaseline: safeBaseline}
-		if digest.Valid {
-			binding.Digest = domain.Digest(digest.String)
+		if !rootEpoch.Valid || !safeBaseline.Valid {
+			rows.Close()
+			return port.ScopeSnapshot{}, fmt.Errorf("malformed root %q row from safety API", root)
+		}
+		binding := domain.PolicyBinding{SafeBaseline: safeBaseline.Bool}
+		if rootDigest.Valid {
+			binding.Digest = domain.Digest(rootDigest.String)
 		}
 		if err := binding.Validate(); err != nil {
 			rows.Close()
-			return port.ScopeSnapshot{}, fmt.Errorf("root %q policy binding: %w", id, err)
+			return port.ScopeSnapshot{}, fmt.Errorf("root %q policy binding: %w", root, err)
 		}
-		snapshot.Roots[id] = domain.RootAuthority{Policy: binding, AuthorizationEpoch: epoch}
+		snapshot.Roots[root] = domain.RootAuthority{Policy: binding, AuthorizationEpoch: domain.Epoch(rootEpoch.Int64)}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return port.ScopeSnapshot{}, fmt.Errorf("iterate roots for scope %q: %w", id, err)
+		return port.ScopeSnapshot{}, fmt.Errorf("iterate safety Scope snapshot %q: %w", id, err)
 	}
 	rows.Close()
-	if len(snapshot.Roots) == 0 {
-		return port.ScopeSnapshot{}, fmt.Errorf("lock scope %q: %w", id, domain.ErrRootNotFound)
+	if !sawScope {
+		return port.ScopeSnapshot{}, ErrScopeNotFound
+	}
+	if missingRoot || len(snapshot.Roots) == 0 {
+		return port.ScopeSnapshot{}, domain.ErrRootNotFound
 	}
 
 	g.lockedScopes[id] = cloneScope(snapshot)
 	return cloneScope(snapshot), nil
 }
 
-func (g *governanceTx) LockRollout(ctx context.Context, scopeID domain.ScopeID, rolloutID domain.RolloutID) (port.RolloutSnapshot, error) {
+func (g *safetyGovernanceTx) LockRollout(ctx context.Context, scopeID domain.ScopeID, rolloutID domain.RolloutID) (port.RolloutSnapshot, error) {
 	if _, ok := g.lockedScopes[scopeID]; !ok {
 		return port.RolloutSnapshot{}, ErrScopeNotLocked
 	}
@@ -191,71 +239,81 @@ func (g *governanceTx) LockRollout(ctx context.Context, scopeID domain.ScopeID, 
 		return port.RolloutSnapshot{}, errors.New("lock order violation: rollout must be locked before target Roots")
 	}
 
-	var snapshot port.RolloutSnapshot
-	var state string
-	var target, rollbackFrom pgtype.Text
-	err := g.tx.QueryRow(ctx, `
-SELECT rollout_id, scope_id, state, target_root_id, base_activation_epoch,
-       last_activation_epoch, base_security_epoch, rollback_from
-FROM raw.policy_rollouts
-WHERE scope_id = $1 AND rollout_id = $2
-FOR UPDATE`, string(scopeID), string(rolloutID)).Scan(
-		&snapshot.ID, &snapshot.Scope, &state, &target, &snapshot.BaseActivationEpoch,
-		&snapshot.LastActivationEpoch, &snapshot.BaseSecurityEpoch, &rollbackFrom)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return port.RolloutSnapshot{}, ErrRolloutNotFound
-	}
+	rows, err := g.tx.Query(ctx, `SELECT * FROM raw.safety_lock_rollout($1, $2)`, string(scopeID), string(rolloutID))
 	if err != nil {
 		return port.RolloutSnapshot{}, fmt.Errorf("lock rollout %q: %w", rolloutID, err)
 	}
-	snapshot.State = domain.RolloutState(state)
-	if err := snapshot.State.Validate(); err != nil {
-		return port.RolloutSnapshot{}, fmt.Errorf("rollout %q state: %w", rolloutID, err)
-	}
-	if snapshot.ID != rolloutID || snapshot.Scope != scopeID {
-		return port.RolloutSnapshot{}, fmt.Errorf("rollout %q returned mismatched identity", rolloutID)
-	}
-	if target.Valid {
-		rootID := domain.RootID(target.String)
-		if err := rootID.Validate(); err != nil {
-			return port.RolloutSnapshot{}, fmt.Errorf("rollout %q target root: %w", rolloutID, err)
-		}
-		snapshot.TargetRoot = &rootID
-	}
-	if rollbackFrom.Valid {
-		state := domain.RolloutState(rollbackFrom.String)
-		if err := state.Validate(); err != nil {
-			return port.RolloutSnapshot{}, fmt.Errorf("rollout %q rollback origin: %w", rolloutID, err)
-		}
-		snapshot.RollbackFrom = &state
-	}
-
-	snapshot.Targets = make(map[domain.RootID]port.RolloutTargetSnapshot)
-	rows, err := g.tx.Query(ctx, `
-SELECT root_id, baseline_bundle_digest, candidate_bundle_digest, base_root_epoch
-FROM raw.rollout_targets
-WHERE scope_id = $1 AND rollout_id = $2
-ORDER BY root_id
-FOR UPDATE`, string(scopeID), string(rolloutID))
-	if err != nil {
-		return port.RolloutSnapshot{}, fmt.Errorf("lock targets for rollout %q: %w", rolloutID, err)
-	}
+	snapshot := port.RolloutSnapshot{Targets: make(map[domain.RootID]port.RolloutTargetSnapshot)}
+	var sawRollout bool
 	for rows.Next() {
-		var rootString string
-		var baseline, candidate pgtype.Text
-		var epoch domain.Epoch
-		if err := rows.Scan(&rootString, &baseline, &candidate, &epoch); err != nil {
+		var got port.RolloutSnapshot
+		var state string
+		var targetRoot, rollbackFrom, rootString, baseline, candidate pgtype.Text
+		var baseEpoch pgtype.Int8
+		if err := rows.Scan(&got.ID, &got.Scope, &state, &targetRoot,
+			&got.BaseActivationEpoch, &got.LastActivationEpoch, &got.BaseSecurityEpoch, &rollbackFrom,
+			&rootString, &baseline, &candidate, &baseEpoch); err != nil {
 			rows.Close()
-			return port.RolloutSnapshot{}, fmt.Errorf("scan target for rollout %q: %w", rolloutID, err)
+			return port.RolloutSnapshot{}, fmt.Errorf("scan safety Rollout snapshot %q: %w", rolloutID, err)
 		}
-		rootID := domain.RootID(rootString)
+		got.State = domain.RolloutState(state)
+		if !sawRollout {
+			if err := got.State.Validate(); err != nil {
+				rows.Close()
+				return port.RolloutSnapshot{}, fmt.Errorf("rollout %q state: %w", rolloutID, err)
+			}
+			if got.ID != rolloutID || got.Scope != scopeID {
+				rows.Close()
+				return port.RolloutSnapshot{}, fmt.Errorf("rollout %q returned mismatched identity", rolloutID)
+			}
+			if targetRoot.Valid {
+				rootID := domain.RootID(targetRoot.String)
+				if err := rootID.Validate(); err != nil {
+					rows.Close()
+					return port.RolloutSnapshot{}, fmt.Errorf("rollout %q target root: %w", rolloutID, err)
+				}
+				got.TargetRoot = &rootID
+			}
+			if rollbackFrom.Valid {
+				rollbackState := domain.RolloutState(rollbackFrom.String)
+				if err := rollbackState.Validate(); err != nil {
+					rows.Close()
+					return port.RolloutSnapshot{}, fmt.Errorf("rollout %q rollback origin: %w", rolloutID, err)
+				}
+				got.RollbackFrom = &rollbackState
+			}
+			snapshot.ID = got.ID
+			snapshot.Scope = got.Scope
+			snapshot.State = got.State
+			snapshot.TargetRoot = got.TargetRoot
+			snapshot.BaseActivationEpoch = got.BaseActivationEpoch
+			snapshot.LastActivationEpoch = got.LastActivationEpoch
+			snapshot.BaseSecurityEpoch = got.BaseSecurityEpoch
+			snapshot.RollbackFrom = got.RollbackFrom
+			sawRollout = true
+		} else if got.ID != snapshot.ID || got.Scope != snapshot.Scope || got.State != snapshot.State {
+			rows.Close()
+			return port.RolloutSnapshot{}, fmt.Errorf("lock rollout %q: inconsistent rows from safety API", rolloutID)
+		}
+		if !rootString.Valid {
+			continue
+		}
+		rootID := domain.RootID(rootString.String)
 		if err := rootID.Validate(); err != nil {
 			rows.Close()
 			return port.RolloutSnapshot{}, fmt.Errorf("invalid target root: %w", err)
 		}
+		if !baseEpoch.Valid {
+			rows.Close()
+			return port.RolloutSnapshot{}, fmt.Errorf("rollout target %q has no base Root epoch", rootID)
+		}
 		baseBinding := domain.PolicyBinding{SafeBaseline: !baseline.Valid}
 		if baseline.Valid {
 			baseBinding.Digest = domain.Digest(baseline.String)
+		}
+		if !candidate.Valid {
+			rows.Close()
+			return port.RolloutSnapshot{}, fmt.Errorf("rollout target %q has no candidate digest", rootID)
 		}
 		candidateDigest := domain.Digest(candidate.String)
 		candidateBinding := domain.PolicyBinding{Digest: candidateDigest}
@@ -267,13 +325,16 @@ FOR UPDATE`, string(scopeID), string(rolloutID))
 			rows.Close()
 			return port.RolloutSnapshot{}, fmt.Errorf("target %q candidate: %w", rootID, err)
 		}
-		snapshot.Targets[rootID] = port.RolloutTargetSnapshot{Baseline: baseBinding, Candidate: candidateBinding, BaseRootEpoch: epoch}
+		snapshot.Targets[rootID] = port.RolloutTargetSnapshot{Baseline: baseBinding, Candidate: candidateBinding, BaseRootEpoch: domain.Epoch(baseEpoch.Int64)}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return port.RolloutSnapshot{}, fmt.Errorf("iterate targets for rollout %q: %w", rolloutID, err)
+		return port.RolloutSnapshot{}, fmt.Errorf("iterate safety Rollout snapshot %q: %w", rolloutID, err)
 	}
 	rows.Close()
+	if !sawRollout {
+		return port.RolloutSnapshot{}, ErrRolloutNotFound
+	}
 	if len(snapshot.Targets) == 0 {
 		return port.RolloutSnapshot{}, fmt.Errorf("rollout %q has no targets", rolloutID)
 	}
@@ -282,7 +343,7 @@ FOR UPDATE`, string(scopeID), string(rolloutID))
 	return cloneRollout(snapshot), nil
 }
 
-func (g *governanceTx) ValidateTargets(ctx context.Context, scopeID domain.ScopeID, targets []domain.RootID) error {
+func (g *safetyGovernanceTx) ValidateTargets(ctx context.Context, scopeID domain.ScopeID, targets []domain.RootID) error {
 	if _, ok := g.lockedScopes[scopeID]; !ok {
 		return ErrScopeNotLocked
 	}
@@ -299,12 +360,7 @@ func (g *governanceTx) ValidateTargets(ctx context.Context, scopeID domain.Scope
 		}
 		seen[id] = struct{}{}
 	}
-	rows, err := g.tx.Query(ctx, `
-SELECT root_id
-FROM raw.roots
-WHERE scope_id = $1
-ORDER BY root_id
-FOR UPDATE`, string(scopeID))
+	rows, err := g.tx.Query(ctx, `SELECT root_id FROM raw.safety_lock_scope_roots($1)`, string(scopeID))
 	if err != nil {
 		return fmt.Errorf("validate targets for scope %q: %w", scopeID, err)
 	}
@@ -334,7 +390,7 @@ FOR UPDATE`, string(scopeID))
 	return nil
 }
 
-func (g *governanceTx) CompareAndSwapScope(ctx context.Context, expected, next port.ScopeSnapshot) error {
+func (g *safetyGovernanceTx) CompareAndSwapScope(ctx context.Context, expected, next port.ScopeSnapshot) error {
 	if !g.validatedScopes[expected.ScopeID] {
 		return ErrTargetsNotLocked
 	}
@@ -357,22 +413,15 @@ func (g *governanceTx) CompareAndSwapScope(ctx context.Context, expected, next p
 	if next.ActivationEpoch < expected.ActivationEpoch || !sameRootIDs(expected.Roots, next.Roots) {
 		return port.ErrStaleWrite
 	}
-	command, err := g.tx.Exec(ctx, `
-UPDATE raw.policy_scopes
-SET activation_epoch = $1, mode = $2, baseline_bundle_digest = $3,
-    live_rollout_id = $4, updated_at = clock_timestamp()
-WHERE scope_id = $5 AND activation_epoch = $6 AND mode = $7
-  AND baseline_bundle_digest IS NOT DISTINCT FROM $8
-  AND live_rollout_id IS NOT DISTINCT FROM $9
-  AND EXISTS (SELECT 1 FROM raw.security_generation
-              WHERE singleton_id = true AND security_epoch = $10)`,
-		next.ActivationEpoch, string(next.Mode), nullableDigest(next.BaselineBundle), nullableRolloutID(next.LiveRolloutID),
+	var scopeUpdated bool
+	err := g.tx.QueryRow(ctx, `SELECT raw.safety_cas_scope($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		string(expected.ScopeID), expected.ActivationEpoch, string(expected.Mode), nullableDigest(expected.BaselineBundle),
-		nullableRolloutID(expected.LiveRolloutID), expected.SecurityEpoch)
+		nullableRolloutID(expected.LiveRolloutID), next.ActivationEpoch, string(next.Mode), nullableDigest(next.BaselineBundle),
+		nullableRolloutID(next.LiveRolloutID), expected.SecurityEpoch).Scan(&scopeUpdated)
 	if err != nil {
 		return fmt.Errorf("CAS Scope %q: %w", expected.ScopeID, err)
 	}
-	if command.RowsAffected() != 1 {
+	if !scopeUpdated {
 		return port.ErrStaleWrite
 	}
 
@@ -381,19 +430,15 @@ WHERE scope_id = $5 AND activation_epoch = $6 AND mode = $7
 		if newRoot.AuthorizationEpoch < oldRoot.AuthorizationEpoch {
 			return port.ErrStaleWrite
 		}
-		command, err := g.tx.Exec(ctx, `
-UPDATE raw.roots
-SET authorization_epoch = $1, effective_bundle_digest = $2,
-    safe_baseline = $3, updated_at = clock_timestamp()
-WHERE root_id = $4 AND scope_id = $5 AND authorization_epoch = $6
-  AND effective_bundle_digest IS NOT DISTINCT FROM $7 AND safe_baseline = $8`,
-			newRoot.AuthorizationEpoch, nullablePolicyDigest(newRoot.Policy), newRoot.Policy.SafeBaseline,
+		var rootUpdated bool
+		err := g.tx.QueryRow(ctx, `SELECT raw.safety_cas_root($1, $2, $3, $4, $5, $6, $7, $8)`,
 			string(rootID), string(expected.ScopeID), oldRoot.AuthorizationEpoch,
-			nullablePolicyDigest(oldRoot.Policy), oldRoot.Policy.SafeBaseline)
+			nullablePolicyDigest(oldRoot.Policy), oldRoot.Policy.SafeBaseline,
+			newRoot.AuthorizationEpoch, nullablePolicyDigest(newRoot.Policy), newRoot.Policy.SafeBaseline).Scan(&rootUpdated)
 		if err != nil {
 			return fmt.Errorf("CAS Root %q in Scope %q: %w", rootID, expected.ScopeID, err)
 		}
-		if command.RowsAffected() != 1 {
+		if !rootUpdated {
 			return port.ErrStaleWrite
 		}
 	}
@@ -457,7 +502,7 @@ WHERE rollout_id = $4 AND scope_id = $5 AND root_id = $6
 	return nil
 }
 
-func (g *governanceTx) CompareAndSwapSecurityEpoch(ctx context.Context, expected, next domain.Epoch) error {
+func (g *safetyGovernanceTx) CompareAndSwapSecurityEpoch(ctx context.Context, expected, next domain.Epoch) error {
 	want, err := expected.Next()
 	if err != nil {
 		return fmt.Errorf("advance Security Epoch: %w", err)
@@ -465,14 +510,12 @@ func (g *governanceTx) CompareAndSwapSecurityEpoch(ctx context.Context, expected
 	if next != want {
 		return errors.New("Security Epoch must advance exactly once")
 	}
-	command, err := g.tx.Exec(ctx, `
-UPDATE raw.security_generation
-SET security_epoch = $1, updated_at = clock_timestamp()
-WHERE singleton_id = true AND security_epoch = $2`, next, expected)
+	var updated bool
+	err = g.tx.QueryRow(ctx, `SELECT raw.safety_cas_security_epoch($1, $2)`, expected, next).Scan(&updated)
 	if err != nil {
 		return fmt.Errorf("CAS global Security Epoch: %w", err)
 	}
-	if command.RowsAffected() != 1 {
+	if !updated {
 		return port.ErrStaleWrite
 	}
 	return nil

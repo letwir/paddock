@@ -1,0 +1,33 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S01",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M05-S01-app-event-source-final", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T09:30:11Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_domain_events_schema.sql", "sha256": "a9b57c7c14b4ddf88cfb45e88e9c2bdc46c25c6f2f4720e51d8d848603c108ca"},
+    {"path": "sql/init.sql", "sha256": "86dd89f70830c3b47d7c6710b225f9cdd2ea64b219d237cd771fd891cc7a9461"},
+    {"path": "tests/test_m05_events_schema_migration.py", "sha256": "693ee58e3a1acc53f0f7dea88efc6f6da368b842b9e11b8f7498ae526f862cf6"},
+    {"path": "internal/storage/postgres/governance_tx.go", "sha256": "e7bee053bdf1a3238de4e8b8f35735c0560f46d61533f907d59b6ab9de156a81"},
+    {"path": "internal/storage/postgres/governance_event_test.go", "sha256": "5187ab88376b3791f3c77ddbac76295ae77ff83461efbfacec253df7a2a7584b"},
+    {"path": "internal/storage/postgres/integration_test.go", "sha256": "528c7953d28d422f40a3f97f38d65d210ee5c21ebee9d8fc05c6b8be4320ac89"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "runner_checks": [
+    {"command": "python3 -m unittest tests.test_m05_events_schema_migration -v", "exit_code": 0, "result": "PASS 12/12 static migration/security source contracts; no SQL execution"},
+    {"command": "python3 -m unittest tests.test_m02_roles tests.test_m02_rebuild_runner tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql -q", "exit_code": 0, "result": "PASS 74 related M02/M09 source tests"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS compile-only; no integration body/DB"},
+    {"command": "go test ./internal/storage/postgres -run 'TestAppendEvent' -count=1", "exit_code": 0, "result": "PASS ordinary fake-transaction unit tests"},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS 89 issues / 148 edges"},
+    {"command": "gofmt and tracked/no-index whitespace checks", "exit_code": 0, "result": "PASS for exact selected source files"}
+  ],
+  "selected_design": {"schema_repair": "Guarded additive schema_version repair on exact paddock_test as paddock_migrator, only if domain_events is empty; if legacy rows exist, DENY without backfill.", "write_boundary": "App-only SECURITY DEFINER append_domain_event_and_outbox function with session_user=paddock_app, fixed search_path, migrator owner; app direct Event INSERT and all EventOutbox privileges revoked; Domain Event+Outbox append is atomic in one function call. State+Receipt+Event atomicity is deferred to M03-S04.", "authorization": "No runtime authorization for this function/ACL DDL is recorded; previous schema-only approval does not cover it."},
+  "source_review": {"kind": "separately dispatched read-only Verifier subagent", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "No actionable source gap after guard/parser fixes, ACL normalization, app adapter and app-pool fixture updates. Reviewed exact schema/owner/constraint preflight, safe existing function grants cleanup, app session gate, paired Event/Outbox inserts, fixture collision/cleanup, and M03-S04 scope split.", "scope": "source and tests only; no database access or runtime reproduction"},
+  "prior_runtime_context": {"observation": "A prior separately scoped M06-S05 integration attempt against existing paddock_test observed SQLSTATE 42703 because raw.domain_events.schema_version was absent. Current catalog was not re-read as part of this source task; no inference about current event row count is made.", "current_schema_migration": "Not applied. Current populated paddock_test and retained M09 append-only fixtures were not accessed or modified."},
+  "verdict": "LOCAL_SOURCE_AND_STATIC_TESTED; FUNCTION_SCHEMA_MIGRATION_NOT_APPLIED; M05_RUNTIME_UNVERIFIED",
+  "next_action": "Request fresh exact runtime approval for read-only preflight, then apply only if raw.domain_events is empty and all guards match. Run only the named app-pool Event/Outbox integration fixture once; otherwise stop without DDL. Preserve M09 fixtures.",
+  "remaining_risks": ["PostgreSQL migration parser/catalog behavior, function execute privileges, app-role atomic insert and cleanup are unverified at runtime.", "No legacy event schema_version backfill policy is defined; populated legacy event table causes the migration to fail closed.", "No CI attestation, commit or push is claimed."]
+}

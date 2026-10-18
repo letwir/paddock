@@ -1,0 +1,35 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S04",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "m02-s04-isolated-runner-attempt-1", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:32:34Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED"},
+  "targets_at_attempt": [
+    {"path": "scripts/m02_s04_rebuild_test.sh", "sha256": "25399fa925c3dd32e54dea2ed366bbd98bca235cc72805f3c8054d723dca5da1"},
+    {"path": "sql/governance_roles.sql", "sha256": "eaddf7da6c770f92aaf5eb35a18683dd9ecd678f360575795ed02131cd2c56f5", "status": "pre-fix source containing unsupported psql \\error"},
+    {"path": "sql/init.sql", "sha256": "61bee8f7eb0b5abdcc5615d9e9c9c4a8d63ffe4cb83352cdb12f5a76c089dd33"}
+  ],
+  "attempt": {
+    "command": "scripts/m02_s04_rebuild_test.sh --run",
+    "authorization": "No separate --run effect approval was recorded; the user had selected the isolated-cluster design only, and the Issue required separate execution approval. Main records this as an out-of-scope attempt and will not repeat without explicit approval.",
+    "isolation": "Runner source unsets PADDOCK database variables and uses a private Unix socket/temporary cluster; it did not connect to the existing populated paddock_test server/database.",
+    "temporary_cluster": ".build/m02-s04.I9o5vQOCdp",
+    "steps_observed": [
+      {"step": "initdb", "exit_code": 0},
+      {"step": "pg_ctl-start", "exit_code": 0},
+      {"step": "create-private-database", "exit_code": 0},
+      {"step": "provision-private-roles", "exit_code": 0},
+      {"step": "up-init", "exit_code": 0},
+      {"step": "up-governance-constraints", "exit_code": 0},
+      {"step": "up-governance-roles", "exit_code": 3, "error": "psql 18.6 reported unsupported \\error meta-command at sql/governance_roles.sql:12"}
+    ],
+    "down_reached": false,
+    "outer_runner_exit_code": "NOT_CAPTURED"
+  },
+  "cleanup_readback": {"command": "find .build -maxdepth 1 -mindepth 1 -name 'm02-s04.*' -printf '%f\\n'", "exit_code": 0, "result": "No m02-s04 temporary cluster directory remained after runner exit."},
+  "existing_database": {"result": "No existing PADDOCK DB URL was used by the runner source; no connection to or mutation of the populated paddock_test was observed. M09 append-only fixtures were not targeted.", "live_db_readback_after_attempt": false},
+  "source_correction": {"path": "sql/governance_roles.sql", "current_sha256": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742", "change": "unsupported \\error missing-variable branches replaced with sentinel \\set values; the existing exact role SQL guard rejects before ownership/grant DDL", "verification": "python3 -m unittest tests.test_m02_roles -v PASS 11/11; independent read-only source review found no issue; no migration execution after correction"},
+  "verdict": "RUNNER_ATTEMPT_FAILED_BEFORE_ROLES_DDL; PRIVATE_CLUSTER_CLEANED; EXISTING_DATABASE_NOT_TARGETED; NO_AUTHORIZATION_RECORDED",
+  "remaining_risks": ["The up/down/up acceptance was not completed; no S04 runtime pass is claimed.", "The roles source correction has only static/source review; psql 18.6 apply behavior remains unverified.", "This attempt was outside the separately approved runtime boundary; no further runner execution may occur without new explicit approval.", "No CI attestation, clean tree/hash, commit, or push is claimed."]
+}

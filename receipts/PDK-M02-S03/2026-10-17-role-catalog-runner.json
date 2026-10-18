@@ -1,0 +1,53 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S03-role-catalog", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:32:56Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_roles.sql", "sha256": "eaddf7da6c770f92aaf5eb35a18683dd9ecd678f360575795ed02131cd2c56f5"},
+    {"path": "tests/test_m02_roles.py", "sha256": "1dfa66f8bf1177e8f035a9228d27189065d4c1c840951595a58619494157db17"},
+    {"path": "sql/admin_governance_roles_checklist.sql", "sha256": "722b6fdfdf7e7bc1610abe1aeebb88628f1de2e1e24ec72d13c233edafa1de56"},
+    {"path": "sql/init.sql", "sha256": "61bee8f7eb0b5abdcc5615d9e9c9c4a8d63ffe4cb83352cdb12f5a76c089dd33"}
+  ],
+  "environment": {"python": "3.14.6", "os": "android", "arch": "arm64", "database": "paddock_test", "postgresql": "18.6", "ci": false},
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m02_roles -v", "exit_code": 0, "result": "PASS; 10/10 static role-contract tests"},
+    {"command": "scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "read-only catalog inventory in an explicit BEGIN TRANSACTION READ ONLY ... COMMIT through PADDOCK_DB_URL", "exit_code": 0, "result": "PASS; current database paddock_test, server PostgreSQL 18.6; no DDL/DML"}
+  ],
+  "catalog_observations": {
+    "read_only_transaction": true,
+    "setup_identity": "current_database=paddock_test, current_user=session_user=paddock_migrator",
+    "roles": "paddock_app and paddock_migrator both LOGIN; rolsuper/rolcreaterole/rolcreatedb/rolreplication/rolbypassrls all false",
+    "role_memberships": 0,
+    "raw_schema_owner": "paddock_migrator",
+    "base_tables": "all 11 sql/init.sql baseline tables exist and are owned by paddock_migrator",
+    "app_schema_privileges": "USAGE=true, CREATE=false",
+    "app_effective_base_table_privileges": "SELECT and INSERT true only on policy_bundles and domain_events; SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER false on the other nine; UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER false on all eleven",
+    "app_and_public_column_acl_entries": 0,
+    "app_and_public_relation_acls": "only SELECT/INSERT on domain_events and policy_bundles for paddock_app; no PUBLIC relation grants observed",
+    "other_schema_acl": "jockey retains USAGE and CREATE on raw; raw ACL also grants USAGE to paddock_app and USAGE/CREATE to paddock_migrator",
+    "trigger_inventory": [
+      "policy_scopes_frozen_rollback_ct (enabled O)",
+      "policy_rollouts_frozen_rollback_ct (enabled O)",
+      "budget_journal_immutable (enabled O)",
+      "checkpoint_policy_immutable (enabled O)",
+      "checkpoint_immutable (enabled O)",
+      "work_order_attempts_immutable_trg (enabled O)",
+      "work_order_dependencies_immutable_trg (enabled O)",
+      "work_order_dependencies_no_cycle_trg (enabled O)",
+      "work_orders_identity_immutable_trg (enabled O)",
+      "work_orders_no_parent_cycle_trg (enabled O)"
+    ],
+    "baseline_bundle_event_mutation_boundary": "No bundle/event immutability triggers were observed; ordinary app UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER are denied by effective privileges. Migration owner remains able to administer owned objects.",
+    "role_script_application": "sql/governance_roles.sql was not applied in this session; existing ownership/ACL state was inspected read-only and was previously recorded as established by administrator-console operations.",
+    "credentials_printed": false
+  },
+  "design_selection": {"date": "2026-10-17", "choice": "jockey is accepted as a separately trusted external DB administration principal with raw schema USAGE/CREATE; this is not the app or Worker role and is not paddock_migrator membership.", "scope": "Interpretation of the observed schema ACL only. No grant/revoke, role membership, ownership, or other DB mutation was authorized or performed."},
+  "source_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "Source generally enforces app/migrator separation, ownership and app relation/column revocation. The verifier noted that existing non-app ACLs such as jockey schema CREATE are not revoked by the script; the user selected jockey as an external admin exception.", "scope": "source review only; no database access by Verifier"},
+  "authorization": {"scope": "Read-only catalog inventory and local static tests only. No role migration application, grant/revoke, membership change, ownership change, or destructive action."},
+  "verdict": "RUNNER_OBSERVED_CURRENT_ROLE_BOUNDARY; GOVERNANCE_ROLES_SCRIPT_NOT_APPLIED; USER_SELECTED_JOCKEY_ADMIN_EXCEPTION",
+  "remaining_risks": ["jockey has schema CREATE on raw and must remain a trusted external administrator, never an ordinary app/Worker principal; this exception is not enforced by membership/role name in the script.", "The official governance_roles.sql was not applied in this session; actual current state is established by read-only catalog observation only.", "No CI attestation, clean tree/hash, commit, or push is claimed."]
+}

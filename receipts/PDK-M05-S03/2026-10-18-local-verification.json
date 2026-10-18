@@ -1,0 +1,234 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S03",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-M05-S03-local-rerun-1",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-18T04:48:05Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "branch": "main",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad tracked changes and 460 tracked/untracked status entries include unrelated work"
+  },
+  "targets": [
+    {
+      "path": "sql/init.sql",
+      "sha256": "2f324bbde2481954a443040f006dd2e200201e84df34360a569c96597108b461"
+    },
+    {
+      "path": "sql/governance_outbox_dispatch.sql",
+      "sha256": "cd5f6afbf551785e19de6633acd85ea7edc404c4bbf2cdf1d75ecd8faf4550ea"
+    },
+    {
+      "path": "internal/governance/port/outbox.go",
+      "sha256": "e82d50cba15cb119f8c685871f69e3625fddbb3337ff75de5eab4f029e6dc195"
+    },
+    {
+      "path": "internal/governance/application/outbox_dispatcher.go",
+      "sha256": "d806f8c1cf1b57c115ce47eea8ee49edef0d4f18d5fb5c78fc7c40ade739a5e7"
+    },
+    {
+      "path": "internal/governance/application/outbox_dispatcher_test.go",
+      "sha256": "d6414d809e0e97948ab2d451aaf3b929dea1695b493981a637ee4a0e9d11c8d0"
+    },
+    {
+      "path": "internal/storage/postgres/outbox_store.go",
+      "sha256": "2f469fda119230836af33d442bb0aab518b6dad6c37d7682d178ffb7aa765720"
+    },
+    {
+      "path": "internal/storage/postgres/outbox_dispatch_integration_test.go",
+      "sha256": "ebc7e1d5b8a7ba846a16f35784bfa8b412d713b25772de7e1e4c9d971f14d9ef"
+    },
+    {
+      "path": "tests/test_m05_outbox_dispatch_migration.py",
+      "sha256": "70d054e21be3830063f416b942d99b7371ae076fb84e428ce3667b1ff98322a2"
+    },
+    {
+      "path": "Issues.md",
+      "sha256": "e97283a96e24ab43be7a38f1d9332dd0ea47353915e0c18003acc8d9ab7240a4"
+    },
+    {
+      "path": "docs/issue-dependencies.generated.md",
+      "sha256": "08fad1299721b1e90c056efca6d35d0e40fa4b853653946038498bc7a39172be"
+    }
+  ],
+  "selected_design": {
+    "dispatcher": "D-018 Polling+NOTIFY; Outbox Polling remains durable truth; NOTIFY is an empty-payload wake-up hint; no external Broker.",
+    "claim": "SECURITY DEFINER app-only function, SELECT FOR UPDATE SKIP LOCKED, maximum 100 rows per transaction inclusive of housekeeping and claims; atomically persist UUID token, 5-minute lease, and cumulative attempt count; commit before publish.",
+    "ack_retry": "Ack/Retry requires matching claim token and unexpired lease; stale/expired token is rejected. Publisher runs outside claim transaction. Persist only bounded uppercase error codes.",
+    "retry_dlq": "20 cumulative claims per cycle; exponential backoff 5 seconds capped 3600 seconds; one automatic redrive after 24 hours; redrive_count 0/1; second cycle ends in terminal DLQ at total attempt 40. DLQ is not marked published.",
+    "privilege_boundary": "M09 function-only Outbox access is preserved; no direct app table/column grants. Functions are migrator-owned SECURITY DEFINER, fixed search_path, raw-qualified, app-session guarded, and EXECUTE granted only to paddock_app."
+  },
+  "runner_checks": [
+    {
+      "command": "Read-only database preflight attempt 1",
+      "exit_code": 3,
+      "result": "FAILED due to syntax error in Runner-authored diagnostic SQL; SELECT-only, no database changes."
+    },
+    {
+      "command": "scripts/init_test_db.sh --check and corrected read-only catalog preflight (first migration attempt)",
+      "exit_code": 0,
+      "result": "PASS; paddock_test, PostgreSQL 18.6, raw_relations=73; migrator/app identity and role/schema/function/ACL prerequisites true; no dispatch artifacts; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_outbox_dispatch.sql (original hash 435e967d...)",
+      "exit_code": 3,
+      "result": "FAIL; index-readback DO rejected newly created indexes because redrive expected IS NULL rather than DDL's IS NOT NULL. Transaction rolled back."
+    },
+    {
+      "command": "Post-failure read-only catalog readback",
+      "exit_code": 0,
+      "result": "PASS; no dispatch columns, constraints, indexes, or functions; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "scripts/init_test_db.sh --check and fresh corrected read-only catalog preflight (repaired migration)",
+      "exit_code": 0,
+      "result": "PASS; migration SHA-256 cd5f6afbf551785e19de6633acd85ea7edc404c4bbf2cdf1d75ecd8faf4550ea; paddock_test/PostgreSQL 18.6/raw_relations=73; expected migrator/app identities and role/schema/function/ACL checks true; no dispatch artifacts; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_outbox_dispatch.sql (repaired hash cd5f6af...)",
+      "exit_code": 0,
+      "result": "PASS; transaction COMMIT; applied once as paddock_migrator."
+    },
+    {
+      "command": "Post-migration read-only schema/function/ACL/index readback",
+      "exit_code": 0,
+      "result": "PASS; 4/4 dispatch columns and validated constraints; both indexes valid/ready with expected normalized predicates; 4/4 functions migrator-owned SECURITY DEFINER/fixed search_path; app EXECUTE=4, PUBLIC/other=0, no direct app Outbox ACL; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "PADDOCK_APP_DB_URL current_database/current_user/session_user readback",
+      "exit_code": 0,
+      "result": "PASS; paddock_test / paddock_app / paddock_app."
+    },
+    {
+      "command": "go test -tags='integration paddock_test' -run '^TestPostgresOutboxLeaseRetryDeadLetterAndRedrive$' ./internal/storage/postgres -count=1 -v (original fixture)",
+      "exit_code": 1,
+      "result": "FAIL at automatic redrive assertion: Claim(ctx,1) returned empty after redrive housekeeping consumed the one-row batch. No retry. Deferred fixture cleanup subsequently verified."
+    },
+    {
+      "command": "Post-test read-only cleanup/schema readback",
+      "exit_code": 0,
+      "result": "PASS; zero it_m05_outbox_% Events and Outbox rows, unpublished_outbox_rows=0; 4 dispatch columns and both dispatch indexes still valid."
+    },
+    {
+      "command": "go test ./... -count=1 (after fixture repair)",
+      "exit_code": 0,
+      "result": "PASS; all untagged Go packages."
+    },
+    {
+      "command": "go vet ./... (after fixture repair)",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "go test -tags=integration,paddock_test -run '^$' ./internal/storage/postgres -count=1 (after fixture repair)",
+      "exit_code": 0,
+      "result": "PASS; tagged integration package compile-only; no test body or DB."
+    },
+    {
+      "command": "python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m05_events_schema_migration tests.test_m05_outbox_dispatch_migration -q (after source repairs)",
+      "exit_code": 0,
+      "result": "PASS; 25 targeted source/static tests."
+    },
+    {
+      "command": "gofmt -d internal/storage/postgres/outbox_dispatch_integration_test.go",
+      "exit_code": 0,
+      "result": "PASS; no output."
+    },
+    {
+      "command": "python3 scripts/lint_design.py --emit-summary",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 edges; Issues SHA-256 8655539386e30288feca6c87cb093a026dc780eb1796600b55ae0a0868649317."
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 dependency edges."
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "Receipt JSON parse and all target SHA-256 comparisons (final)",
+      "exit_code": 0,
+      "result": "PASS; JSON valid and all 10 recorded target hashes matched."
+    },
+    {
+      "command": "Fresh read-only preflight before corrected named test",
+      "exit_code": 0,
+      "result": "PASS; paddock_test/PostgreSQL 18.6/raw_relations=75; correct migrator/app identities; columns/constraints/indexes/functions/ACL valid; fixture-prefix rows=0; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "go test -tags='integration paddock_test' -run '^TestPostgresOutboxLeaseRetryDeadLetterAndRedrive$' ./internal/storage/postgres -count=1 -v (modified fixture)",
+      "exit_code": 0,
+      "result": "PASS; corrected fixture verified redrive housekeeping then next-poll Claim; log: events=2 outbox=2 published=1; total_attempts=40 redrives=1 terminal=true."
+    },
+    {
+      "command": "Post-rerun read-only cleanup/schema readback",
+      "exit_code": 0,
+      "result": "PASS; zero it_m05_outbox_% Event/Outbox fixtures and unpublished rows; 4 dispatch columns, 4 validated constraints, both indexes valid/ready."
+    },
+    {
+      "command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py (post-M05-S04 cursor/design record update)",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 edges; current Issues SHA-256 1d35e0544a05829605c9d6e36cd5e1eb5d5ede2b1e756212adb45f714a8bf70d."
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "result": "No actionable findings.",
+    "scope": "Verifier read the complete current M05 implementation files, M05 acceptance/selected design, and this Receipt. Main observed that the implementation files are untracked additions relative to HEAD, inspected the scoped current Issue changes/status, and reconciled the selected policy, Runner checks, runtime readback, cleanup, and reviewer report.",
+    "limitations": "Verifier did not inspect Git diff/status, run tests, or access the database. The full current contents of untracked M05 implementation files were reviewed as source additions. Main reviewed the M05 Issue delta and confirmed target file status; unrelated worktree changes remain out of scope. CI attestation is absent."
+  },
+  "database_execution": {
+    "preflight": "Fresh read-only preflight before corrected fixture run passed on paddock_test / PostgreSQL 18.6 / raw_relations=75; migrator/app roles, expected schema/function/ACL/indexes, zero fixture-prefix rows and zero unpublished rows.",
+    "migration_attempted": true,
+    "migration_attempt_count": 2,
+    "migration_applied": true,
+    "migration_exit_code": 0,
+    "migration_failure": "Index readback guard rejected the two newly created indexes; SQL transaction aborted. Post-failure readback saw no dispatch DDL artifacts.",
+    "integration_body_run": true,
+    "approval_status": "Three explicit one-shot approvals were used: first migration attempt (failed/rolled back), repaired migration plus first test (migration committed, test failed on fixture expectation), then one corrected test rerun (PASS). No further DB operation is needed or authorized.",
+    "named_test": "TestPostgresOutboxLeaseRetryDeadLetterAndRedrive",
+    "fixture_effect": "The final named test passed and its deferred cleanup ran; final read-only postcheck confirmed exact fixture-prefix absence and zero unpublished rows.",
+    "migration_source_sha256_attempted": "435e967d2e03a5a2f3836490e6fd051cd73b1662fe601723ba597d80b92522d9",
+    "failure_root_cause": "The created redrive index predicate contains dead_lettered_at IS NOT NULL, but the migration readback expected the normalized string dead_lettered_atisnull. The source expectation was corrected to dead_lettered_atisnotnull and an offline static regression assertion was added.",
+    "source_repair_sha256": "cd5f6afbf551785e19de6633acd85ea7edc404c4bbf2cdf1d75ecd8faf4550ea",
+    "migration_first_attempt_exit_code": 3,
+    "migration_first_attempt_source_sha256": "435e967d2e03a5a2f3836490e6fd051cd73b1662fe601723ba597d80b92522d9",
+    "migration_second_attempt_exit_code": 0,
+    "migration_applied_source_sha256": "cd5f6afbf551785e19de6633acd85ea7edc404c4bbf2cdf1d75ecd8faf4550ea",
+    "migration_readback": "PASS: 4/4 expected columns/validated constraints; both expected indexes valid/ready with correct predicates; four migrator-owned fixed-search-path SECURITY DEFINER functions; app EXECUTE only; no direct app Outbox privileges; pending rows 0.",
+    "integration_body_run_count": 2,
+    "integration_body_exit_code": 0,
+    "integration_body_source_sha256": "d826979700ae93c51d1f18b4a8a0974c4117ff93fc5674b5c56c78816b8518a1",
+    "integration_body_failure": "Original fixture expected Claim(ctx,1) to return attempt 21 in the same call that performs due redrive housekeeping. The shared batch capacity was consumed by housekeeping, so that call returned empty; assertion failed. Fixture was modified to verify housekeeping then next-poll Claim.",
+    "integration_body_run_after_fixture_repair": true,
+    "fixture_cleanup_readback": "PASS after both test runs; latest readback showed zero it_m05_outbox_% Events/Outbox rows, unpublished_outbox_rows=0, and migration columns/constraints/indexes valid.",
+    "integration_body_exit_codes": [
+      1,
+      0
+    ],
+    "integration_body_source_sha256_first": "d826979700ae93c51d1f18b4a8a0974c4117ff93fc5674b5c56c78816b8518a1",
+    "integration_body_source_sha256_final": "ebc7e1d5b8a7ba846a16f35784bfa8b412d713b25772de7e1e4c9d971f14d9ef",
+    "integration_body_failure_first_run": "Original fixture expected Claim(ctx,1) to return attempt 21 in the same call that performed due redrive housekeeping. The shared batch capacity was consumed by housekeeping, so that call returned empty; fixture was corrected to assert housekeeping state then claim on the next poll.",
+    "integration_body_success": "PASS in 2.315s; log reported events=2, outbox=2, published=1, total_attempts=40, redrives=1, terminal=true."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_RUNNER_AND_INDEPENDENT_REVIEW",
+  "limitations": [
+    "M05-S03 selected runtime acceptance and cleanup passed in local Runner observations; migration is applied to guarded paddock_test.",
+    "Independent Verifier reviewed all complete M05 source files and acceptance with no actionable findings, but did not inspect Git status/diff or run DB/tests; Main reconciled observed untracked source additions and scoped Issue changes.",
+    "Trusted CI attestation absent; no CI attestation is claimed.",
+    "Broad unrelated worktree modifications remain; complete whole-worktree diff hash is unavailable.",
+    "No commit or push."
+  ],
+  "verdict": "M05_S03_DONE_D016_LOCAL; MIGRATION_AND_NAMED_INTEGRATION_PASS; CLEANUP_PASS; NO_CI_ATTESTATION",
+  "next_action": "PDK-M05-S03/S04 are complete. PDK-M05-S05 D-019–D-022 policy is selected; Main source-only authorization is pending for pure policy contract/tests. No DB operation is authorized."
+}

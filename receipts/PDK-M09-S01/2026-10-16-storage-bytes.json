@@ -1,0 +1,200 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S01",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-16-M09-STORAGE-BYTES-extension",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-16",
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/budget.go",
+      "sha256": "583fec205472dec719bcdb2ed9279f079a785a09f7aba6e7bf3d4639f74a9df1"
+    },
+    {
+      "path": "internal/governance/domain/budget_test.go",
+      "sha256": "414804e57cc0cb6cf8405458178455135a2c370e51eb69d9b9c452410cca8e32"
+    },
+    {
+      "path": "sql/governance_budget_storage_bytes.sql",
+      "sha256": "395558824ad9cecad4e18aa320bcfa6986ac1ce3cf1afb82125a6b8ebf76b01f"
+    },
+    {
+      "path": "tests/test_m09_budget_storage_bytes_sql.py",
+      "sha256": "23841b9a8403a9a1f6ece82f203dc4c9ec7b33f87788dd38223abf0f9cfa6954"
+    },
+    {
+      "path": "internal/storage/postgres/budget_integration_test.go",
+      "sha256": "b13d969d3ca51c79d68d836c11073ecf278cb1545abf3a00277b16b331c8c9b1"
+    }
+  ],
+  "environment": {
+    "go": "go1.27.1",
+    "os": "android",
+    "arch": "arm64",
+    "postgresql": "18.6 (Debian 18.6-1.pgdg13+2)",
+    "ci": false
+  },
+  "checks": [
+    {
+      "command": "go test ./... -count=1",
+      "exit_code": 0,
+      "result": "PASS; all Go packages after STORAGE_BYTES extension"
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; tagged package compile-only"
+    },
+    {
+      "command": "python3 -m unittest tests.test_m09_budget_storage_bytes_sql tests.test_m09_budget_sql -v",
+      "exit_code": 0,
+      "result": "PASS; 10/10 static SQL contracts"
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 148 edges; Issues.md SHA-256 ce76c5e27675b261244030e745aed9d8c73753c98026d85ce261415f46c47811 before extension receipt link"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "Read-only preflight",
+      "exit_code": 0,
+      "result": "PASS; paddock_test/paddock_migrator; expected resource CHECK exists; zero STORAGE_BYTES rows; isolated roles"
+    },
+    {
+      "command": "psql guarded sql/governance_budget_storage_bytes.sql",
+      "exit_code": 0,
+      "result": "PASS; ALTER resource CHECK and add byte-unit constraint, COMMIT; exact paddock_test/migrator guard; no data/table/function dropped"
+    },
+    {
+      "command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestBudgetLedgerAcceptance$' -count=1 -v",
+      "exit_code": 0,
+      "result": "PASS; migrator STORAGE_BYTES grant, app delegation/reserve/spend/settle, wrong-unit rejection, counter and journal reconciliation; retained fixture; no cleanup"
+    },
+    {
+      "command": "Read-only STORAGE_BYTES postcheck",
+      "exit_code": 0,
+      "result": "PASS; both constraints present; 2 storage rows use unit byte; balances parent 1000/237/0/0 and child 400/237/0/0; 1 allocation SETTLED; 0 bad storage units/invariants; no open storage allocations"
+    },
+    {
+      "command": "read-only paddock_test postcheck for all m09_it_ fixtures and suffix 3d8f405b892f22b40737227e",
+      "exit_code": 0,
+      "result": "PASS; all M09: 6 scopes/roots, 12 accounts, 58 journal rows, 0 OPEN/6 SETTLED allocations. Latest STORAGE_BYTES suffix: 4 accounts, 2 allocations, 14 operations, 18 journal rows. STORAGE_BYTES accounts both unit=byte; parent 1000/237/0/0 and child 400/237/0/0; 0 invariant/unit/open-allocation errors; journal sums reconcile."
+    }
+  ],
+  "independent_review": {
+    "kind": "separately dispatched verifier subagent",
+    "result": "Read-only review found no actionable source/runtime-receipt discrepancy after Main added the complete retained fixture inventory and exact postcheck command/counts. Main reconciled the review with Runner observations.",
+    "scope": "STORAGE_BYTES extension domain/migration/integration source, receipt target hashes, retained IDs and read-only DB postcheck; verifier did not connect/re-run DB"
+  },
+  "authorization": {
+    "source": "User selected M09-S01 reopen to add STORAGE_BYTES/byte for M09-S03; existing user-approved paddock_test/M09-S01 runtime scope applied.",
+    "scope": "One guarded additive resource constraint migration and exact m09_it_ test fixture; no down/reset/drop/production/credential display/external effect"
+  },
+  "verdict": "D-016_LOCAL_DONE; STORAGE_BYTES_PADDOCK_TEST_RUNTIME_PASS; CI_ATTESTATION_NONE; APPEND_ONLY_FIXTURES_RETAINED",
+  "retained_fixtures": {
+    "scope": "m09_it_scope_3d8f405b892f22b40737227e",
+    "root": "m09_it_root_3d8f405b892f22b40737227e",
+    "accounts": [
+      {
+        "id": "m09_it_account_3d8f405b892f22b40737227e",
+        "resource": "TOKENS",
+        "unit": "m09_it_unit_3d8f405b892f22b40737227e",
+        "granted": 100,
+        "spent": 12,
+        "reserved": 0,
+        "delegated": 0
+      },
+      {
+        "id": "m09_it_account_b_3d8f405b892f22b40737227e",
+        "resource": "TOKENS",
+        "unit": "m09_it_unit_3d8f405b892f22b40737227e",
+        "granted": 60,
+        "spent": 12,
+        "reserved": 0,
+        "delegated": 0,
+        "terminal": true,
+        "settled": true
+      },
+      {
+        "id": "m09_it_account_storage_3d8f405b892f22b40737227e",
+        "resource": "STORAGE_BYTES",
+        "unit": "byte",
+        "granted": 1000,
+        "spent": 237,
+        "reserved": 0,
+        "delegated": 0
+      },
+      {
+        "id": "m09_it_account_storage_child_3d8f405b892f22b40737227e",
+        "resource": "STORAGE_BYTES",
+        "unit": "byte",
+        "granted": 400,
+        "spent": 237,
+        "reserved": 0,
+        "delegated": 0,
+        "terminal": true,
+        "settled": true
+      }
+    ],
+    "allocations": [
+      {
+        "id": "d9f1de13-a92f-4cc9-a14f-33aa6e791633",
+        "parent": "m09_it_account_3d8f405b892f22b40737227e",
+        "child": "m09_it_account_b_3d8f405b892f22b40737227e",
+        "amount": 60,
+        "state": "SETTLED"
+      },
+      {
+        "id": "67a3c459-baf1-49be-8765-455d0a920d7e",
+        "parent": "m09_it_account_storage_3d8f405b892f22b40737227e",
+        "child": "m09_it_account_storage_child_3d8f405b892f22b40737227e",
+        "amount": 400,
+        "state": "SETTLED"
+      }
+    ],
+    "operations": [
+      "m09_it_close_a_3d8f405b892f22b40737227e",
+      "m09_it_delegate_b_3d8f405b892f22b40737227e",
+      "m09_it_grant_3d8f405b892f22b40737227e",
+      "m09_it_release_3d8f405b892f22b40737227e",
+      "m09_it_replay_3d8f405b892f22b40737227e",
+      "m09_it_reserve_3d8f405b892f22b40737227e",
+      "m09_it_settle_child_3d8f405b892f22b40737227e",
+      "m09_it_settle_reserve_3d8f405b892f22b40737227e",
+      "m09_it_storage_close_3d8f405b892f22b40737227e",
+      "m09_it_storage_delegate_3d8f405b892f22b40737227e",
+      "m09_it_storage_grant_3d8f405b892f22b40737227e",
+      "m09_it_storage_reserve_3d8f405b892f22b40737227e",
+      "m09_it_storage_settle_child_3d8f405b892f22b40737227e",
+      "m09_it_storage_settle_reserve_3d8f405b892f22b40737227e"
+    ],
+    "operation_count": 14,
+    "journal_rows": 18,
+    "retention": "Intentionally retained because budget ledger is append-only; no cleanup/delete. Scope/root-only interruption fixtures from prior failed attempts are listed in the baseline receipt."
+  },
+  "remaining_risks": [
+    "No CI attestation; evidence is local Runner execution plus independent read-only receipt/source review and Main reconciliation.",
+    "M09-S03 checkpoint-specific migration/runtime is outside this extension approval and requires its own scoped authorization.",
+    "Append-only m09_it_ fixtures remain intentionally stored and reconciled; no cleanup/delete/reset performed."
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M04-S02",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-17-M04-S02-source",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-17T11:40:16Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated tracked and untracked changes remain"
+  },
+  "targets": [
+    {"path": "internal/storage/postgres/commit_ack_loss_integration_test.go", "sha256": "528d0e421c43e03abe6b0a03b2b538fc97e8c60dbda946ab60434a99a04aa55c"},
+    {"path": "Issues.md", "sha256": "ce74fa3f0e82ff1cc1f4a63aeaf4a324bc8f2ae3a5119469649bbf275e89237b"},
+    {"path": "docs/issue-dependencies.generated.md", "sha256": "ef362138e59be9c5748e70b58137e13de6995d51561540ad5fbd0f74bed4c33d"}
+  ],
+  "selected_design": {
+    "receipt_contract": "Reuse M03-S05 JCS-normalized Domain RequestDigest and existing SafetyService Receipt; same command ID/request replays stored result, changed request is rejected before CAS.",
+    "commit_unknown_test": "A dedicated PostgreSQL integration fixture wraps the real app transactor and returns a synthetic lost-ack error only after the inner transaction's real Commit returns success. Retry the same Stop command, prove the durable Receipt response is returned and Scope/Security Epoch do not advance again. Then Release the fixture Scope and clean scoped Receipt/Event/Outbox rows.",
+    "test_db_residual": "Never rewind the global monotone Security Epoch; the authorized integration run will leave paddock_test at baseline+2 (Stop plus Release)."
+  },
+  "runner_checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all untagged Go packages."},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS."},
+    {"command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; integration test compiles only; no test body/DB."},
+    {"command": "python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m05_events_schema_migration -q", "exit_code": 0, "result": "PASS; 18 targeted SQL static tests."},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 dependency edges."},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS."},
+    {"command": "python3 scripts/continue_plan.py", "exit_code": 1, "result": "Planner refused because completed PDK-M08-S05 has runner_evidence but no current_evidence. The next issue was selected by direct inspection of explicit depends_on only; both M04-S02 dependencies are [x]. No unrelated issue was changed."}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only Verifier subagent",
+    "result": "One medium concern claimed fixture rows lacked final cleanup readback.",
+    "main_reconciliation": "Re-read internal/storage/postgres/integration_test.go:936-969; cleanupFixtures commits deletion of exact fixture Scope/Root/Rollout/Target/Bundle rows and queries their combined count, reporting failure unless zero. The concern is not actionable; no unresolved source finding remains. Verifier did not access DB or run the new test body."
+  },
+  "issue_state": "IMPLEMENTED_NOT_DONE",
+  "limitations": [
+    "The new named M04-S02 PostgreSQL test body has not run; only tagged compile-only passed.",
+    "The user selected the real DB fixture and persistent +2 global Security Epoch effect, but separate exact runtime approval is still required.",
+    "No CI attestation.",
+    "Worktree is dirty; full diff hash unavailable.",
+    "No commit or push."
+  ],
+  "verdict": "IMPLEMENTED_LOCAL_VERIFICATION_ONLY; DB_APPROVAL_PENDING",
+  "next_action": "Obtain separate exact approval to run only TestPostgresSafetyReceiptReplayAfterCommitAcknowledgementLoss against guarded paddock_test. The run must log final command Receipt/Event/Outbox cleanup counts and leave the global Security Epoch monotone at +2; no reset/down or other DB tests."
+}

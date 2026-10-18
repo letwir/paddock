@@ -32,11 +32,31 @@ class S04ContinueResumeTests(unittest.TestCase):
         issue_text = (self.root / "Issues.md").read_text(encoding="utf-8")
         issue_text, active_count = re.subn(r"^active_issue: PDK-M\d{2}-S\d{2}$", "active_issue: PDK-M00-S04", issue_text, count=1, flags=re.M)
         issue_text, state_count = re.subn(r"^issue_state: [A-Z_]+$", "issue_state: WIP", issue_text, count=1, flags=re.M)
+        issue_text, execution_count = re.subn(r"^execution_state: [A-Z_]+$", "execution_state: IMPLEMENTING_SOURCE_ONLY_MAIN", issue_text, count=1, flags=re.M)
+        issue_text, receipt_count = re.subn(r"^last_receipt:.*$", "last_receipt: NONE", issue_text, count=1, flags=re.M)
         issue_text, marker_count = re.subn(r"^- \[[ x~*\-]\] `PDK-M00-S04`", "- [-] `PDK-M00-S04`", issue_text, count=1, flags=re.M)
-        if (active_count, state_count, marker_count) != (1, 1, 1):
+        if (active_count, state_count, execution_count, receipt_count, marker_count) != (1, 1, 1, 1, 1):
             raise AssertionError("could not construct pre-interruption S04 Cursor fixture")
         (self.root / "Issues.md").write_text(issue_text, encoding="utf-8")
         shutil.copy2(SOURCE / "scripts" / "continue_plan.py", self.root / "scripts" / "continue_plan.py")
+        self.copy_local_markdown_targets()
+
+    def copy_local_markdown_targets(self):
+        link_re = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+        for name in ("README.md", "decisions.md", "Issues.md", "method.md", "THREAT_MODEL.md"):
+            source_doc = SOURCE / name
+            fixture_doc = self.root / name
+            for link in link_re.findall(fixture_doc.read_text(encoding="utf-8")):
+                if link.startswith(("https://", "http://", "#", "mailto:")):
+                    continue
+                target = link.split("#", 1)[0].strip("<>")
+                if not target or ".." in Path(target).parts:
+                    continue
+                src = source_doc.parent / target
+                dst = fixture_doc.parent / target
+                if src.is_file() and not dst.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -98,6 +118,10 @@ class S04ContinueResumeTests(unittest.TestCase):
         # the first genuinely ready TODO is M01-S01.
         self.mutate("active_issue: PDK-M00-S04", "active_issue: PDK-M00-S01")
         self.mutate("issue_state: WIP", "issue_state: DONE")
+        text = self.issues().read_text(encoding="utf-8")
+        text, count = re.subn(r"^- \[[ x~*\-]\] `PDK-M01-S01`", "- [ ] `PDK-M01-S01`", text, count=1, flags=re.M)
+        self.assertEqual(count, 1)
+        self.issues().write_text(text, encoding="utf-8")
         self.assertEqual(PLANNER.plan(self.root), {
             "issue_id": "PDK-M01-S01", "reason": "first_ready_incomplete"})
 

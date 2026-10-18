@@ -1,0 +1,28 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S03-d016-reconcile", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:34:25Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_roles.sql", "sha256": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742"},
+    {"path": "tests/test_m02_roles.py", "sha256": "b94c8fd3537fdf519a5b6d81c5c91bd706327429657b9c0a917a5fd60a732366"},
+    {"path": "receipts/PDK-M02-S03/2026-10-17-role-catalog-verification.json", "sha256": "99622e63a93b36320690fe55bc1a92a2e2cff53626b10d0097413bb8bcba0605"},
+    {"path": "receipts/PDK-M02-S03/2026-10-17-psql-guard-source-fix.json", "sha256": "fff5c77caa4e964216cda5976854316b40f737d2fcd0f63b89335003f4e944e1"}
+  ],
+  "runner_evidence": {
+    "static_tests": {"command": "python3 -m unittest tests.test_m02_roles -v", "exit_code": 0, "result": "PASS 11/11 including missing psql variable fail-closed sentinel contract"},
+    "design_lint": {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS 89 issues / 148 dependency edges"},
+    "catalog": {"source": "2026-10-17-role-catalog-verification.json", "mode": "explicit READ ONLY transactions only", "result": "App effective UPDATE/DELETE denied on all 11 baseline tables; migrator owns raw/schema and all 11; role memberships/elevation checks pass; jockey external-admin ACLs and trigger-helper function owners inventoried"},
+    "source_correction": "Unsupported psql \\error missing-variable branches replaced with sentinel \\set values; exact SQL guard rejects before ownership/ACL DDL. This correction is static/source reviewed and tested, not applied to the live DB.",
+    "official_roles_script": "sql/governance_roles.sql remains unapplied in this session; catalog state was established through earlier administrator-console provisioning and observed read-only here."
+  },
+  "user_selection": {"date": "2026-10-17", "accepted_external_admin_exception": "jockey may retain observed raw USAGE/CREATE, policy_scopes SELECT/INSERT/DELETE, roots SELECT/INSERT/DELETE/REFERENCES, policy_scopes.scope_id UPDATE, and ownership of the seven named SECURITY INVOKER M02 trigger helper functions. This exception is not app/Worker/migrator identity; no membership involving those roles was observed.", "authority_limit": "The selection is an acceptance interpretation, not authorization to alter database roles/ACLs/ownership."},
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "Reviewed updated role source, psql sentinel guard, tests, catalog receipt, and user-selected jockey exception; no remaining acceptance gap. Verifier did not access DB or reproduce catalog results.", "scope": "source, receipt, acceptance and D-016 interpretation only"},
+  "main_reconciliation": {"decision": "The selected acceptance is satisfied: ordinary paddock_app cannot UPDATE/DELETE baseline tables; paddock_migrator is separate and owns raw plus the 11 baseline tables. The observed jockey schema/table/column ACLs and seven trigger-helper function owners are explicitly accepted as an external DBA exception. Main compared the independent review with Runner static tests and read-only catalog evidence.", "residuals": ["jockey retains the explicitly accepted external-admin privileges enumerated in the runner receipt.", "The official roles SQL was not applied; current live state is catalog-observed and previously provisioned out-of-band.", "A separate M02-S04 runner attempt is disclosed in receipts/PDK-M02-S04/2026-10-17-runner-attempt.json; it failed in a private temporary cluster before role DDL and did not target the existing paddock_test. No further runtime is authorized without approval.", "No CI attestation or trusted CI receipt; dirty worktree/full diff hash unavailable; no commit/push."]},
+  "issue_state": "DONE",
+  "authorization": {"scope": "M02-S03 static tests and explicit READ ONLY catalog inspection only. No role migration application, grant/revoke, membership change, ownership transfer, or destructive action."},
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; CI_ABSENT; EXTERNAL_ADMIN_EXCEPTION_EXPLICITLY_ACCEPTED",
+  "next_action": "Next dependency-ready candidate is PDK-M02-S04. Review its isolated up/down/up source plan; any future runtime requires a separate explicit approval."
+}

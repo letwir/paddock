@@ -1,0 +1,171 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S04",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-M05-S04-db-runtime",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-18T06:04:00Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "branch": "main",
+    "dirty": true,
+    "dirty_status_entries": 467,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated tracked and untracked changes remain"
+  },
+  "selected_design": {
+    "architecture": "User selected Go consumer with one pgx transaction and narrowly scoped direct DML; Main implemented source-only after the general Worker workspace-root routing failure and explicit user authorization.",
+    "dedupe": "Verify Event ID exists in raw.domain_events; insert raw.event_inbox(consumer_id,event_id,processed_at) with targetless ON CONFLICT DO NOTHING; only if a row is inserted, increment the per-consumer projection counter in the same transaction. Effect errors roll both changes back. A commit error can have unknown outcome; retry the same key so the Inbox primary key reconciles.",
+    "privileges": "paddock_app has Inbox column INSERT on consumer_id,event_id,processed_at only. Targetless ON CONFLICT avoids Inbox SELECT; the migration guards the Inbox primary key as its sole valid unique index. Projection privileges are SELECT/INSERT on consumer_id and processed_event_count plus UPDATE on processed_event_count. No direct Outbox table/column ACL.",
+    "effect": "The local per-consumer processed-event counter is the concrete DB effect. This does not claim arbitrary consumer handler semantics or external API exactly-once behavior."
+  },
+  "targets": [
+    {
+      "path": "internal/governance/port/consumer_inbox.go",
+      "sha256": "d2ee90bd44d2617937dfa9b644f5073822e4e3b10cfec516fd1c78908a33a88d"
+    },
+    {
+      "path": "internal/governance/application/consumer_inbox.go",
+      "sha256": "0f11385b819e6da48e74cdb74f26ccdb707878a97c170492ad50751eb272d3f9"
+    },
+    {
+      "path": "internal/governance/application/consumer_inbox_test.go",
+      "sha256": "7c9d79dfc975a84c0464b1022cbff535c9c4d11991ee8213fc7551dc4f718406"
+    },
+    {
+      "path": "internal/storage/postgres/consumer_inbox_store.go",
+      "sha256": "c81592adb013caa98718225e3b61a907be6a64bc16e002129c49ae5838616c87"
+    },
+    {
+      "path": "internal/storage/postgres/consumer_inbox_integration_test.go",
+      "sha256": "2a6e92a518ff47114e803cbfd3e4371d26fed6af80208edece4a21f623902e69"
+    },
+    {
+      "path": "sql/governance_consumer_inbox.sql",
+      "sha256": "3eda0890bd322f83103d911b003db7df1f054a34ef205b06a9296d2d098f10fb"
+    },
+    {
+      "path": "tests/test_m05_consumer_inbox_migration.py",
+      "sha256": "674c3c09d1da61e699ef85d6110b4a462bba5c32a03747033c353c38be0d1e02"
+    },
+    {
+      "path": "Issues.md",
+      "sha256": "e97283a96e24ab43be7a38f1d9332dd0ea47353915e0c18003acc8d9ab7240a4"
+    },
+    {
+      "path": "docs/issue-dependencies.generated.md",
+      "sha256": "08fad1299721b1e90c056efca6d35d0e40fa4b853653946038498bc7a39172be"
+    }
+  ],
+  "runner_checks": [
+    {
+      "command": "Initial focused Go compile/test attempt before local source corrections",
+      "exit_code": 1,
+      "result": "FAIL; compiler reported an undefined test variable and an unused import. Both were corrected before final verification."
+    },
+    {
+      "command": "Final go test ./... -count=1",
+      "exit_code": 0,
+      "result": "PASS; all untagged Go packages."
+    },
+    {
+      "command": "Final go vet ./...",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "Final go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; integration package compile-only; no test body or DB."
+    },
+    {
+      "command": "Final python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m05_events_schema_migration tests.test_m05_outbox_dispatch_migration tests.test_m05_consumer_inbox_migration -q",
+      "exit_code": 0,
+      "result": "PASS; 29 targeted source/static tests."
+    },
+    {
+      "command": "Final gofmt -d on five M05-S04 Go source/test files",
+      "exit_code": 0,
+      "result": "PASS; no output."
+    },
+    {
+      "command": "Final python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 149 dependency edges; Issues SHA-256 d09c4e8decd6b075ac4bebb04b1b487480dc9e5413bd638d916cab6963a1ea76."
+    },
+    {
+      "command": "Final git diff --check",
+      "exit_code": 0,
+      "result": "PASS."
+    },
+    {
+      "command": "scripts/init_test_db.sh --check and fresh read-only M05-S04 preflight",
+      "exit_code": 0,
+      "result": "PASS; database paddock_test PostgreSQL 18.6 raw_relations=75; migrator/app identities/roles valid; Inbox shape/PK sole unique index valid; projection absent; app has no Inbox ACL; app domain_events SELECT and append function ready; no direct app Outbox table/column privileges; unpublished_outbox_rows=0."
+    },
+    {
+      "command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_consumer_inbox.sql",
+      "exit_code": 0,
+      "result": "PASS; guarded additive migration committed once as paddock_migrator."
+    },
+    {
+      "command": "Post-migration read-only schema and ACL readback",
+      "exit_code": 0,
+      "result": "PASS; Inbox 4-column shape/PK/one unique index; projection owned by migrator with 2 columns and 3 validated constraints/PK; paddock_app Inbox INSERT columns and projection column privileges match expected contract; Outbox table/column ACL absent; unpublished rows=0."
+    },
+    {
+      "command": "PADDOCK_APP_DB_URL current_database/current_user/session_user",
+      "exit_code": 0,
+      "result": "PASS; paddock_test / paddock_app / paddock_app."
+    },
+    {
+      "command": "go test -tags='integration paddock_test' -run '^TestPostgresConsumerInboxAppliesEventOnce$' ./internal/storage/postgres -count=1 -v",
+      "exit_code": 0,
+      "result": "PASS in 4.497s; log: duplicate_deliveries=3 same_event_effects=1 second_consumer_effects=1 failed_effect_inbox_rows=0 retried_effects=1."
+    },
+    {
+      "command": "Post-test read-only cleanup/schema/ACL readback",
+      "exit_code": 0,
+      "result": "PASS; fixture Event/Outbox/Inbox/projection rows all 0; unpublished_outbox_rows=0; projection schema and sole Inbox unique index remain intact; app direct Outbox table ACL absent."
+    },
+    {
+      "command": "Receipt JSON parse and all target SHA-256 comparisons",
+      "exit_code": 0,
+      "result": "PASS; JSON valid and all listed target hashes matched."
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "result": "Final source review reported no actionable findings. It reviewed the Inbox transaction, durable Event check, targetless ON CONFLICT/sole-unique-index guard, app grants, migration, and fixture. A prior actionable fixture-reset mismatch (wrong consumer ID) was corrected; a separate follow-up confirmed same-consumer/same-Event retry after reset.",
+    "limitations": "Verifier reviewed the current M05-S04 source and criteria, but did not edit, run tests, access the database, or inspect Git diff/status. Main reconciled observed file state and Runner/DB evidence. CI attestation absent."
+  },
+  "database_execution": {
+    "preflight": "PASS; guarded paddock_test PostgreSQL 18.6, correct migrator/app identities, baseline Inbox shape and sole PK unique index, projection absent, app no Inbox ACL, required domain_events read/append access, no direct Outbox ACL, and no pending Outbox rows.",
+    "migration": "sql/governance_consumer_inbox.sql",
+    "migration_sha256": "3eda0890bd322f83103d911b003db7df1f054a34ef205b06a9296d2d098f10fb",
+    "migration_applied": true,
+    "migration_attempt_count": 1,
+    "migration_exit_code": 0,
+    "test": "TestPostgresConsumerInboxAppliesEventOnce",
+    "test_body_run": true,
+    "test_body_run_count": 1,
+    "test_exit_code": 0,
+    "test_duration_seconds": 4.497,
+    "test_result": "PASS; three deliveries of one event produced one effect; a second consumer independently applied the event; forced projection overflow rolled back the Inbox marker; same-key redelivery applied exactly once.",
+    "cleanup_readback": "PASS; zero fixture-prefix Events, Outbox, Inbox, or projection rows; unpublished_outbox_rows=0; migration schema/unique index and privilege boundary intact.",
+    "approval_status": "User explicitly approved one guarded migration application and one named test execution conditional on matching read-only preflight. Both authorized operations succeeded. No additional DB operation is requested or performed."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_RUNNER_INDEPENDENT_REVIEW_AND_MAIN_RECONCILIATION",
+  "limitations": [
+    "Integration result is local Runner evidence, not CI attestation.",
+    "Projection counter demonstrates this local DB effect contract; arbitrary domain consumer behavior and external API exactly-once are not claimed.",
+    "Independent review did not inspect Git diff/status or execute tests; its report is source-only.",
+    "Broad unrelated worktree modifications remain; complete dirty-diff hash unavailable.",
+    "No commit or push."
+  ],
+  "verdict": "MIGRATION_PASS; NAMED_DB_TEST_PASS; CLEANUP_ACL_READBACK_PASS; DONE_D016_LOCAL; NO_CI_ATTESTATION",
+  "next_action": "PDK-M05-S03/S04 are complete. PDK-M05-S05 D-019–D-022 policy is selected; Main source-only authorization is pending for pure policy contract/tests. No DB operation is authorized."
+}

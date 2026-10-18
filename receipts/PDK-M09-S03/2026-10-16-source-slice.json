@@ -1,0 +1,29 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M09-S03",
+  "runner":{"kind":"local","identity":"Main Runner","run_id":"continue-2026-10-16-M09-S03-source","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED","time_finish_utc":"2026-10-16",
+  "source":{"git_commit":"2f1dcfe143c3ef66e33d82c003e2432256b11518","git_tree":"UNAVAILABLE_DIRTY_WORKTREE","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED; broad unrelated/untracked changes remain"},
+  "targets":[
+    {"path":"internal/governance/domain/checkpoint.go","sha256":"d5a666d3accd84387518bb8850ec3ab4efafc0a3cac06fd9f579b819cbee4471"},
+    {"path":"internal/governance/domain/checkpoint_test.go","sha256":"d89289b4d3a068d6561f2e027b71b96676002963b47d6b65ea8b667faa7ec2c1"},
+    {"path":"internal/governance/application/checkpoint.go","sha256":"0b7628ea445f3ccfb2cdca425b30bdfc4580116bca9462acd1dd7d6f9ec7ea85"},
+    {"path":"internal/governance/application/checkpoint_test.go","sha256":"5439a8b26898e5dc3b53cf1668802e0cf0cf2a6a3652c988ad80a6cb517234e2"},
+    {"path":"internal/storage/postgres/checkpoint_store.go","sha256":"0ee439f6f00fa85e42f60aa1f06dbc21742e72ff533a7c0ac49e1ffe8327da16"},
+    {"path":"sql/governance_checkpoints.sql","sha256":"a187442b4cbf90d0b203ce44d6cb6fa658a6f92b0d9665ce62d7d87f36378aab"},
+    {"path":"tests/test_m09_checkpoint_sql.py","sha256":"83d9458c2826af9a85fbca148e799862f1bdcb9dc158e477162df8cad7bd3fca"}
+  ],
+  "environment":{"go":"go1.27.1","os":"android","arch":"arm64","ci":false},
+  "checks":[
+    {"command":"go test ./... -count=1","exit_code":0,"result":"PASS; all Go packages"},
+    {"command":"go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; tagged PostgreSQL compile-only"},
+    {"command":"python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql -v","exit_code":0,"result":"PASS; 28 source-contract tests across M09 workstreams"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues/148 edges"},
+    {"command":"git diff --check","exit_code":0,"result":"PASS"}
+  ],
+  "independent_review":{"kind":"separately dispatched verifier subagent","result":"Read-only review found no remaining source defect in exact manifest fields/types, attempt identity binding, null-safe JCS comparison, payload hash, restore authorization, and narrow roles.","scope":"M09-S03 domain/application/PostgreSQL/SQL source and static contracts; no DB runtime"},
+  "authorization":{"source":"User selected single-row bytea, STORAGE_BYTES budget, one pgx transaction, canonical manifest, quarantine and restore revalidation.","scope":"Source/tests only; M09-S03 runtime/migration requires separate approval and was not executed."},
+  "verdict":"LOCAL_SOURCE_TESTED; S03_DB_RUNTIME_UNVERIFIED; ISSUE_REMAINS_IMPLEMENTED",
+  "remaining_risks":["No PostgreSQL migration/runtime, upload interruption fixture, restore-through-different-Runner fixture, catalog or concurrency test was executed.","Runtime JCS/hash/quarantine/restore/atomic-budget behavior remains unverified.","No CI attestation, commit or push."]
+}

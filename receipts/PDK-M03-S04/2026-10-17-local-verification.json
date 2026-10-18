@@ -1,0 +1,83 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M03-S04",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-17-M03-S04-final-db",
+    "attestation": "NONE",
+    "time_finish_utc": "2026-10-17T11:22:08Z"
+  },
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; broad pre-existing tracked and untracked changes remain"
+  },
+  "targets": [
+    {"path": "internal/governance/application/safety.go", "sha256": "a183c32cbe4d3876f0a6e4d396dc2e1bc87bf3422ca10c13b58bcc65f1b6d10c"},
+    {"path": "internal/governance/application/safety_test.go", "sha256": "39bb2619f142393b4892ed0a6c102a0da01bc8573d6e21e9dbf896df3b1c52e4"},
+    {"path": "internal/storage/postgres/governance_tx.go", "sha256": "d96f1c592726a0a46dec834ce578a0795d5ab4b860c28babb2e10d17250f4409"},
+    {"path": "internal/storage/postgres/governance_tx_direct.go", "sha256": "59a1cbdef4a1df5811089e66a02e1f4668ad5092fcae10b08b4c607b6ec52cbd"},
+    {"path": "internal/storage/postgres/safety_tx.go", "sha256": "494fd1c66640db5445199f281c4ca06db6035876f6c54071ddb358f2beb4e3f3"},
+    {"path": "internal/storage/postgres/transactor.go", "sha256": "abd768e7a84568cd6bffe902002ed1dc748b6405cff90c6c766be7d7f739a1fa"},
+    {"path": "internal/storage/postgres/governance_event_test.go", "sha256": "929397c132205f1216d7d3e5b12d39356091497f63b294e87510e5afe1e39139"},
+    {"path": "internal/storage/postgres/integration_test.go", "sha256": "492d46e18d1075a6a2d749076fee5e6077dae19e6c55b7043ddeea9bebbce1a5"},
+    {"path": "sql/governance_safety_api.sql", "sha256": "c80400bdc403627628a170b6695982ff72e45efe5fba0b8ee4ebb7460de2a4cc"},
+    {"path": "tests/test_m03_s04_safety_api_migration.py", "sha256": "f66822286c3e6de45d09198e7e58e3af6aeaef8fc8cd553bfe77de51e85b86ce"},
+    {"path": "Issues.md", "sha256": "f7c839f044c0c6416c39270438db213c4092b611258f54ccfbc5a2a2a9b38dfa"},
+    {"path": "docs/issue-dependencies.generated.md", "sha256": "14895e3649935bb45eed1ef498ea6b15f1fd345f3fedc3658764c4c38a2da157"}
+  ],
+  "selected_design": {
+    "service": "Extend SafetyService.Stop and SafetyService.Release; append the safety Event after state/epoch CAS and Receipt through the existing transaction-bound capability.",
+    "event_payload": "Event type and before/after Scope Activation Epoch and Security Epoch only; no signer IDs, signature bytes, or full AuthorityState snapshots.",
+    "envelope": "aggregate_kind=scope; aggregate_id=ScopeID; aggregate_version=resulting Security Epoch; event_id=safety/<commandID>; schema=paddock.safety-event/1.",
+    "database_boundary": "Preserve M09 function-only Root access. SafetyService uses NewSafetyTransactor, selecting an app-only adapter for Scope/Root/Security Epoch/Receipt access through SECURITY DEFINER functions in the same app-session transaction. Generic NewTransactor/GovernanceTx remains unchanged. Existing Event+Outbox append function remains the write path. No direct application table/column grants."
+  },
+  "authorization": {
+    "scope": "User explicitly authorized read-only preflight, one application of sql/governance_safety_api.sql as paddock_migrator on exact paddock_test, one named SafetyService integration subtest, and final fixture/readback verification.",
+    "excluded": ["No other DB test bodies", "No down/reset/drop", "No production or llm-memory DB", "No credential output", "No commit or push"]
+  },
+  "database_preflight": {
+    "init_check": {"command": "scripts/init_test_db.sh --check", "exit_code": 0, "observation": "paddock_test; PostgreSQL 18.6; raw_relations=73; read-only."},
+    "identity": {"migration": "database=paddock_test; current_user=session_user=paddock_migrator", "app": "database=paddock_test; current_user=session_user=paddock_app"},
+    "guards": [
+      "Six target base tables exist and are migrator-owned.",
+      "paddock_app and paddock_migrator are non-elevated and have zero role-membership edges.",
+      "raw schema owner is paddock_migrator.",
+      "Existing append_domain_event_and_outbox is migrator-owned SECURITY DEFINER, search_path=pg_catalog, app EXECUTE true, PUBLIC EXECUTE false.",
+      "paddock_app domain_events SELECT=true/INSERT=false; event_outbox SELECT/INSERT=false.",
+      "paddock_app has no direct table or column privileges on raw.roots; no direct table/column privileges on the Safety state/Receipt tables.",
+      "paddock_app raw schema USAGE=true; new Safety API function count=0 before migration; app Event SELECT=true."
+    ],
+    "preflight_command_attempts": "Two initial aggregate read-only catalog-query attempts exited 1 due malformed query composition; neither performed DDL or writes. They were replaced by the successful individual read-only checks above. No migration was attempted until all guards passed."
+  },
+  "runner_checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all untagged Go packages."},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS."},
+    {"command": "go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only, no DB/test body."},
+    {"command": "python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m05_events_schema_migration -q", "exit_code": 0, "result": "PASS; 18 targeted SQL static tests."},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 dependency edges."},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS."},
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_safety_api.sql", "exit_code": 0, "result": "Guarded migration applied once as paddock_migrator to paddock_test; output suppressed to avoid exposing connection diagnostics."},
+    {"command": "Post-migration read-only catalog/API ACL readback", "exit_code": 0, "result": "8 functions found; 8/8 migrator-owned SECURITY DEFINER with fixed search_path; app EXECUTE 8/8; PUBLIC EXECUTE=0; other-role EXECUTE=0; direct app table ACL=0; direct app column ACL=0 on target tables."},
+    {"command": "go test -tags='integration paddock_test' -run '^TestPostgresGovernanceIntegration$/^SafetyService_receipts_in_rollback-only_transaction$' ./internal/storage/postgres -count=1 -v", "exit_code": 0, "result": "PASS; named test body 0.49s, parent 0.94s. App-session Scope/Root/Security Epoch/Receipt API, event/outbox append, injected 23505 failure, savepoint rollback, outer rollback and baseline restoration all passed. Test log: post-rollback safety fixture counts: receipts=0 events=0 outbox=0. Registered parent fixture cleanup/readback emitted no errors."}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only Verifier subagent, final diff",
+    "result": "One concern was reported: direct app SELECT from domain_events in the integration fixture. Main reconciled it as non-actionable: sql/governance_domain_events_schema.sql explicitly grants paddock_app SELECT on raw.domain_events (while denying INSERT); preflight independently observed Event SELECT=true. Outbox remains inaccessible to app and final Outbox count is read through the privileged cleanup connection after rollback.",
+    "scope": "Safety-specific adapter, SQL migration/functions, test fixture, and role/schema context.",
+    "database_access": false,
+    "tests_run": false,
+    "main_reconciliation": "Compared the finding to source ACL and Runner preflight. No unresolved findings remain."
+  },
+  "issue_state": "DONE_UNDER_D016_LOCAL_VERIFICATION",
+  "limitations": [
+    "CI attestation is absent; local Runner and Verifier are the evidence of record under D-016.",
+    "Only the named SafetyService integration subtest ran; broader PostgreSQL integration parent subtests were intentionally excluded.",
+    "Worktree remains broadly dirty and full diff hash is unavailable.",
+    "No commit or push occurred."
+  ],
+  "verdict": "PASS_LOCAL_D016; CI_ATTESTATION_ABSENT",
+  "next_action": "Select the next dependency-ready Issue from the explicit depends_on DAG; preserve unrelated dirty changes."
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M09-S02",
+  "runner":{"kind":"local","identity":"Main Runner","run_id":"continue-2026-10-16-M09-S02-source","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED","time_finish_utc":"2026-10-16",
+  "source":{"git_commit":"2f1dcfe143c3ef66e33d82c003e2432256b11518","git_tree":"UNAVAILABLE_DIRTY_WORKTREE","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED; broad unrelated/untracked changes remain"},
+  "targets":[
+    {"path":"internal/governance/domain/spawn_policy.go","sha256":"52c3d61cb8c35e4b9f76e76b3126ab58bde7fc2f7419e472afe0fed5b5ed9e6d"},
+    {"path":"internal/governance/domain/spawn_policy_test.go","sha256":"97286796487edacd3968da808bcd44b7a1ffccf2c333b854e4dc6399ec098678"},
+    {"path":"internal/governance/application/spawn_admission.go","sha256":"fcc5ec0378a8f2ae7dfecfe3181c000052f5584bfce91541788be8be525eb017"},
+    {"path":"internal/governance/application/spawn_admission_test.go","sha256":"180fed2779d5340147aee25a43f63a15a8e1437e3c9ae2f4255566b204171b9e"},
+    {"path":"internal/storage/postgres/spawn_store.go","sha256":"7285c7ede9f574f87c127f41ff88d3f65b341df8823cda21f1016362c52def17"},
+    {"path":"sql/governance_spawn_policy.sql","sha256":"7f04a182687f8878dc851cd3b1204149b5ce26be97580d101689a82e56d96c31"},
+    {"path":"tests/test_m09_spawn_policy_sql.py","sha256":"e0f8f7beb4af7767c48d7a55f402ff930630314f5794f5ae171b84f442d13f60"}
+  ],
+  "environment":{"go":"go1.27.1","os":"android","arch":"arm64","ci":false},
+  "checks":[
+    {"command":"go test ./... -count=1","exit_code":0,"result":"PASS; all Go packages"},
+    {"command":"go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; tagged PostgreSQL compile-only"},
+    {"command":"python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql -v","exit_code":0,"result":"PASS; 28 source-contract tests across M09 workstreams"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues/148 edges"},
+    {"command":"git diff --check","exit_code":0,"result":"PASS"}
+  ],
+  "independent_review":{"kind":"separately dispatched verifier subagent","result":"Read-only review found no remaining actionable SQL/source defect after requiring task.key JSON string before text coercion.","scope":"Root caps, exact operation replay, atomic spawn persistence, role boundary, DB digest source, and Lease attempt cap; no DB runtime"},
+  "authorization":{"source":"User selected Root-wide finite SpawnPolicy, recursive canonical semantic fingerprint via trusted Coordinator, operation replay, and Lease attempt cap.","scope":"Go/SQL source and tests only; M09-S02 migration/runtime was not authorized or executed."},
+  "verdict":"LOCAL_SOURCE_TESTED; S02_DB_RUNTIME_UNVERIFIED; ISSUE_REMAINS_IMPLEMENTED",
+  "remaining_risks":["No SQL migration/runtime/concurrency integration executed; Root cap enforcement and Lease attempt behavior remain unverified in PostgreSQL.","Semantic fingerprint is computed by trusted Coordinator and checked for shape/count at DB boundary, per selected trust model; DB does not independently recompute the recursive hash.","No CI attestation, commit or push."]
+}

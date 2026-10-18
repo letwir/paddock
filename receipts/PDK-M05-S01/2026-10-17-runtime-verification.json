@@ -1,0 +1,49 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M05-S01",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M05-S01-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T09:57:11Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_domain_events_schema.sql", "sha256_applied": "a9b57c7c14b4ddf88cfb45e88e9c2bdc46c25c6f2f4720e51d8d848603c108ca"},
+    {"path": "sql/init.sql", "sha256": "86dd89f70830c3b47d7c6710b225f9cdd2ea64b219d237cd771fd891cc7a9461"},
+    {"path": "tests/test_m05_events_schema_migration.py", "sha256": "693ee58e3a1acc53f0f7dea88efc6f6da368b842b9e11b8f7498ae526f862cf6"},
+    {"path": "internal/storage/postgres/governance_tx.go", "sha256": "e7bee053bdf1a3238de4e8b8f35735c0560f46d61533f907d59b6ab9de156a81"},
+    {"path": "internal/storage/postgres/governance_event_test.go", "sha256": "5187ab88376b3791f3c77ddbac76295ae77ff83461efbfacec253df7a2a7584b"},
+    {"path": "internal/storage/postgres/integration_test.go", "sha256": "528c7953d28d422f40a3f97f38d65d210ee5c21ebee9d8fc05c6b8be4320ac89"},
+    {"path": "internal/governance/domain/event.go", "sha256": "0fdd77672752ec297700df411d0aa6183db9c2d2f5cc07731e1a3f58ac37649d"},
+    {"path": "internal/governance/domain/event_test.go", "sha256": "df7e7711c2cef2e1709058ed500c8e1a5b3a03750948b35373104e938ff53c12"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "database": "paddock_test", "postgresql": "18.6", "ci": false},
+  "authorization": {"source": "User explicitly authorized read-only preflight, one guarded migration application only if domain_events is empty and guards match, function/ACL readback, then only the named app-role Event/Outbox integration subtest once. The approval is one-shot; no retry is authorized.", "scope": "No down/reset/drop, no production/llm-memory, no role membership/ownership change, no M09 fixture mutation, no credential display."},
+  "preflight": {
+    "command": "scripts/init_test_db.sh --check plus explicit psql READ ONLY catalogs using PADDOCK_DB_URL and PADDOCK_APP_DB_URL",
+    "exit_code": 0,
+    "observations": [
+      "current_database=paddock_test, PostgreSQL 18.6",
+      "setup current_user=session_user=paddock_migrator; app current_user=session_user=paddock_app",
+      "both roles exist, non-elevated, zero membership edges involving app/migrator",
+      "raw schema and raw.domain_events/raw.event_outbox owned by paddock_migrator; both ordinary tables",
+      "schema_version absent; raw.domain_events rowcount=0; raw.event_outbox rowcount=0",
+      "app function absent; app had Event INSERT but no Outbox privileges before migration",
+      "existing event fixture namespace count=0"
+    ],
+    "credentials_printed": false
+  },
+  "checks": [
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -f sql/governance_domain_events_schema.sql", "exit_code": 0, "result": "Guarded transaction BEGIN/COMMIT; schema_version added to empty Event table, append function/owner/ACLs installed."},
+    {"command": "read-only post-migration catalog and app-privilege queries", "exit_code": 0, "result": "schema_version text NOT NULL with validated named nonempty CHECK; append function migrator-owned SECURITY DEFINER search_path=pg_catalog, app EXECUTE true, PUBLIC EXECUTE false; app domain_events SELECT=true/INSERT=false/UPDATE=false/DELETE=false, event_outbox privileges all false; domain_events and outbox rowcounts remain zero."},
+    {"command": "go test -tags=integration ./internal/storage/postgres -run '^TestPostgresGovernanceIntegration$/^AppendEvent_envelope,_uniqueness,_and_callback_rollback$' -count=1 -v", "exit_code": "NOT_RUN_BUILD_TAG_MISMATCH", "result": "The first compile-only invocation lacked the paddock_test tag; build failed at undefined openPullPool before tests ran and before any database connection. Correct combined-tag invocation below is the sole integration body run."},
+    {"command": "go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestPostgresGovernanceIntegration$/^AppendEvent_envelope,_uniqueness,_and_callback_rollback$' -count=1 -v", "exit_code": 0, "result": "PASS; only the named Event/Outbox app-pool subtest body ran. It verified app identity/function privileges, event envelope readback, matching Outbox, duplicate aggregate-version SQLSTATE 23505, callback-error rollback, and exact fixture cleanup."},
+    {"command": "read-only post-run Event/Outbox fixture query", "exit_code": 0, "result": "Rows matching event_id or aggregate_id `it_%` are zero in raw.domain_events and raw.event_outbox; exact subtest cleanup verified."},
+    {"command": "python3 -m unittest tests.test_m05_events_schema_migration -v", "exit_code": 0, "result": "PASS 12/12 migration/security static contracts."},
+    {"command": "python3 -m unittest tests.test_m02_roles tests.test_m02_rebuild_runner tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql -q", "exit_code": 0, "result": "PASS 74 related static tests."},
+    {"command": "go test ./... -count=1; go vet ./...; tagged integration compile-only; focused TestAppendEvent unit tests", "exit_code": 0, "result": "PASS."},
+    {"command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges."}
+  ],
+  "source_review": {"kind": "separately dispatched read-only Verifier subagent", "difficulty": "D_worker=HARD; D_pub=HARD", "result": "No actionable source finding after final SQL/ACL/adapter/app-fixture review. Verifier explicitly did not execute tests or access database.", "scope": "source and acceptance criteria only"},
+  "main_reconciliation": {"decision": "The renewed conditional approval's guards matched (including zero legacy Event rows); the function/ACL migration committed, app-role fixture passed once, exact event/outbox cleanup was readback-confirmed, and privilege/catalog postconditions match selected app-only Event+Outbox design. M05-S01 claims Event+Outbox atomicity only; State+Receipt+Event composition remains M03-S04.", "limitations": ["The first wrong-tag command was a pre-test build failure with no DB connection; it is disclosed above.", "A read-only preflight query with a malformed LIKE escape failed after returning initial identity/count outputs; it performed no mutation; the corrected preflight command succeeded.", "The source/runtime Runner worktree is dirty and has no full diff hash; no CI attestation, commit, or push.", "The migration intentionally refuses if preexisting Event rows are present; no legacy backfill policy exists."]},
+  "verdict": "DONE_UNDER_D016_LOCAL_VERIFICATION; APP_ROLE_EVENT_OUTBOX_FIXTURE_PASS; NO_CI_ATTESTATION",
+  "next_action": "PDK-M05-S01 has been reconciled and marked DONE under D-016 local verification. No additional database operation is needed; preserve M09 append-only fixtures."
+}

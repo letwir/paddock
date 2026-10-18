@@ -1,0 +1,29 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S03",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S02-S03-repair-source", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T03:58:08Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256": "6eaf8292ecf7a885f0daf5e7a35e52ea076e02387631cf9a00f1ac131cae7f6a"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "4b6b3f2b98a3409b2b2ba5ebfad238495a2ffaa115f5f55217c050090b8a2ef7"},
+    {"path": "sql/governance_checkpoints.sql", "sha256": "86b9a6fe4f1ab22b32185dc72770be6d272c490e5c960f0f6ad2fea320f6bf15"},
+    {"path": "internal/storage/postgres/checkpoint_integration_test.go", "sha256": "a24a03c51bf7973573e55c02758d8eb4622ca760076d3d7bb4d62857ec6a7e56"},
+    {"path": "tests/test_m09_checkpoint_sql.py", "sha256": "42cba7b75f7f2f7cdeffa263422b6c432b4fdc36cc9aba6f10e6ae48894ab3af"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m09_repair_sql -v", "exit_code": 0, "result": "PASS; 7 static repair migration contract tests"},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql -v", "exit_code": 0, "result": "PASS; 33 M09 source-contract tests"},
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; compile-only; no DB test body"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "tracked and no-index whitespace checks; gofmt", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable source finding after adding live digest-column catalog guards; reviewed exact reserve receipt, qualified aggregate, restore hash, and transaction boundaries.", "scope": "repair SQL and static contract only; no DB application/runtime"},
+  "authorization": {"design_selection": "User selected one combined single-transaction guarded repair script for S02 and S03.", "scope": "Source/design verification only. Repair migration has NOT been applied; separate explicit authorization is still required before DB DDL and fixture reruns."},
+  "verdict": "LOCAL_REPAIR_SOURCE_TESTED; REPAIR_NOT_APPLIED; S03_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["Repair guard/DDL behavior has only source/static verification; PostgreSQL application and function runtime remain unverified.", "Current paddock_test still has the old unqualified stored_bytes aggregate in the applied S03 function; S03 runtime failed SQLSTATE 42702.", "No CI attestation, commit, or push is claimed."]
+}

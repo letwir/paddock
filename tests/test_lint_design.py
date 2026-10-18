@@ -18,13 +18,36 @@ class DesignLintTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         for f in MODULE.NAME_FILES:
             shutil.copy2(SOURCE/f, self.root/f)
+        # Clean lint fixtures are disposable roots and must not inherit the
+        # cursor receipt reference as completion evidence.
+        issues = self.root/'Issues.md'
+        text = issues.read_text(encoding='utf-8')
+        text, count = re.subn(r"^last_receipt:.*$", "last_receipt: NONE", text, count=1, flags=re.M)
+        if count != 1:
+            raise AssertionError("copied Issues.md must contain exactly one last_receipt Cursor field")
+        issues.write_text(text, encoding='utf-8')
         shutil.copy2(SOURCE/'AGENTS.md',self.root/'AGENTS.md')
         shutil.copytree(SOURCE/'rules',self.root/'rules')
         (self.root/'docs').mkdir()
         shutil.copy2(SOURCE/'docs/bootstrap-safety.md',self.root/'docs/bootstrap-safety.md')
         (self.root/'scripts').mkdir()
         shutil.copy2(SOURCE/'scripts/lint_design.py',self.root/'scripts/lint_design.py')
+        # The README link checker requires the generated summary to exist;
+        # replace its live-repository contents below with fixture-derived data.
         shutil.copy2(SOURCE/'docs/issue-dependencies.generated.md',self.root/'docs/issue-dependencies.generated.md')
+        # Disposable design fixtures must preserve every project-local
+        # Markdown link target referenced by the copied source documents.
+        # In particular, current Issue records link to verification receipts,
+        # and README.md links to its localized variants. Copy only those exact
+        # referenced files rather than assuming the fixture starts with them.
+        copy_markdown_link_targets(SOURCE, self.root, MODULE.NAME_FILES)
+        # Build the disposable summary from the normalized fixture, not the
+        # live Issues.md whose digest differs from this temporary copy.
+        errors, records, source_sha = MODULE.validate(self.root, check_generated=False)
+        if errors:
+            raise AssertionError(f"clean temporary design fixture has lint errors: {errors}")
+        (self.root/'docs/issue-dependencies.generated.md').write_text(
+            MODULE.render(records, source_sha), encoding='utf-8')
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -50,10 +73,12 @@ class DesignLintTests(unittest.TestCase):
         found=set(MODULE.DEC_RE.findall(decisions))
         self.assertTrue(expected.issubset(found))
         self.assertEqual(len(found),len(MODULE.DEC_RE.findall(decisions)))
-        readme=(self.root/'README.md').read_text(encoding='utf-8')
+        # README.md is a route page; the parallel editions link to the
+        # authoritative issue/design documents.
+        readme=(self.root/'README-en.md').read_text(encoding='utf-8')
         for target in ('THREAT_MODEL.md','Issues.md','method.md'):
             self.assertRegex(readme,rf'\]\({re.escape(target)}\)')
-        for path in ('decisions.md','THREAT_MODEL.md','README.md'):
+        for path in ('decisions.md','THREAT_MODEL.md','README-en.md'):
             self.assertIn('DESIGN_BASELINE',(self.root/path).read_text(encoding='utf-8'))
 
     def test_s05_threat_model_dimensions(self):
@@ -74,7 +99,7 @@ class DesignLintTests(unittest.TestCase):
     def test_s06_bootstrap_safety_boundaries(self):
         safety=(self.root/'docs/bootstrap-safety.md').read_text(encoding='utf-8')
         for phrase in ('PoC approval keys','dedicated disposable test database',
-                       'Emergency Stop lifecycle','Safe Baseline','**Release:**',
+                       'Emergency Stop lifecycle','Safe Baseline','BS-03.4 Release',
                        'O-002','O-003','O-010','PDK-M06-S08','PDK-M02-S05','PDK-M06-S05',
                        'remain OPEN','grants no DB access'):
             self.assertIn(phrase,safety)
@@ -95,8 +120,27 @@ class DesignLintTests(unittest.TestCase):
     def test_open_without_concrete_issue(self):
         p=self.root/'decisions.md'
         s=p.read_text(encoding='utf-8')
-        s=s.replace('| PDK-M05-S02 |','| M05 |',1)
+        s=s.replace('| PDK-M06-S08 |','| M06 |',1)
         p.write_text(s, encoding='utf-8')
         self.assert_error('OPEN_NO_RESOLVER')
+
+
+def copy_markdown_link_targets(source: Path, root: Path, document_names):
+    """Copy exact local Markdown link targets needed by disposable lint roots."""
+    for doc_name in document_names:
+        source_doc = source / doc_name
+        fixture_doc = root / doc_name
+        text = fixture_doc.read_text(encoding="utf-8")
+        for link in MODULE.LINK_RE.findall(text):
+            if link.startswith(("https://", "http://", "#", "mailto:")):
+                continue
+            target = link.split("#", 1)[0].strip("<>")
+            if not target or ".." in Path(target).parts:
+                continue
+            source_target = source_doc.parent / target
+            fixture_target = fixture_doc.parent / target
+            if source_target.is_file() and not fixture_target.exists():
+                fixture_target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_target, fixture_target)
 
 if __name__=='__main__': unittest.main()

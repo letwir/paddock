@@ -1,0 +1,35 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S02-final-runtime", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T04:25:45Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated/untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256_applied": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d"},
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "bb809ab78b47a0f169ba07cee7fc6105993775ed901f97e5caf4aa9ccf7e8c95"},
+    {"path": "internal/storage/postgres/spawn_store.go", "sha256": "ea48f7432709f3c5201080beb224f994c524bd7da33ac7647789a511e759a087"},
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "ff7285dd21ccb4f8bcb52419088f2e4a85fb9b2607a9afb2ea12a5b587a6258b"},
+    {"path": "tests/test_m09_spawn_policy_sql.py", "sha256": "3dd38289a635aef173744c9d71eb6f139b395aaa7f8566e32b256927a79afdb3"},
+    {"path": "tests/test_m09_repair_sql.py", "sha256": "1e902dad21eda53675a2c0453b62e74c6015c1683a5ba495292920cab8e404d3"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "database": "paddock_test", "postgresql": "18.6", "ci": false},
+  "applied_migrations": [
+    {"path": "sql/governance_spawn_policy.sql", "sha256_at_application": "b3278175e864401ec57ea82e28664e88d7a77cd4dc68063597850a51cec530a8", "exit_code": 0, "result": "guarded S02 transaction committed"},
+    {"path": "sql/governance_m09_s02_s03_repair.sql", "sha256_at_application": "9c1c358f53953f2910d3aa641b808266a89667f6070ace9265714fb14e8b915d", "exit_code": 0, "result": "combined guarded repair transaction committed; helper output variables corrected"}
+  ],
+  "database_identity": {"setup": "paddock_test / current_user=session_user=paddock_migrator", "application": "paddock_test / current_user=session_user=paddock_app", "roles": "both non-elevated, no memberships", "raw_owner": "paddock_migrator", "credentials_printed": false},
+  "checks": [
+    {"command": "scripts/init_test_db.sh --check", "exit_code": 0, "result": "paddock_test PostgreSQL 18.6; read-only preflight"},
+    {"command": "read-only repair preflight and post-repair catalog/ACL check", "exit_code": 0, "result": "required objects/columns present; helper uses SELECT INTO/RETURN NEXT, both repaired functions migrator-owned SECURITY DEFINER with search_path=pg_catalog; app EXECUTE present; PUBLIC EXECUTE and direct app table SELECT absent"},
+    {"command": "go test -tags=paddock_test ./internal/storage/postgres -run '^TestSpawnAdmissionIntegration$' -count=1 -v", "exit_code": 0, "result": "PASS; semantic fingerprint DAG with key renaming and reverse task order, replay/conflict, depth/descendant/live-child caps including concurrent one-winner case, DB-clock deadline, configured attempt cap, unconfigured-root first Attempt/retry denial, dependency persistence"},
+    {"command": "read-only post-run spawn_it_ fixture count query", "exit_code": 0, "result": "zero fixture Scope, Root, WorkOrder, Spawn operation/fingerprint, Attempt, Lease, and test policy-bundle rows; exact S02 cleanup verified"},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql tests.test_m09_repair_sql -q", "exit_code": 0, "result": "PASS; 41 source-contract and repair static tests"},
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1; go test ./... -count=1; go vet ./...", "exit_code": 0, "result": "PASS; compile-only tagged target, full untagged Go suite, vet"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable source finding in the expanded fixture; reviewed simultaneous cap, unconfigured-root Lease behavior, reverse DAG and exact cleanup.", "scope": "source review; Runner receipt and DB readback remain Main observations"},
+  "authorization": {"scope": "User renewed explicit approval for the combined guarded repair and expanded S02 fixture. No down/reset/drop, production, role change, credential output, or unrelated tests."},
+  "verdict": "S02_EXPANDED_FIXTURE_PASS_AND_EXACT_CLEANUP_VERIFIED; ISSUE_REMAINS_IMPLEMENTED_PENDING_FINAL_RECONCILIATION",
+  "remaining_risks": ["No CI attestation, commit, or push is claimed.", "S02 remains non-DONE until separate Verifier review of the final Runner receipt and Main reconciliation." ]
+}

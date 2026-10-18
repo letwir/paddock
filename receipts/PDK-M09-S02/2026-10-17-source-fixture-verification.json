@@ -1,0 +1,28 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M09-S02",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M09-S02-source-fixture", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T03:38:28Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED; broad unrelated and untracked changes remain"},
+  "targets": [
+    {"path": "sql/governance_spawn_policy.sql", "sha256": "b3278175e864401ec57ea82e28664e88d7a77cd4dc68063597850a51cec530a8"},
+    {"path": "internal/storage/postgres/spawn_integration_test.go", "sha256": "550ca1e597b1dc40e9a691b2314c8b26e8c9b50ce31933adce957021ce248a60"}
+  ],
+  "environment": {"go": "go1.27.1", "python": "3.14.6", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "go test -tags=paddock_test -run '^$' ./internal/storage/postgres -count=1", "exit_code": 0, "result": "PASS; tagged source compiled only; no test body/DB runtime executed"},
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all untagged Go packages"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 -m unittest tests.test_m09_spawn_policy_sql tests.test_m09_checkpoint_sql tests.test_m09_budget_sql tests.test_m09_budget_storage_bytes_sql -v", "exit_code": 0, "result": "PASS; 30 M09 SQL source-contract tests"},
+    {"command": "python3 -m unittest discover -s tests -q", "exit_code": 1, "result": "FAIL; 133 tests, 12 failures/errors in out-of-scope temporary design fixtures: historical receipt/README edition targets are absent in copied roots and S08 expects an obsolete README anchor; M09-focused 30 source-contract tests passed"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues/148 edges"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS for tracked diff"},
+    {"command": "bounded no-index whitespace-check loop over both untracked target files (per-file diff status 1 expected; loop exit 0)", "exit_code": 0, "result": "PASS; no whitespace diagnostics"},
+    {"command": "test -z \"$(gofmt -l internal/storage/postgres/spawn_integration_test.go)\"", "exit_code": 0, "result": "PASS; source formatted"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only verifier subagent", "result": "No actionable source finding in the current S02 SQL, store, and integration fixture; reverse-order DAG and empty dependency-array cases were reviewed.", "scope": "selected Root caps, DAG persistence/order, fingerprint replay, role/policy boundaries, and Lease-attempt cap source only; no PostgreSQL runtime"},
+  "authorization": {"scope": "S02 source and opt-in fixture source verification only. No migration, database connection, integration execution, or credential access was authorized or performed."},
+  "verdict": "LOCAL_SOURCE_TESTED; S02_DB_RUNTIME_UNVERIFIED; ISSUE_REMAINS_IMPLEMENTED",
+  "remaining_risks": ["PostgreSQL migration/runtime, concurrency behavior, cap enforcement, replay behavior, and Lease attempt enforcement remain unverified.", "The selected trust boundary assigns semantic fingerprint computation to the trusted Coordinator; SQL validates supplied fingerprint shape/count but does not recompute the recursive digest.", "No CI attestation, commit, or push is claimed."]
+}

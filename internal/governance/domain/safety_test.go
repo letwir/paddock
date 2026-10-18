@@ -138,7 +138,7 @@ func TestSafetyQuorumStopAdvancesSecurityEpochAndDeniesOldGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	const commandID = "stop-command"
-	message, err := SafetyApprovalMessage(SafetyActionStop, initial.Scope, initial.SecurityEpoch, commandID)
+	message, err := SafetyApprovalMessage(SafetyActionStop, initial.Scope, initial.SecurityEpoch, commandID, "nonce-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestSafetyQuorumStopAdvancesSecurityEpochAndDeniesOldGrant(t *testing.T) {
 		{SignerID: signers[0].ID, Signature: ed25519.Sign(privateKeys[0], message)},
 		{SignerID: signers[1].ID, Signature: ed25519.Sign(privateKeys[1], message)},
 	}
-	result, err := quorum.Stop(initial, initial.Scope, initial.SecurityEpoch, commandID, signatures)
+	result, err := quorum.Stop(initial, initial.Scope, initial.SecurityEpoch, commandID, "nonce-1", signatures)
 	if err != nil {
 		t.Fatal(err)
 	}

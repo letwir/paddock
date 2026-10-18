@@ -21,6 +21,11 @@ class S08AcceptanceTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         for name in LINTER.NAME_FILES:
             shutil.copy2(SOURCE / name, self.root / name)
+        issues = self.root / "Issues.md"
+        text = issues.read_text(encoding="utf-8")
+        text, count = re.subn(r"(?m)^last_receipt:.*$", "last_receipt: NONE", text)
+        self.assertEqual(count, 1, "fixture last_receipt anchor must occur exactly once")
+        issues.write_text(text, encoding="utf-8")
         shutil.copy2(SOURCE / "AGENTS.md", self.root / "AGENTS.md")
         (self.root / "docs").mkdir()
         shutil.copy2(
@@ -31,12 +36,30 @@ class S08AcceptanceTests(unittest.TestCase):
         shutil.copytree(SOURCE / "rules", self.root / "rules")
         (self.root / "scripts").mkdir()
         shutil.copy2(SOURCE / "scripts" / "lint_design.py", self.root / "scripts" / "lint_design.py")
+        self.copy_local_markdown_targets()
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def validate(self):
         return LINTER.validate(self.root, check_generated=False)[0]
+
+    def copy_local_markdown_targets(self):
+        link_re = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+        for name in LINTER.NAME_FILES:
+            source_doc = SOURCE / name
+            fixture_doc = self.root / name
+            for link in link_re.findall(fixture_doc.read_text(encoding="utf-8")):
+                if link.startswith(("https://", "http://", "#", "mailto:")):
+                    continue
+                target = link.split("#", 1)[0].strip("<>")
+                if not target or ".." in Path(target).parts:
+                    continue
+                src = source_doc.parent / target
+                dst = fixture_doc.parent / target
+                if src.is_file() and not dst.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
 
     def change_once(self, path, old, new):
         file = self.root / path
@@ -76,12 +99,12 @@ class S08AcceptanceTests(unittest.TestCase):
         self.assert_lint_error("CYCLE:")
 
     def test_open_decision_without_concrete_resolver_is_reported(self):
-        self.change_once("decisions.md", "| PDK-M05-S02 |", "| M05 |")
-        self.assert_lint_error("OPEN_NO_RESOLVER: O-001")
+        self.change_once("decisions.md", "| PDK-M06-S08 |", "| M06 |")
+        self.assert_lint_error("OPEN_NO_RESOLVER: O-002")
 
     def test_broken_markdown_link_is_reported(self):
-        self.change_once("README.md", "](THREAT_MODEL.md)", "](missing-threat-model.md)")
-        self.assert_lint_error("BROKEN_LINK: README.md -> missing-threat-model.md")
+        self.change_once("README.md", "](README-en.md)", "](missing-readme.md)")
+        self.assert_lint_error("BROKEN_LINK: README.md -> missing-readme.md")
 
     def test_cursor_status_mismatch_is_reported(self):
         issues = self.root / "Issues.md"

@@ -1,0 +1,25 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S04",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "continue-2026-10-17-M02-S04-runner-source-final", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-17T05:32:34Z",
+  "source": {"git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518", "git_tree": "UNAVAILABLE_DIRTY_WORKTREE", "dirty": true, "dirty_diff_sha256": "NOT_CAPTURED"},
+  "targets": [
+    {"path": "scripts/m02_s04_rebuild_test.sh", "sha256": "25399fa925c3dd32e54dea2ed366bbd98bca235cc72805f3c8054d723dca5da1", "mode": "0700"},
+    {"path": "tests/test_m02_rebuild_runner.py", "sha256": "226fc137543be0a4e0afc7bb44d787f9bf263fea11dbdd31fd615d43a707621f"},
+    {"path": "sql/governance_roles.sql", "sha256_current": "301dfdcdff90c0e09bead31891ff59dae222fe0fe6cab9452aee8ceb1c269742"}
+  ],
+  "checks": [
+    {"command": "python3 -m unittest tests.test_m02_rebuild_runner -v", "exit_code": 0, "result": "PASS; 8/8 source-only checks, runner was not invoked by this test"},
+    {"command": "bash -n scripts/m02_s04_rebuild_test.sh", "exit_code": 0, "result": "PASS"},
+    {"command": "scripts/m02_s04_rebuild_test.sh --help and no-argument path", "exit_code": 0, "result": "PASS; no side effects"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 edges"},
+    {"command": "tracked and no-index whitespace checks", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {"kind": "separately dispatched read-only Verifier subagent", "result": "No actionable runner source gap on temp path/cleanup, local socket, role sequence, down assertions or catalog checks.", "scope": "source only; no runner or database execution"},
+  "runner_attempt_receipt": "receipts/PDK-M02-S04/2026-10-17-runner-attempt.json",
+  "authorization": {"source": "User selected the isolated local cluster design; this design selection alone did not grant execution permission.", "scope": "Current runner source and static tests only. --run has no explicit execution authorization. One prior attempt occurred before a separate --run approval was recorded; see attempt receipt and scope disclosure."},
+  "verdict": "RUNNER_SOURCE_IMPLEMENTED; STATIC_TESTED; RUNTIME_FAILED_ON_PRE_FIX_ROLE_GUARD; EXECUTION_NOT_AUTHORIZED",
+  "remaining_risks": ["The M02 up/down/up acceptance has not been completed.", "Corrected governance_roles.sql psql behavior remains source/static reviewed but unexecuted.", "The previous attempt was an out-of-scope action; no further runtime may occur without explicit user authorization.", "No CI attestation, commit, or push is claimed."]
+}

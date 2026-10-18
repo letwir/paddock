@@ -32,7 +32,10 @@ type poolBeginner struct{ pool *pgxpool.Pool }
 func (p poolBeginner) Begin(ctx context.Context) (transaction, error) { return p.pool.Begin(ctx) }
 
 // Transactor owns one pgx transaction for one application callback.
-type Transactor struct{ pool beginner }
+type Transactor struct {
+	pool      beginner
+	safetyAPI bool
+}
 
 func NewTransactor(pool *pgxpool.Pool) (*Transactor, error) {
 	if pool == nil {
@@ -70,7 +73,11 @@ func (t *Transactor) WithinTransaction(ctx context.Context, fn func(port.Governa
 		}
 	}()
 
-	if err := fn(newGovernanceTx(tx)); err != nil {
+	var governanceTx port.GovernanceTx = newGovernanceTx(tx)
+	if t.safetyAPI {
+		governanceTx = newSafetyGovernanceTx(tx)
+	}
+	if err := fn(governanceTx); err != nil {
 		if rollbackErr := rollback(tx); rollbackErr != nil {
 			return errors.Join(err, fmt.Errorf("rollback governance transaction: %w", rollbackErr))
 		}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M02-S06",
+  "runner": {"kind": "local", "identity": "Main Runner", "run_id": "conversation-2026-10-13-PDK-M02-S06", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-13T22:01:36Z",
+  "source": {
+    "git_commit": "f4e66bcb4ada48be5a53bb8083dc4dad73a140c7",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_DIRTY_DIFF_NOT_CAPTURED"
+  },
+  "environment": {"database": "paddock_test", "postgresql_version": "18.6", "dsn_variable": "PADDOCK_DB_URL", "dsn_value_recorded": false},
+  "targets": [
+    {"path": "sql/governance_safety_constraints.sql", "sha256": "c2a6fe68aa5bcf9bb1dfc0eca392c82df64736051aa0c32ec8a7fe3124d3b303"},
+    {"path": "sql/governance_safety_constraints_down.sql", "sha256": "9f420c133f0ccf365b4ec432ee3e1b204a1e3aead665d29efd97b32a48b697aa"},
+    {"path": "tests/test_m02_safety_constraints.py", "sha256": "46239d3359ce1222cb8afe07efd37e4c2a34b9270e32339048080982bd61bafe"},
+    {"path": "tests/integration_m02_safety_constraints.sql", "sha256": "0030fad55e863be8ac55c3b1b9f18c569187ea4fde2156f90f9ae3e76264f1ed"},
+    {"path": "tests/integration_m02_safety_concurrency.py", "sha256": "acb344168f552c376c9dd9c98dbaa4b042a58cc2350ca5c5ce778de061d08bad"}
+  ],
+  "checks": [
+    {"command": "read-only S06 preflight: paddock_test PG18.6, frozen scopes and missing-live count, migration objects absent", "exit_code": 0, "result": "frozen=0; frozen_without_live=0; check=0; triggers=0"},
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_safety_constraints.sql", "exit_code": 0, "result": "BEGIN; target/base guards; CHECK and two deferred constraint triggers created; COMMIT"},
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f tests/integration_m02_safety_constraints.sql (attempt 1)", "exit_code": 3, "result": "FAILED: SET CONSTRAINTS by trigger name rejected; open fixture transaction rolled back on connection close; no persistent fixture rows"},
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f tests/integration_m02_safety_constraints.sql (attempt 2)", "exit_code": 3, "result": "FAILED: expected wrong-scope foreign_key_violation was not caught; open fixture transaction rolled back on connection close; no persistent fixture rows"},
+    {"command": "psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f tests/integration_m02_safety_constraints.sql (attempt 3)", "exit_code": 0, "result": "PASS: valid same-scope rollback; missing-live, wrong-scope, wrong-state denials; SAFE_STOPPED NULL-baseline representation; final ROLLBACK"},
+    {"command": "python3 tests/integration_m02_safety_concurrency.py --apply (attempt 1)", "exit_code": 1, "result": "FAILED: aligned psql output prevented barrier waiter count parsing; harness cleanup path ran"},
+    {"command": "read-only S06 fixture residue check after failed attempts", "exit_code": 0, "result": "migration objects present; fixture scopes/rollouts/roots/bundles all zero"},
+    {"command": "python3 tests/integration_m02_safety_concurrency.py --apply (attempt 2)", "exit_code": 0, "result": "PASS: harness internal assertions verified both workers updated and waited at advisory barrier; exactly one commit and one transaction abort with accepted SQLSTATE; committed state matched winner; cleanup and fixture absence verified. User-facing output: S06 two-session race completed; fixture cleanup verified."},
+    {"command": "read-only final S06 catalog/fixture check", "exit_code": 0, "result": "paddock_test PG18.6; CHECK=1; triggers=2; fixture rollouts/scopes/roots/bundles=0"},
+    {"command": "python3 -m unittest tests.test_m02_safety_constraints -v", "exit_code": 0, "result": "PASS; 6 tests"},
+    {"command": "python3 tests/integration_m02_safety_concurrency.py --dry-test", "exit_code": 0, "result": "PASS; 1 offline test"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 edges"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"}
+  ],
+  "authorization": {"source": "Current-task user explicitly authorized S06 migration, rollback-only positive/negative fixture, and two-session race test against current PADDOCK_DB_URL", "scope": "Add one CHECK, two constraint triggers and two trigger functions; run transaction-local fixtures; no down migration, schema/table drop, or non-fixture row changes", "data_impact": "No existing data changed; fixture rows rolled back and verified absent"},
+  "verdict": "LOCAL_RUNNER_PASS; independent review pending; no CI attestation",
+  "remaining_risks": [
+    "Worktree was dirty and full diff hash was not captured.",
+    "Concurrency harness does not retain raw child logs; it validates internal markers, SQLSTATE, final state and cleanup, but exact winning session/SQLSTATE are not surfaced in user-facing output.",
+    "PGPASSWORD is passed only in the psql child environment; same-host process-environment visibility remains a residual risk.",
+    "No CI attestation or Verifier-of-Record is claimed."
+  ]
+}
