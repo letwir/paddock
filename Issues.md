@@ -27,16 +27,16 @@ snapshot_date: 2026-10-12
 project: PADDOCK
 repository_root: .
 phase: MAIN_DESIGN_REVISION
-active_goal: M14
-active_issue: PDK-M14-S01
+active_goal: M04
+active_issue: PDK-M04-S05
 issue_state: TODO
-execution_state: NOT_STARTED
+execution_state: WAITING_FOR_DESIGN_SELECTION
 current_branch: main
 verified_commit: NONE
 last_receipt: NONE
 last_verified_test: "PDK-M05-S05 completed under D-016 local Runner and separate read-only source review. Receipt: receipts/PDK-M05-S05/2026-10-18-local-verification.json. CI attestation absent."
-next_action: "The requested completed-Issue commit/push is prepared from a curated snapshot excluding M13-S01 WIP and .build/nested-repository artifacts; M08-S04 remains [~] with only its explicitly authorized shared dependency subset. After remote push verification, begin dependency-ready PDK-M14-S01 design/effect-scope preflight. Do not change protected-branch/CODEOWNERS settings without separate exact approval."
-confidence: "PDK-M05-S03/S04/S05 are DONE under D-016 local Runner, independent review, and Main reconciliation. Branch HEAD remains unchanged; worktree has broad tracked/untracked changes. No commit/push has been performed; CI attestation absent."
+next_action: PDK-M04-S05 is next dependency-ready in the pushed completed-only Issue snapshot. Select its negative-receipt taxonomy/retention contract before CODE; no DB migration/test body is authorized.
+confidence: PDK-M05-S03..S05 completed Issue batch 5d842cf89f08aafd06928fe9f0f0bacb6497e7e0 is on origin/main. Local M08-S04/M13-S01 and M04-S05 design work remains unpushed; no CI attestation.
 
 
 
@@ -390,7 +390,7 @@ confidence: "PDK-M05-S03/S04/S05 are DONE under D-016 local Runner, independent 
   - `verification_receipt`: `receipts/PDK-M05-S05/2026-10-18-local-verification.json`
   - `independent_review`: Separate read-only Verifier reviewed `Issues.md` M05-S05 acceptance, D-019–D-022, and both complete pure Go policy source/test files; no actionable findings. It confirmed canonical schema parsing/fail-closed behavior, quarantine identity/anchor, retention holds/deadlines, replay boundary/support checks, trusted-service audit contract, and separation from Outbox mutation. It did not run tests, inspect Git diff/status, or access DB. Main reconciled the review with Runner observations and the recorded policy. CI attestation absent.
   - `remaining_gate`: NONE for the selected D-019–D-022 policy-recording and pure-domain boundary-test acceptance under D-016. Residual: no DB quarantine/replay/retention-worker enforcement is implemented or claimed; CI absent; worktree broadly dirty/full diff hash unavailable.
-  - `next_action`: PDK-M05-S05 is DONE. Before new implementation work, reconcile the requested push/commit scope against the broadly dirty worktree; the next dependency-ready Issue is PDK-M14-S01.
+  - `next_action`: PDK-M05-S05 and the audited completed-Issue batch are pushed as commit `5d842cf89f08aafd06928fe9f0f0bacb6497e7e0` to `origin/main`. The next dependency-ready Issue in this pushed snapshot is PDK-M04-S05; select its design before CODE. Remaining uncommitted WIP stays local.
 
 ### M06 / P0 / Governance Kernel・Policy検証・Approval
 

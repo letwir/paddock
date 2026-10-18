@@ -38,11 +38,11 @@
     },
     {
       "path": "Issues.md",
-      "sha256": "7d2b36552085c39223961dd1e791d8f8f04d7b23ce05e5a5f3681f712a32b605"
+      "sha256": "10be52667dceaca204e02ae5bf807d5fb810f0ab4e43a73734105384933029a1"
     },
     {
       "path": "docs/issue-dependencies.generated.md",
-      "sha256": "d50997822cec6a498480eb69aef209f6759251b4f4d9ea86b71242bd1f240dac"
+      "sha256": "07ae63e1355ff5d5839e7223c4dba9b760827d704af603f4b74c9036c95c1f17"
     }
   ],
   "runner_checks": [
@@ -89,7 +89,7 @@
     {
       "command": "python3 scripts/continue_plan.py after evidence-key reconciliation",
       "exit_code": 0,
-      "result": "PASS; selected next dependency-ready PDK-M14-S01 (first_ready_incomplete). The completed Issue records now use the planner-required current_evidence key."
+      "result": "PASS; selected PDK-M14-S01 before the completed-only push snapshot Cursor update; the pushed snapshot now selects dependency-ready PDK-M04-S05 after WIP pruning."
     },
     {
       "command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py (final Cursor/Issue reconciliation)",
@@ -160,5 +160,5 @@
     "Full Python suite required repairs to disposable test fixtures because Issue/README local links evolved; fixtures now copy referenced local files. These fixture tests are included in the full suite and separately source-reviewed."
   ],
   "verdict": "POLICY_AND_BOUNDARY_TESTS_PASS; INDEPENDENT_SOURCE_REVIEW_NO_FINDINGS; DONE_D016_LOCAL; NO_DB_EFFECTS; NO_CI_ATTESTATION",
-  "next_action": "After commit/push result is verified, proceed to dependency-ready PDK-M14-S01. M08-S04 remains [~]; M13-S01 WIP source/record and all temporary/nested-repository artifacts were excluded from this snapshot."
+  "next_action": "PDK-M05-S03..S05 are pushed in commit 5d842cf89f08aafd06928fe9f0f0bacb6497e7e0. Next dependency-ready issue in this pushed snapshot is PDK-M04-S05; resolve its design before CODE. Local WIP remains unpushed."
 }
