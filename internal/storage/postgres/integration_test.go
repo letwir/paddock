@@ -271,6 +271,29 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := pool.QueryRow(caseCtx, `SELECT security_epoch FROM raw.security_generation WHERE singleton_id=true`).Scan(&baselineSecurity); err != nil {
 			t.Fatalf("read pre-test security baseline: %v", err)
 		}
+		// Migrator pre-seeds only this WorkOrder. Attempt/Slot/Lease are created
+		// below by the existing app APIs, and disappear with the outer rollback.
+		workID := f.root + "_safety_work"
+		if _, err := pool.Exec(caseCtx, `INSERT INTO raw.work_orders(work_order_id,root_id,parent_id) VALUES($1,$2,NULL)`, workID, f.root); err != nil {
+			t.Fatal("preseed safety WorkOrder failed")
+		}
+		t.Cleanup(func() {
+			cleanCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			var leases, slots, attempts, requirements int
+			if err := pool.QueryRow(cleanCtx, `SELECT
+                (SELECT count(*) FROM raw.work_order_leases WHERE work_order_id=$1),
+                (SELECT count(*) FROM raw.work_order_pull_slots WHERE work_order_id=$1),
+                (SELECT count(*) FROM raw.work_order_attempts WHERE work_order_id=$1),
+                (SELECT count(*) FROM raw.work_order_capability_requirements WHERE work_order_id=$1)`, workID).Scan(&leases, &slots, &attempts, &requirements); err != nil || leases != 0 || slots != 0 || attempts != 0 || requirements != 0 {
+				t.Errorf("rollback left safety lease fixture rows: leases=%d slots=%d attempts=%d requirements=%d err=%v", leases, slots, attempts, requirements, err)
+				return
+			}
+			tag, err := pool.Exec(cleanCtx, `DELETE FROM raw.work_orders WHERE work_order_id=$1 AND root_id=$2`, workID, f.root)
+			if err != nil || tag.RowsAffected() != 1 {
+				t.Errorf("exact safety WorkOrder cleanup failed: %v", err)
+			}
+		})
 		tx, err := appPool.Begin(caseCtx)
 		if err != nil {
 			t.Fatalf("begin safety transaction: %v", err)
@@ -283,6 +306,24 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 				_ = tx.Rollback(rollbackCtx)
 			}
 		}()
+		for _, query := range []string{
+			`SELECT raw.configure_work_order_capabilities($1,'[]'::jsonb)`,
+			`SELECT raw.mark_work_order_pull_ready($1)`,
+		} {
+			var ok bool
+			if err := tx.QueryRow(caseCtx, query, workID).Scan(&ok); err != nil || !ok {
+				t.Fatal("app safety WorkOrder configuration/ready failed")
+			}
+		}
+		binding := domain.AttemptLeaseBinding{WorkOrderID: domain.WorkOrderID(workID), AttemptID: domain.AttemptID(workID + "_attempt"), WorkerID: domain.WorkerID(workID + "_worker"), SessionID: domain.SessionID(workID + "_session")}
+		var issuedAttempt, issuedSlot string
+		var leaseExpiry time.Time
+		if err := tx.QueryRow(caseCtx, `SELECT attempt_id,slot_id,lease_epoch,expires_at FROM raw.issue_work_order_lease($1,$2,$3,$4,$5,'[]'::jsonb,'[]'::jsonb,interval '10 minutes')`, workID, string(binding.WorkerID), string(binding.SessionID), string(binding.AttemptID), workID+"_slot").Scan(&issuedAttempt, &issuedSlot, &binding.LeaseEpoch, &leaseExpiry); err != nil || issuedAttempt != string(binding.AttemptID) || issuedSlot != workID+"_slot" || binding.LeaseEpoch != 1 {
+			t.Fatal("app safety lease issuance failed")
+		}
+		authorization := func(grant domain.Grant) domain.HighRiskAuthorization {
+			return domain.HighRiskAuthorization{Grant: grant, Lease: binding}
+		}
 		gov := newSafetyGovernanceTx(tx)
 		snapshot, err := gov.LockScope(caseCtx, domain.ScopeID(f.scope))
 		if err != nil {
@@ -344,7 +385,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := gate.CheckNewGrant(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("CheckNewGrant after Stop = %v, want ErrSafeStopped", err)
 		}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrSafeStopped) {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant)); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("CheckHighRiskAction after Stop = %v, want ErrSafeStopped", err)
 		}
 		stoppedSnapshot, err := newSafetyGovernanceTx(tx).LockScope(caseCtx, snapshot.ScopeID)
@@ -390,10 +431,10 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		}
 		releasedRoot := released.State.Roots[domain.RootID(f.root)]
 		releasedGrant := domain.Grant{Root: domain.RootID(f.root), Policy: releasedRoot.Policy, AuthorizationEpoch: releasedRoot.AuthorizationEpoch, SecurityEpoch: released.State.SecurityEpoch}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, releasedGrant); err != nil {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(releasedGrant)); err != nil {
 			t.Fatalf("CheckHighRiskAction after Release with current grant: %v", err)
 		}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, preStopGrant); !errors.Is(err, domain.ErrStaleGrant) {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant)); !errors.Is(err, domain.ErrStaleGrant) {
 			t.Fatalf("CheckHighRiskAction after Release with stale grant = %v, want ErrStaleGrant", err)
 		}
 		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, "safety-fixture-nonce", activation, releaseSigs); err != nil {
@@ -879,6 +920,15 @@ func (o outerTxTransactor) WithinTransaction(ctx context.Context, fn func(port.G
 		return fn(newSafetyGovernanceTx(o.tx))
 	}
 	return fn(newGovernanceTx(o.tx))
+}
+
+// This adapter borrows the existing rollback-only transaction; it never commits
+// or opens another connection for the typed SafetyGate capability.
+func (o outerTxTransactor) WithinSafetyGateTransaction(ctx context.Context, fn func(port.SafetyGateTx) error) error {
+	if !o.safetyAPI {
+		return errors.New("SafetyGate requires app-only adapter")
+	}
+	return fn(newSafetyGateTx(o.tx))
 }
 
 func requireSchema(ctx context.Context, pool *pgxpool.Pool) error {

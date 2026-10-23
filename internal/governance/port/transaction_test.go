@@ -3,16 +3,53 @@ package port
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/letwir/paddock/internal/governance/domain"
 )
 
+func TestRolloutSnapshotCarriesCompleteMonitoringFence(t *testing.T) {
+	snapshotType := reflect.TypeOf(RolloutSnapshot{})
+	f, ok := snapshotType.FieldByName("Monitoring")
+	if !ok || f.Type != reflect.TypeOf(domain.MonitoringWindow{}) {
+		t.Fatal("rollout snapshot lost monitoring CAS values")
+	}
+	r, ok := f.Type.FieldByName("DecisionRevision")
+	if !ok || r.Type.Kind() != reflect.Int64 {
+		t.Fatal("DecisionRevision must remain int64")
+	}
+}
+
 type fakeGovernanceTx struct {
 	receivers       []GovernanceTx
 	databaseTime    time.Time
 	databaseTimeErr error
+}
+
+func TestTransactionRolledBackPreservesJoinedCause(t *testing.T) {
+	cause := errors.New("transaction callback failed")
+	err := fmt.Errorf("transaction: %w", errors.Join(ErrTransactionRolledBack, cause))
+	if !errors.Is(err, ErrTransactionRolledBack) || !errors.Is(err, cause) {
+		t.Fatalf("rollback marker or cause lost: %v", err)
+	}
+	if ErrTransactionRolledBack.Error() != "governance transaction rolled back" ||
+		errors.Is(ErrTransactionRolledBack, ErrCommitOutcomeUnknown) || errors.Is(ErrTransactionRolledBack, ErrStaleWrite) {
+		t.Fatal("rollback marker must be stable and distinct from other outcomes")
+	}
+}
+
+func TestCommitOutcomeUnknownPreservesJoinedCause(t *testing.T) {
+	cause := errors.New("commit acknowledgement lost")
+	err := fmt.Errorf("commit: %w", errors.Join(ErrCommitOutcomeUnknown, cause))
+	if !errors.Is(err, ErrCommitOutcomeUnknown) || !errors.Is(err, cause) {
+		t.Fatalf("outcome marker or cause lost: %v", err)
+	}
+	if ErrCommitOutcomeUnknown.Error() != "governance commit outcome unknown" || errors.Is(ErrCommitOutcomeUnknown, ErrStaleWrite) {
+		t.Fatal("commit outcome marker must be stable and distinct from stale write")
+	}
 }
 
 func (f *fakeGovernanceTx) LookupCommandReceipt(context.Context, string) (CommandReceipt, bool, error) {
@@ -118,5 +155,18 @@ func TestFakeTransactorSharesTransactionAndPropagatesCallbackError(t *testing.T)
 func TestStaleWriteSentinelIsStable(t *testing.T) {
 	if ErrStaleWrite.Error() == "" {
 		t.Fatal("ErrStaleWrite must have a stable description")
+	}
+}
+
+func TestReceiptExpiryRetainsOriginalTerminalIdentity(t *testing.T) {
+	for _, status := range []string{"SUCCEEDED", "REJECTED"} {
+		r := CommandReceipt{CommandID: "permanent-id", RequestDigest: domain.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Status: status, Response: []byte("full response")}
+		r.Expired, r.Response = true, []byte(ReceiptTombstoneResponse)
+		if r.CommandID != "permanent-id" || r.RequestDigest.Validate() != nil || r.Status != status || !r.Expired {
+			t.Fatalf("tombstone changed terminal identity: %+v", r)
+		}
+	}
+	if ErrReceiptExpired.Error() != "command receipt response expired" || errors.Is(ErrReceiptExpired, ErrStaleWrite) || errors.Is(ErrReceiptExpired, ErrCommitOutcomeUnknown) {
+		t.Fatal("expiry must have a stable distinct sentinel")
 	}
 }

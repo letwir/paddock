@@ -1,0 +1,55 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S04",
+  "related_issue_ids": ["PDK-M06-S05", "PDK-M07-S03", "PDK-M07-S07"],
+  "runner": {"kind":"LOCAL","identity":"Main Runner","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc": "NOT_RECORDED",
+  "time_finish_utc": "2026-10-22T17:23:41Z",
+  "source": {"git_commit":"74750c3d5218fa3dc8f7082123402191def73086","git_tree":"UNAVAILABLE_DIRTY_WORKTREE","dirty":true,"dirty_diff_sha256":"UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE"},
+  "environment": {"go_version":"go1.27.3 android/arm64","db_version":"PostgreSQL major 18 confirmed by read-only preflight; minor version not retained"},
+  "targets": [
+    {"path":"internal/governance/domain/high_risk_authorization.go","sha256":"484c3f03d5091f5e816fbdc1aaf624abc9db4a075d9f1f243ac87b3298d356f4"},
+    {"path":"internal/governance/domain/high_risk_authorization_test.go","sha256":"f71b6eae26d0b1170f833961486de1338503c823283b8009beaf1680a585cbb3"},
+    {"path":"internal/governance/port/safety_gate_transaction.go","sha256":"0f9fb5d950bf7a7ce278a587ee8844b3e6e64a9cc00de17ce6b4b7468e4cbbe8"},
+    {"path":"internal/governance/application/safety_gate.go","sha256":"8629b7e4c2ff3462ba34caa21702353865bc35cef35992972d9618a48f7d59db"},
+    {"path":"internal/governance/application/safety_gate_test.go","sha256":"13fe020f033b7b0ae35ea4f5da79d0877b743ad65ebd3420a81d559c74fd23de"},
+    {"path":"internal/storage/postgres/safety_gate_transactor.go","sha256":"03c4163ac877887a542fc714164288eda96d5a018684ecf37c44bfa4cd3c1a31"},
+    {"path":"internal/storage/postgres/safety_gate_lease.go","sha256":"0af2c83fddbd3a9db19f66604bcfe44d8fa53e3dec196ab9e71e8a5e11f03567"},
+    {"path":"internal/storage/postgres/safety_gate_lease_test.go","sha256":"887f8b5e00a2585a68899649e687a2526d4af74cdbd169ef8fe8eb7c4bcb8c46"},
+    {"path":"internal/storage/postgres/integration_test.go","sha256":"ed78005290092c3975963de01ac96a85f414fc22e42e9cb64cb77260e93e95f3"},
+    {"path":"internal/storage/postgres/rollout_application_integration_test.go","sha256":"fee125fb34b50ec4b1bb8fb70fb2b6f52eaff2edc448f8e256fd328d965378fc"},
+    {"path":"sql/governance_safety_lease_api.sql","sha256":"a9b942adce1081d88de4b3c4dd9598cbae198ca87b739f941e711c454294e0bc"},
+    {"path":"sql/governance_safety_lease_api_down.sql","sha256":"502c7783b17aba4d101f30a1798f28b9e8b93552b469d6c4b368cc0baf897d00"},
+    {"path":"tests/test_m07_s04_safety_lease_api.py","sha256":"b37593c4329e914eb94e938611beba8b9f45b8e56256f888a5ec05302ca9525d"}
+  ],
+  "checks": [
+    {"command":"fresh inline Python/psql read-only preflight using approved PADDOCK_DB_URL and PADDOCK_APP_DB_URL; values not printed","exit_code":0,"result":"PASS; paddock_test/PostgreSQL major 18, expected migrator/app session identities, 15 tables and 15 existing APIs, app direct protected-table DML denied, domain_events schema_version present, WorkOrder tree index present, no matching fixtures, new validator absent, global security_epoch=3."},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off psql -X -q -v ON_ERROR_STOP=1 -f sql/governance_safety_lease_api.sql using PADDOCK_DB_URL as paddock_migrator","exit_code":0,"result":"PASS; approved additive migration applied once to paddock_test. Down migration not run."},
+    {"command":"read-only catalog readback of raw.safety_validate_current_lease and protected ACLs","exit_code":0,"result":"PASS; migrator-owned SECURITY DEFINER/fixed path, app EXECUTE only, PUBLIC/other EXECUTE denied, no app direct protected-table privileges, session guard, WorkOrder→Lease FOR SHARE, clock_timestamp and Attempt check present."},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags=integration ./internal/storage/postgres -run '^TestPostgresGovernanceIntegration/SafetyService receipts in rollback-only transaction$' -count=1 -v","exit_code":1,"result":"Build stopped before any body: openPullPool was not compiled because the paddock_test build tag was missing. No DB connection/test body ran."},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestPostgresGovernanceIntegration/SafetyService receipts in rollback-only transaction$' -count=1 -v","exit_code":0,"result":"PASS; the named M06 rollback-only SafetyService subtest ran once (1.044s parent); rollback readback reported receipts=0/events=0/outbox=0."},
+    {"command":"read-only pre-shared-test identity/Epoch/fixture check","exit_code":0,"result":"PASS; paddock_test/paddock_migrator; global security_epoch=3; matching shared fixture count=0."},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestRolloutApplicationAppOnlyIntegration$' -count=1 -v","exit_code":0,"result":"PASS; combined M07-S03/S07/S04 body ran once (2.936s)."},
+    {"command":"initial inline Python/psql read-only postflight wrapper","exit_code":1,"result":"Read-only false negative: checker expected boolean `t`; psql emitted text `true`. No mutation occurred in this query."},
+    {"command":"read-only postflight diagnostic and corrected exact-fixture/API/Security-Epoch postflight","exit_code":0,"result":"PASS; paddock_test/migrator identity; validator ACL valid; M06/shared scope/root/rollout/target/work/attempt/lease/slot/receipt/event/outbox/bundle fixture counts all zero; global security_epoch=4 (preflight 3 + 1). No rewind."},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain ./internal/governance/port ./internal/governance/application ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; targeted offline packages."},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go vet ./internal/governance/domain ./internal/governance/port ./internal/governance/application ./internal/storage/postgres","exit_code":0,"result":"PASS."},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_m03_s04_safety_api_migration tests.test_m04_rollout_api tests.test_m07_rollout_deadlines_sql tests.test_m07_s04_safety_lease_api -v","exit_code":0,"result":"PASS; 33 static SQL/API tests."},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^$' -count=1","exit_code":0,"result":"PASS; compile-only; no test bodies ran."},
+    {"command":"gofmt -d on changed Go sources; git diff --check","exit_code":0,"result":"PASS."},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues / 152 edges."}
+  ],
+  "independent_review": {
+    "kind":"Separate read-only Verifier subagent",
+    "result":"No findings.",
+    "scope":"Reviewed the complete 13-file S04 source, Domain authorization, transaction boundary, SQL API/ACL/locks, M06 rollback-only fixture and shared S03/S07 fixture/cleanup.",
+    "limitations":"No DB access or integration-body execution; no CI attestation."
+  },
+  "verdict":"LOCAL RUNNER PASS; FINAL-HASH M06/S03/S07/S04 ACCEPTANCE OBSERVED; MAIN D-016 RECONCILIATION PENDING",
+  "remaining_risks":[
+    "Migration is applied only to isolated paddock_test; down was not run. The global test Security Epoch permanently advanced 3→4 as explicitly approved and was not rewound.",
+    "Evidence is local to paddock_test/PostgreSQL major 18; no CI attestation, production behavior, external side effect, deployed Gateway or TOCTOU elimination is claimed.",
+    "M06-S05, M07-S03, M07-S07 and M07-S04 require Main D-016 reconciliation of current Runner evidence and separate review before DONE.",
+    "The worktree is broadly dirty; a complete worktree diff hash is unavailable."
+  ]
+}

@@ -24,6 +24,105 @@ type safetyFake struct {
 	operations                                            []string
 }
 
+func newHoldExtendFixture(t *testing.T) (*SafetyService, *monitoringTxFake, HoldExtendRequest) {
+	t.Helper()
+	monitor, tx, record := newMonitoringFixture(t)
+	record.Gate.Checks = nil
+	if _, err := monitor.RecordDecision(context.Background(), record); err != nil {
+		t.Fatal(err)
+	}
+	safety, _, keys := safetyFixture(t, domain.ScopeActive)
+	safety.transactor = tx
+	q := HoldExtendRequest{CommandID: "extend", Nonce: "extension-nonce", Scope: tx.scope.ScopeID, Rollout: tx.rollout.ID, ExpectedSecurityEpoch: tx.scope.SecurityEpoch, ExpectedDecisionRevision: 1}
+	message, err := domain.HoldExtendApprovalMessage(rolloutDomain(tx.scope, tx.rollout), q.ExpectedSecurityEpoch, q.CommandID, q.Nonce, domain.MonitoringExtendedCap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		q.Signatures = append(q.Signatures, domain.SafetySignature{SignerID: string(rune('a' + i)), Signature: ed25519.Sign(keys[i], message)})
+	}
+	return safety, tx, q
+}
+
+func TestSafetyHoldExtendCurrentRevisionAndReplay(t *testing.T) {
+	svc, tx, q := newHoldExtendFixture(t)
+	oldEpoch, oldRevision := tx.scope.SecurityEpoch, tx.rollout.Monitoring.DecisionRevision
+	out, err := svc.HoldExtend(context.Background(), q)
+	if err != nil || !out.Monitoring.ExtensionUsed || out.Monitoring.HoldBudget != domain.MonitoringExtendedCap || out.Monitoring.DecisionRevision != oldRevision || tx.scope.SecurityEpoch != oldEpoch {
+		t.Fatal(out, err)
+	}
+	if len(tx.events) != 2 || tx.events[1].Type() != "MonitoringHoldExtended" || len(tx.receipts) != 2 {
+		t.Fatal("missing atomic extension receipt/event")
+	}
+	if replay, err := svc.HoldExtend(context.Background(), q); err != nil || !reflect.DeepEqual(replay, out) || len(tx.events) != 2 {
+		t.Fatal("extension replay changed state", err)
+	}
+	q.CommandID = "extend-again"
+	if _, err := svc.HoldExtend(context.Background(), q); err == nil || tx.rollout.Monitoring.HoldBudget != domain.MonitoringExtendedCap || len(tx.events) != 2 {
+		t.Fatal("second extension accepted", err)
+	}
+}
+
+func TestSafetyHoldExtendRejectsStaleExpiredAndInvalidQuorum(t *testing.T) {
+	for _, change := range []string{"stale revision", "rerecorded equal time", "expired", "duplicate signer", "invalid signature", "one signer", "security epoch"} {
+		t.Run(change, func(t *testing.T) {
+			svc, tx, q := newHoldExtendFixture(t)
+			switch change {
+			case "stale revision":
+				q.ExpectedDecisionRevision = 0
+			case "rerecorded equal time":
+				tx.rollout.Monitoring.DecisionRevision++
+				q.ExpectedDecisionRevision++
+			case "expired":
+				tx.now = tx.rollout.Monitoring.HoldDeadline
+			case "duplicate signer":
+				q.Signatures[1] = q.Signatures[0]
+			case "invalid signature":
+				q.Signatures[1].Signature[0] ^= 1
+			case "one signer":
+				q.Signatures = q.Signatures[:1]
+			case "security epoch":
+				q.ExpectedSecurityEpoch++
+			}
+			old := tx.rollout
+			if _, err := svc.HoldExtend(context.Background(), q); err == nil {
+				t.Fatal("invalid approval accepted")
+			}
+			if !reflect.DeepEqual(old, tx.rollout) || len(tx.events) != 1 {
+				t.Fatal("denied approval changed monitoring")
+			}
+		})
+	}
+}
+
+func TestSafetyHoldExtendAtomicFailuresAndUnknownCommit(t *testing.T) {
+	for _, operation := range []string{"DB clock", "rollout CAS", "MonitoringHoldExtended", "receipt", "commit"} {
+		t.Run(operation, func(t *testing.T) {
+			svc, tx, q := newHoldExtendFixture(t)
+			old := tx.rollout
+			tx.fail = operation
+			if operation == "commit" {
+				tx.commitErr = tx.cause
+			}
+			if _, err := svc.HoldExtend(context.Background(), q); !errors.Is(err, tx.cause) {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tx.rollout, old) || len(tx.events) != 1 || len(tx.receipts) != 1 {
+				t.Fatal("partial extension persisted")
+			}
+		})
+	}
+	svc, tx, q := newHoldExtendFixture(t)
+	tx.commitErr = errors.Join(port.ErrCommitOutcomeUnknown, tx.cause)
+	if _, err := svc.HoldExtend(context.Background(), q); !errors.Is(err, port.ErrCommitOutcomeUnknown) {
+		t.Fatal(err)
+	}
+	tx.commitErr = nil
+	if out, err := svc.HoldExtend(context.Background(), q); err != nil || out.Monitoring.DecisionRevision != 1 || len(tx.events) != 2 {
+		t.Fatal("unknown extension replay reapplied", err)
+	}
+}
+
 func TestSafetyRequestDigestUsesJCSCanonicalPayload(t *testing.T) {
 	first, err := domain.NewCanonicalRequest("command", "nonce", []byte(`{"action":"EMERGENCY_STOP","scope":"scope"}`))
 	if err != nil {
@@ -364,5 +463,102 @@ func TestSafetyRequestDigestSignatureOrderAndContent(t *testing.T) {
 	}
 	if a == b || a == c {
 		t.Fatal("signature order/content omitted from digest")
+	}
+}
+
+func TestSafetyNegativeReceiptsPreserveAuthorizationAndReplay(t *testing.T) {
+	for _, action := range []domain.SafetyAction{domain.SafetyActionStop, domain.SafetyActionRelease} {
+		t.Run(string(action), func(t *testing.T) {
+			mode := domain.ScopeActive
+			if action == domain.SafetyActionRelease {
+				mode = domain.ScopeSafeStop
+			}
+			s, f, _ := safetyFixture(t, mode)
+			activation := domain.AuthorityState{Scope: f.snapshot.ScopeID, ScopeActivationEpoch: f.snapshot.ActivationEpoch + 1, SecurityEpoch: f.snapshot.SecurityEpoch + 1, Mode: domain.ScopeActive, DatabaseAvailable: true, Roots: f.snapshot.Roots}
+			nonce := "negative-nonce"
+			invoke := func() error {
+				if action == domain.SafetyActionStop {
+					_, err := s.Stop(context.Background(), "scope", 7, "negative-safety", nonce, nil)
+					return err
+				}
+				_, err := s.Release(context.Background(), "scope", 7, "negative-safety", nonce, activation, nil)
+				return err
+			}
+			first := invoke()
+			if CommandErrorResponse(first).Code != "FORBIDDEN" || !errors.Is(first, domain.ErrInvalidApproval) || f.scopeCalls != 0 || f.epochCalls != 0 || len(f.events) != 0 {
+				t.Fatalf("authorization changed: %v %+v", first, f)
+			}
+			original := f.receipts["negative-safety"]
+			if original.Status != "REJECTED" || len(original.Response) == 0 {
+				t.Fatalf("denial not persisted: %+v", original)
+			}
+			// A negative replay never becomes authorized because current state or
+			// quorum circumstances changed. It does not need a state transition.
+			f.lockErr = domain.ErrDatabaseUnavailable
+			if second := invoke(); !reflect.DeepEqual(CommandErrorResponse(first), CommandErrorResponse(second)) {
+				t.Fatalf("unstable negative replay: %v", second)
+			}
+			nonce = "modified-nonce"
+			if err := invoke(); CommandErrorResponse(err).Code != "COMMAND_ID_CONFLICT" {
+				t.Fatalf("modified Safety payload accepted: %v", err)
+			}
+			expired := original
+			expired.Expired, expired.Response = true, []byte(port.ReceiptTombstoneResponse)
+			f.receipts["negative-safety"] = expired
+			if err := invoke(); errors.Is(err, port.ErrReceiptExpired) || CommandErrorResponse(err).Code != "COMMAND_ID_CONFLICT" {
+				t.Fatalf("expiry hid conflict: %v", err)
+			}
+			nonce = "negative-nonce"
+			if err := invoke(); !errors.Is(err, port.ErrReceiptExpired) {
+				t.Fatalf("expired denial not returned: %v", err)
+			}
+			if !reflect.DeepEqual(f.receipts["negative-safety"], expired) || !reflect.DeepEqual(f.operations, []string{"receipt"}) {
+				t.Fatal("Safety denial replay mutated state or reused command ID")
+			}
+		})
+	}
+}
+
+func TestSafetySuccessfulReceiptExpiryDoesNotReapplyTransition(t *testing.T) {
+	s, f, keys := safetyFixture(t, domain.ScopeActive)
+	id, sigs := signSafety(t, keys, domain.SafetyActionStop, f.snapshot, "expired-stop", "nonce", nil)
+	if _, err := s.Stop(context.Background(), "scope", 7, id, "nonce", sigs); err != nil {
+		t.Fatal(err)
+	}
+	r := f.receipts[id]
+	r.Expired, r.Response = true, []byte(port.ReceiptTombstoneResponse)
+	f.receipts[id] = r
+	if _, err := s.Stop(context.Background(), "scope", 7, id, "nonce", sigs); !errors.Is(err, port.ErrReceiptExpired) {
+		t.Fatal(err)
+	}
+	if f.scopeCalls != 1 || f.epochCalls != 1 || len(f.events) != 1 || !reflect.DeepEqual(f.receipts[id], r) {
+		t.Fatal("expired success was reapplied")
+	}
+}
+
+func TestSafetyMalformedActivationReceiptBindsCompleteRejectedPayload(t *testing.T) {
+	s, f, _ := safetyFixture(t, domain.ScopeSafeStop)
+	activation := domain.AuthorityState{Scope: "scope"} // no valid mode or Roots
+	invoke := func() error {
+		_, err := s.Release(context.Background(), "scope", 7, "malformed-activation", "nonce", activation, nil)
+		return err
+	}
+	first := invoke()
+	if !errors.Is(first, domain.ErrInvalidApproval) || CommandErrorResponse(first).Code != "FORBIDDEN" {
+		t.Fatalf("invalid activation accepted: %v", first)
+	}
+	original := f.receipts["malformed-activation"]
+	if original.Status != "REJECTED" || f.scopeCalls != 0 || f.epochCalls != 0 {
+		t.Fatal("malformed activation affected authority")
+	}
+	if second := invoke(); !reflect.DeepEqual(CommandErrorResponse(first), CommandErrorResponse(second)) {
+		t.Fatal("malformed activation denial did not replay")
+	}
+	activation.SecurityEpoch++
+	if err := invoke(); CommandErrorResponse(err).Code != "COMMAND_ID_CONFLICT" {
+		t.Fatalf("malformed activation payload was not bound: %v", err)
+	}
+	if !reflect.DeepEqual(f.receipts["malformed-activation"], original) {
+		t.Fatal("modified activation replaced terminal denial")
 	}
 }

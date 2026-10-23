@@ -1,0 +1,89 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S06",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-22T04:05:19Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE",
+    "target_manifest_sha256": "77f133e5b7c7206ccb3ade0c8acbc973ac530a1499747ca2147636f3e2a0c58a"
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "PostgreSQL 18.6 (server_version_num=180006; paddock_test)"
+  },
+  "targets": [
+    {"path":"internal/governance/domain/monitoring.go","sha256":"24c4e1f82ec88274661ea7a99dbde44037190bc76d011b650d26df94d7a23487"},
+    {"path":"internal/governance/domain/monitoring_test.go","sha256":"1ba4d510551a9790e2ff54eb8cd102ce5f11171cb37489db7665becbce2a6a99"},
+    {"path":"internal/governance/domain/rollout_test.go","sha256":"6264c6e3db3c6be2c537b4557679b252728b2723b257732245f92d8a3773a29a"},
+    {"path":"internal/governance/domain/safety_quorum.go","sha256":"735186f8a7185cd37ac87630874d3de466eceb5177da52e8f10a96e6a2cb69a9"},
+    {"path":"internal/governance/domain/safety_quorum_test.go","sha256":"26b138e44149de51d95d6a16e448fbe1f108011d8d667308dec6acbbcd10e99e"},
+    {"path":"internal/governance/port/transaction.go","sha256":"5866971a8458797ee9a4c3b2b258bbdccd0db31c1af371f56350b051ddf8d2d9"},
+    {"path":"internal/governance/port/transaction_test.go","sha256":"d8da648709b04313ac7ceb3c1156e690d571dcbe57aae05847bc1c97e39b6179"},
+    {"path":"internal/governance/port/rollout_deadline.go","sha256":"e5c94560b4f62db7aaa4d22a26098032ca9c7c54598e757c64d62aef593d5e83"},
+    {"path":"internal/governance/port/rollout_deadline_test.go","sha256":"f899eaf9d7a52819ccb750fa11630a264e49e7a868127875562d0422e53b0dfe"},
+    {"path":"internal/governance/application/safety.go","sha256":"14d1c3414a524c4e38a9a510d34b345f9821a5210e2b4bba6e801d3014ced3dd"},
+    {"path":"internal/governance/application/safety_test.go","sha256":"cc10d9846d37e2c9f79db43b8758abc2280767c41b6f7e7d25fdb4b36382ac1b"},
+    {"path":"internal/governance/application/rollout_service.go","sha256":"abc519259a0f259d3d7c67404e6e89c273236c556647594f8f2e8355e9ad4816"},
+    {"path":"internal/governance/application/rollout_service_test.go","sha256":"4c11646e1653398d3ff5317ca17a353bd1561c032744bfaf114dbb86913d6aa2"},
+    {"path":"internal/governance/application/monitoring_service.go","sha256":"d7bcb38eeb80d36b8cfd5108c658093e0896302700640b94886c84d176b921c7"},
+    {"path":"internal/governance/application/monitoring_service_test.go","sha256":"572da8f92892a9f855018e82d429c4debe152abfb66a5071289b38d833cd712c"},
+    {"path":"internal/governance/application/rollout_deadline_reaper.go","sha256":"883992ae4ec6da7537a03babdd50da97e1d041fcbac23dde55d2220806eaef91"},
+    {"path":"internal/governance/application/rollout_deadline_reaper_test.go","sha256":"bfc199b6a8cd9d2fb79d15cf962b6e96ed087e2deb68ad0c68092f2fdeae4a98"},
+    {"path":"internal/storage/postgres/rollout_governance_tx.go","sha256":"1e6a813b3c8e55adef012e384c53537a64b975196740635847a83953ad7840a9"},
+    {"path":"internal/storage/postgres/rollout_governance_tx_test.go","sha256":"13c094fb94c0e6924af9dd63a97bcb367dfb6ab1caa34efa9e7f49ce2bf35e65"},
+    {"path":"internal/storage/postgres/rollout_transactor.go","sha256":"28a603ed2c88df26c77e7fd9558c9cd768cbc395f5cac310fdb720d7e735a7d4"},
+    {"path":"internal/storage/postgres/rollout_deadline_store.go","sha256":"d1d838e7ab3238919535c5329b82d3303aea39350506b7e0c133dada43430b4f"},
+    {"path":"internal/storage/postgres/rollout_deadline_store_test.go","sha256":"e05e731fbe68fcbeeb8ba1a5b6fa17679d551a01b43581f43a83306209f58cf8"},
+    {"path":"internal/storage/postgres/rollout_deadline_integration_test.go","sha256":"61f9110e79210a5e2cfe0ca3e239891b6c2e1013be91e42f2d8b8e3ccc027515"},
+    {"path":"sql/governance_rollout_api.sql","sha256":"644f99eb904e261d53a760dfa64babbf17a0e8dabd817482dcdc29f4400ac53f"},
+    {"path":"sql/governance_rollout_deadlines.sql","sha256":"4d75769a903dded638fb14ce8cd0e7560f408bed96f0bd9485dc8cb8f784cd78"},
+    {"path":"sql/governance_rollout_deadlines_down.sql","sha256":"b4a56fe55678bb818af235c35cbc8cbd8fabdf0eec8ac8991aef90fc27fab673"},
+    {"path":"tests/test_m07_rollout_deadlines_sql.py","sha256":"4200107ee282d0ec93fa3f43675a08d4cb4e3ed940900ddd60cf4c486e988fcd"}
+  ],
+  "checks": [
+    {"command":"go test ./internal/governance/domain ./internal/governance/port ./internal/governance/application ./internal/storage/postgres -count=20 -shuffle=on (final after fixture correction)","exit_code":0,"result":"PASS"},
+    {"command":"go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS"},
+    {"command":"go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_m04_rollout_api.py' -q","exit_code":0,"result":"PASS (7 tests)"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_m07_rollout_deadlines_sql.py' -q","exit_code":0,"result":"PASS (12 tests)"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL go test -tags='integration paddock_test rollout_concurrency' -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; no test bodies ran"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q","exit_code":0,"result":"PASS (218 tests)"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS (89 issues, 152 edges)"},
+    {"command":"git diff --check plus target gofmt/trailing-whitespace scan","exit_code":0,"result":"PASS"},
+    {"command":"diff of current SafetyApprovalMessage source against HEAD extraction","exit_code":0,"result":"byte-identical"},
+    {"command":"Initial focused governance run after revision validation change, before fixture correction","exit_code":1,"result":"FAIL; TestCompletedRolloutRequiresFreshPass fixture had a nonempty Decision at revision zero; fixture corrected to revision one and final focused/full suites passed"},
+    {"command":"scripts/init_test_db.sh --check","exit_code":0,"result":"Read-only: paddock_test PostgreSQL 18.6, raw_relations=77; no DDL"},
+    {"command":"Read-only PADDOCK_DB_URL/PADDOCK_APP_DB_URL identity, role, owner, privilege, legacy-row, column, and prerequisite-function preflight (credential values not displayed)","exit_code":0,"result":"paddock_test/paddock_migrator and paddock_test/paddock_app identities verified; non-elevated roles, zero memberships, migrator table ownership, no app direct write privileges, zero incompatible monitoring rows/columns, all required prior APIs present and executable by app"},
+    {"command":"psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_rollout_api.sql","exit_code":0,"result":"BEGIN/COMMIT; source hash matched 644f99eb904e261d53a760dfa64babbf17a0e8dabd817482dcdc29f4400ac53f"},
+    {"command":"psql \"$PADDOCK_DB_URL\" -X -v ON_ERROR_STOP=1 -f sql/governance_rollout_deadlines.sql","exit_code":0,"result":"BEGIN/COMMIT; source hash matched 4d75769a903dded638fb14ce8cd0e7560f408bed96f0bd9485dc8cb8f784cd78"},
+    {"command":"go test -tags='integration paddock_test' -run '^(TestRolloutMonitoringRoundtripIntegration|TestRolloutFullFieldStaleCASIntegration|TestRolloutDeadlineOrderingAndBoundsIntegration|TestRolloutConcurrentReaperCleanupIntegration)$' -count=1 -v ./internal/storage/postgres","exit_code":0,"result":"PASS; all four named PostgreSQL test bodies passed (67.524s)"},
+    {"command":"Read-only migrator/app identity, 14-column + validated constraint/index, four-function owner/SECURITY DEFINER/search_path/EXECUTE, no direct app writes, fixture/bundle cleanup readback","exit_code":0,"result":"PASS; paddock_test PostgreSQL 18.6; all four functions migrator-owned, SECURITY DEFINER, fixed search_path=pg_catalog, app EXECUTE and no PUBLIC/other-role grants; direct app writes NONE; all fixture counts and m07_test bundles zero; app identity paddock_app"}
+  ],
+  "independent_review": {
+    "kind":"Separate read-only Verifier subagent",
+    "result":"No findings",
+    "scope":"Final Stage 2/Stage 3 source, SQL, and tests",
+    "limitations":"This review was source-only and preceded the separately approved DB run. No CI attestation"
+  },
+  "runtime_independent_review": {
+    "kind":"Separate read-only Verifier subagent",
+    "result":"No findings",
+    "scope":"Runner migration exit codes, named integration results, read-only catalog/cleanup observations, and Issue acceptance reconciliation",
+    "limitations":"Verifier did not connect to or query the database; it reviewed the recorded Runner evidence and test/migration source. No CI or Verifier-of-Record attestation"
+  },
+  "verdict": "LOCAL_D016_VERIFIED; NO_CI_ATTESTATION",
+  "remaining_risks": [
+    "No CI or Verifier-of-Record attestation is claimed.",
+    "Runtime evidence is local to paddock_test PostgreSQL 18.6 and does not establish behavior on other servers/environments.",
+    "Worktree was already dirty with unrelated/pre-existing changes; full dirty-tree hash unavailable."
+  ]
+}

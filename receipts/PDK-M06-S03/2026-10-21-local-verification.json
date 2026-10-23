@@ -1,0 +1,108 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S03",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_utc": "2026-10-21T10:16:42.827102+00:00",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go version go1.27.1 android/arm64",
+    "python_version": "3.14.6"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/shadow_replay.go",
+      "sha256": "03aa75849f32fa1ae5bdda72cb33b52c70bf1d6155ce61edc2007fc35d2537e7"
+    },
+    {
+      "path": "internal/governance/domain/shadow_replay_test.go",
+      "sha256": "4c6434cce8fd62afb3a0a7428f6bfeb5bb8b6ff04c27f92b0f7d452105aa0cb7"
+    },
+    {
+      "path": "internal/governance/domain/testdata/shadow_replay_cases.json",
+      "sha256": "bbb724b8cd5c197928525d2df2e240360b8c5a3ada272f58cff598ad233669ad"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused M06-S03 tests",
+      "command": "go test ./internal/governance/domain -run ^TestShadowReplay -count=2",
+      "exit_code": 0,
+      "stdout_sha256": "bf639fe3c4261d05a4878e9b0e23040eead11650d8c8a7178880fb195616bafb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "full offline Go tests",
+      "command": "go test ./... -count=1 -shuffle=on",
+      "exit_code": 0,
+      "stdout_sha256": "077de432aae5303ab3726cbaad791ca17638beb3da71cf7d782d8194a65019b2",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "full Go vet",
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "fixture JSON schema/count",
+      "command": "python3 -B -c import json,pathlib; x=json.loads(pathlib.Path(\"internal/governance/domain/testdata/shadow_replay_cases.json\").read_text()); assert len(x)==32 and {c[\"want\"][\"outcome\"] for c in x}=={\"PASS\",\"FAIL\",\"HOLD\",\"ABORT\"}; print(\"fixture cases=32 outcomes=PASS,FAIL,HOLD,ABORT\")",
+      "exit_code": 0,
+      "stdout_sha256": "fb044c5d37877b5e053baf1bccae2aac8a904a471e305efa8b64ecbb50dd1ef1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "gofmt check",
+      "command": "gofmt -d internal/governance/domain/shadow_replay.go internal/governance/domain/shadow_replay_test.go",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "design lint",
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "stdout_sha256": "ae2a50c42d84b95361ba7ddd5f2dde1e51b263bfa90bddb8aca0e10741c1d77f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "diff check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "No findings.",
+    "reviewed_paths": [
+      "internal/governance/domain/shadow_replay.go",
+      "internal/governance/domain/shadow_replay_test.go",
+      "internal/governance/domain/testdata/shadow_replay_cases.json"
+    ],
+    "execution": "review only; no tests or DB actions"
+  },
+  "verdict": "PASS_FOR_SELECTED_PURE_DOMAIN_SCOPE",
+  "remaining_risks": [
+    "Evidence inputs are explicit fixture assertions; no cryptographic verification or operational Sybil detection is implemented or claimed.",
+    "No DB, external runtime, CI, or Verifier-of-Record execution; local evidence only.",
+    "Unrelated existing dirty worktree was preserved; full overlay hash not captured."
+  ]
+}

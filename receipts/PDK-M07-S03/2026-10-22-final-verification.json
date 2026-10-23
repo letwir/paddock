@@ -1,0 +1,75 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S03",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_RECORDED",
+  "time_finish_utc": "2026-10-22T10:49:30Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE"
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "PostgreSQL major 18 confirmed by read-only preflight; minor version not retained"
+  },
+  "targets": [
+    {
+      "path": "internal/storage/postgres/rollout_application_integration_test.go",
+      "sha256": "7e202b36c8db8a13a4fdee83104b1d647ecb23e48bf9384b88e45521bc894332"
+    }
+  ],
+  "checks": [
+    {
+      "command": "approved target check: sha256sum internal/storage/postgres/rollout_application_integration_test.go; git rev-parse HEAD",
+      "exit_code": 0,
+      "result": "PASS; current source hash and target revision matched the exact approval."
+    },
+    {
+      "command": "fresh inline Python/psql read-only preflight using PADDOCK_DB_URL and PADDOCK_APP_DB_URL without printing values",
+      "exit_code": 0,
+      "result": "PASS; database=paddock_test; PostgreSQL major 18; migrator/app roles verified; 3 required fixed-path APIs verified; app direct DML denied; 0 matching pre-existing rollout fixtures."
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestRolloutApplicationAppOnlyIntegration$' -count=1 -v",
+      "exit_code": 0,
+      "result": "PASS; exactly the named integration body ran once against the current target hash (2.681s)."
+    },
+    {
+      "command": "inline Python/psql read-only exact-fixture postflight",
+      "exit_code": 0,
+      "result": "PASS; exact scope/root/rollout/target/receipt/event/outbox/bundle fixture counts all 0; target database and migrator session identity verified."
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^$' -count=1",
+      "exit_code": 0,
+      "result": "PASS; compile-only, no tests ran."
+    },
+    {
+      "command": "test -z \"$(gofmt -d internal/storage/postgres/rollout_application_integration_test.go)\" && git diff --check -- internal/storage/postgres/rollout_application_integration_test.go",
+      "exit_code": 0,
+      "result": "PASS; no formatting or whitespace errors."
+    }
+  ],
+  "independent_review": {
+    "kind": "Separate read-only Verifier subagent",
+    "result": "No actionable findings on the current source.",
+    "scope": "Reviewed PDK-M07-S03 acceptance and the current test's exact active-rollout count, original MONITORING row, unchanged Scope slot/epoch, and absent blocked rollout/target/event checks.",
+    "limitations": "Verifier did not access the database or run the test body. No CI or Verifier-of-Record attestation is claimed."
+  },
+  "related_receipts": [
+    "receipts/PDK-M07-S03/2026-10-22-local-source-verification.json",
+    "receipts/PDK-M07-S03/2026-10-22-db-run-and-source-followup.json"
+  ],
+  "verdict": "LOCAL ACCEPTANCE CHECKS PASS; D-016 MAIN RECONCILIATION PENDING",
+  "remaining_risks": [
+    "Evidence is local to the isolated paddock_test environment; no CI attestation, production behavior, or Verifier-of-Record is claimed.",
+    "The worktree is broadly dirty and untracked; a complete target-tree/diff hash is unavailable."
+  ]
+}

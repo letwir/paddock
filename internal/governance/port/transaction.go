@@ -12,6 +12,26 @@ import (
 
 var ErrStaleWrite = errors.New("stale governance snapshot")
 
+// ErrReceiptExpired is returned only after the saved request digest matches.
+// It never permits command ID reuse; the original terminal status is retained.
+var ErrReceiptExpired = errors.New("command receipt response expired")
+
+// ReceiptTombstoneResponse is the permanent payload-free retention marker. The
+// fixed SQL API writes these exact UTF-8 bytes, without changing status/digest.
+const ReceiptTombstoneResponse = `{"schema_version":"paddock.command-response/1","kind":"EXPIRED","code":"RECEIPT_EXPIRED","detail":"The command response retention period has expired; this command ID cannot be reused."}`
+
+// ErrCommitOutcomeUnknown marks a Commit attempt whose outcome cannot be
+// established. Errors carrying it must preserve the underlying cause and never be
+// automatically retried, including when that cause exposes an abort SQLSTATE.
+// Reconcile the durable receipt using the same command ID instead.
+var ErrCommitOutcomeUnknown = errors.New("governance commit outcome unknown")
+
+// ErrTransactionRolledBack means the Transactor confirmed rollback or the
+// server explicitly reported an aborted transaction. SQLSTATE alone outside
+// that boundary is not proof of rollback. The original cause must be preserved;
+// ErrCommitOutcomeUnknown takes precedence if both markers are present.
+var ErrTransactionRolledBack = errors.New("governance transaction rolled back")
+
 // ScopeSnapshot is the persisted Scope plus all same-scope Root authority rows
 // and the global Security Epoch observed under the transaction's locks.
 type ScopeSnapshot struct {
@@ -24,13 +44,15 @@ type ScopeSnapshot struct {
 	Roots           map[domain.RootID]domain.RootAuthority
 }
 
-// CommandReceipt is a completed durable command outcome. Only SUCCEEDED
-// receipts with a valid response may be returned by LookupCommandReceipt.
+// CommandReceipt is a completed durable SUCCEEDED or REJECTED command outcome.
+// Lookup may replace the body with a permanent tombstone at the half-open
+// 365-day DB-clock deadline. Consumers must compare RequestDigest before Expired.
 type CommandReceipt struct {
 	CommandID     string
 	RequestDigest domain.Digest
 	Status        string
 	Response      []byte
+	Expired       bool
 }
 
 // RolloutTargetSnapshot is one persisted rollout target row.
@@ -52,12 +74,16 @@ type RolloutSnapshot struct {
 	BaseSecurityEpoch   domain.Epoch
 	RollbackFrom        *domain.RolloutState
 	Targets             map[domain.RootID]RolloutTargetSnapshot
+	Monitoring          domain.MonitoringWindow
 }
 
 // Transactor executes fn within one transaction. The Transactor owns commit and
 // rollback: an error returned by fn must roll back the transaction, and commit
 // or transaction errors must be propagated to the caller. The callback must not
 // retain or use its GovernanceTx after fn returns.
+// Confirmed rollbacks and known server aborts carry ErrTransactionRolledBack.
+// Failed rollbacks must not add that marker. Uncertain Commit errors instead
+// carry ErrCommitOutcomeUnknown. All errors preserve the original cause.
 type Transactor interface {
 	WithinTransaction(ctx context.Context, fn func(GovernanceTx) error) error
 }
@@ -73,13 +99,18 @@ type GovernanceTx interface {
 	// externally supplied signer ID/signature atomically. It performs no key
 	// verification or signing.
 	InsertPolicyBundle(ctx context.Context, bundle domain.CanonicalBundle, signerKeyID string, signature []byte) error
-	// DatabaseTime returns PostgreSQL wall-clock time within this transaction.
-	// Callers must use it, rather than a worker-supplied timestamp, for deadlines.
+	// DatabaseTime returns a fresh PostgreSQL clock_timestamp() observation
+	// within this transaction, after the caller's state locks. It is not cached
+	// transaction-start time (now()/transaction_timestamp()). Callers use this,
+	// rather than a worker-supplied timestamp, for all monitoring deadlines.
 	DatabaseTime(ctx context.Context) (time.Time, error)
 	LockScope(ctx context.Context, scopeID domain.ScopeID) (ScopeSnapshot, error)
 	LockRollout(ctx context.Context, scopeID domain.ScopeID, rolloutID domain.RolloutID) (RolloutSnapshot, error)
 	ValidateTargets(ctx context.Context, scopeID domain.ScopeID, targets []domain.RootID) error
 	CompareAndSwapScope(ctx context.Context, expected, next ScopeSnapshot) error
+	// CompareAndSwapRollout compares the entire locked expected snapshot,
+	// including all monitoring fields and DecisionRevision. A stale or missing
+	// row returns ErrStaleWrite. Never implement this as an unconditional update.
 	CompareAndSwapRollout(ctx context.Context, expected, next RolloutSnapshot) error
 	CompareAndSwapSecurityEpoch(ctx context.Context, expected, next domain.Epoch) error
 	LookupCommandReceipt(ctx context.Context, commandID string) (CommandReceipt, bool, error)

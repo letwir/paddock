@@ -1,0 +1,67 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S07",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_RECORDED",
+  "time_finish_utc": "2026-10-22T11:31:33Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE"
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/storage/postgres/rollout_application_integration_test.go",
+      "sha256": "b3155789e97eef41114effa767c7813c6bc42f70bad37804be650945ffc1cb37"
+    }
+  ],
+  "checks": [
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^$' -count=1",
+      "exit_code": 0,
+      "result": "PASS; compile-only, no test bodies ran and no DB variables were available."
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/application ./internal/governance/domain ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; application, domain, and postgres offline unit/package tests."
+    },
+    {
+      "command": "test -z \"$(gofmt -d internal/storage/postgres/rollout_application_integration_test.go)\" && git diff --check -- internal/storage/postgres/rollout_application_integration_test.go",
+      "exit_code": 0,
+      "result": "PASS; format and whitespace checks."
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues / 152 dependency edges."
+    }
+  ],
+  "plan_audit": {
+    "kind": "Separate read-only PRE_VERIFY auditor",
+    "result": "PASS on one-file scope, grant checks, competing Rollback outcome, exact cleanup, accepted single-transaction boundary, and separate S03 re-verification requirement."
+  },
+  "independent_review": {
+    "kind": "Separate read-only Verifier subagent",
+    "result": "No findings on the current source.",
+    "scope": "Reviewed Root A/B Gate checks, two-command Rollback competition, winner-only effects, global Safety Stop behavior, fixture IDs/cleanup, and S03 preservation.",
+    "limitations": "No database access or integration body execution. Main's compile-only/unit/package checks are not DB runtime evidence."
+  },
+  "verdict": "IMPLEMENTED; LOCAL SOURCE CHECKS AND REVIEWS PASS; DATABASE BODY NOT_RUN",
+  "remaining_risks": [
+    "A fresh exact current-task approval is required before the named DB body; it persists one global security_generation.security_epoch increment in paddock_test and does not rewind it.",
+    "PDK-M07-S03 shares this integration source and remains reopened pending current-hash DB re-verification.",
+    "No CI attestation, deployed network Gateway, external side-effect atomicity, or TOCTOU elimination is claimed.",
+    "The worktree is broadly dirty; a complete diff hash is unavailable."
+  ]
+}

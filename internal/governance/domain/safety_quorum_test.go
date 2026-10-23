@@ -1,10 +1,215 @@
 package domain
 
 import (
+	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"fmt"
 	"math"
+	"reflect"
 	"testing"
+	"time"
 )
+
+func signHoldExtend(t *testing.T, r PolicyRollout, ids []string, keys []ed25519.PrivateKey) []SafetySignature {
+	t.Helper()
+	msg, err := HoldExtendApprovalMessage(r, r.BaseSecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := make([]SafetySignature, len(ids))
+	for i, id := range ids {
+		out[i] = SafetySignature{id, ed25519.Sign(keys[i], msg)}
+	}
+	return out
+}
+
+func TestHoldExtendQuorumOneShotAndCumulativeCap(t *testing.T) {
+	q, ids, keys, _ := safetyFixture(t)
+	s, r, start := monitoringFixture(t)
+	// Consume a closed episode first: extension must not reset that usage.
+	r = recordMonitoring(t, r, DecisionHold, start.Add(time.Hour))
+	r = recordMonitoring(t, r, DecisionPass, start.Add(7*time.Hour))
+	r = recordMonitoring(t, r, DecisionHold, start.Add(10*time.Hour))
+	before := r
+	for _, count := range []int{2, 3} {
+		sigs := signHoldExtend(t, r, ids[:count], keys[:count])
+		out, err := q.HoldExtend(s, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, sigs, start.Add(11*time.Hour))
+		if err != nil || out.Validate() != nil {
+			t.Fatal(err)
+		}
+		m := out.Monitoring
+		if !m.ExtensionUsed || m.HoldBudget != 48*time.Hour || m.HoldUsed != 6*time.Hour || m.ExtensionCommandID != "extend-1" || m.ExtensionNonce != "nonce-1" || !m.HoldDeadline.Equal(start.Add(52*time.Hour)) || m.ObservationDeadline != r.Monitoring.ObservationDeadline {
+			t.Fatal(m)
+		}
+		if got, err := q.HoldExtend(s, out, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, sigs, start.Add(12*time.Hour)); err == nil || !reflect.DeepEqual(got, out) {
+			t.Fatal("extension replay accepted")
+		}
+		if got, err := q.HoldExtend(s, out, s.SecurityEpoch, "extend-2", "nonce-2", MonitoringExtendedCap, sigs, start.Add(12*time.Hour)); err == nil || !reflect.DeepEqual(got, out) {
+			t.Fatal("second extension accepted")
+		}
+		out = recordMonitoring(t, out, DecisionPass, start.Add(51*time.Hour))
+		if out.Monitoring.HoldUsed != 47*time.Hour {
+			t.Fatal("extension reset cumulative usage")
+		}
+		out = recordMonitoring(t, out, DecisionHold, start.Add(60*time.Hour))
+		if !out.Monitoring.HoldDeadline.Equal(start.Add(61 * time.Hour)) {
+			t.Fatal("extended cap reset per episode")
+		}
+		got, result, err := EvaluateMonitoring(out, start.Add(100*time.Hour))
+		if err != nil || result != MonitoringSafeRollback || got.Monitoring.HoldUsed != MonitoringExtendedCap {
+			t.Fatal(result, err)
+		}
+	}
+	if !reflect.DeepEqual(before, r) {
+		t.Fatal("input mutated")
+	}
+}
+
+func TestHoldExtendRejectsInvalidSignaturesAndAuthority(t *testing.T) {
+	q, ids, keys, _ := safetyFixture(t)
+	s, r, start := monitoringFixture(t)
+	r = recordMonitoring(t, r, DecisionHold, start.Add(time.Hour))
+	valid := signHoldExtend(t, r, ids[:2], keys[:2])
+	unknown := append([]SafetySignature(nil), valid...)
+	unknown[0].SignerID = "outsider"
+	malformed := append([]SafetySignature(nil), valid...)
+	malformed[0].Signature = []byte{1}
+	invalid := append([]SafetySignature(nil), valid...)
+	invalid[0].Signature = make([]byte, ed25519.SignatureSize)
+	for _, tc := range []struct {
+		name string
+		sigs []SafetySignature
+	}{
+		{"none", nil}, {"one", valid[:1]}, {"unknown", unknown}, {"duplicate", []SafetySignature{valid[0], valid[0]}},
+		{"malformed", malformed}, {"invalid", invalid}, {"valid pair plus invalid", append(append([]SafetySignature(nil), valid...), SafetySignature{ids[2], []byte{1}})},
+		{"four", append(append([]SafetySignature(nil), valid...), valid...)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := q.HoldExtend(s, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, tc.sigs, start.Add(2*time.Hour))
+			if err == nil || !reflect.DeepEqual(got, r) {
+				t.Fatal("bad signatures accepted or input changed")
+			}
+		})
+	}
+	for _, change := range []func(*AuthorityState){
+		func(s *AuthorityState) { s.Scope = "other" }, func(s *AuthorityState) { s.SecurityEpoch++ },
+		func(s *AuthorityState) { s.ScopeActivationEpoch++ }, func(s *AuthorityState) { s.DatabaseAvailable = false },
+		func(s *AuthorityState) { s.Mode = ScopeFrozen }, func(s *AuthorityState) { s.Mode = ScopeSafeStop },
+	} {
+		bad := cloneAuthority(s)
+		change(&bad)
+		if got, err := q.HoldExtend(bad, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, valid, start.Add(2*time.Hour)); err == nil || !reflect.DeepEqual(got, r) {
+			t.Fatal("bad authority accepted")
+		}
+	}
+	for _, at := range []time.Time{{}, start, r.Monitoring.HoldDeadline, r.Monitoring.HoldDeadline.Add(time.Hour)} {
+		if got, err := q.HoldExtend(s, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, valid, at); err == nil || !reflect.DeepEqual(got, r) {
+			t.Fatal("bad clock/expired hold accepted")
+		}
+	}
+	if got, err := (SafetyQuorum{}).HoldExtend(s, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, valid, start.Add(2*time.Hour)); err == nil || !reflect.DeepEqual(got, r) {
+		t.Fatal("zero quorum accepted")
+	}
+}
+
+func TestHoldExtendSigningBindsSnapshotAndCommand(t *testing.T) {
+	q, ids, keys, _ := safetyFixture(t)
+	s, r, start := monitoringFixture(t)
+	r = recordMonitoring(t, r, DecisionHold, start.Add(time.Hour))
+	msg, err := HoldExtendApprovalMessage(r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg2, err := HoldExtendApprovalMessage(r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+	if err != nil || !bytes.Equal(msg, msg2) {
+		t.Fatal("nondeterministic signing bytes")
+	}
+	valid := signHoldExtend(t, r, ids[:2], keys[:2])
+	for _, tc := range []struct {
+		name   string
+		change func(*PolicyRollout)
+	}{
+		{"rollout", func(r *PolicyRollout) { r.ID = "other" }},
+		{"scope", func(r *PolicyRollout) { r.Scope = "other" }},
+		{"epoch", func(r *PolicyRollout) { r.BaseSecurityEpoch++ }},
+		{"cumulative used", func(r *PolicyRollout) {
+			r.Monitoring.HoldUsed = time.Hour
+			r.Monitoring.ObservationDeadline = r.Monitoring.ObservationDeadline.Add(time.Hour)
+			r.Monitoring.HoldDeadline = r.Monitoring.HoldDeadline.Add(-time.Hour)
+		}},
+		{"deadline", func(r *PolicyRollout) {
+			r.Monitoring.HoldSince = r.Monitoring.HoldSince.Add(-time.Second)
+			r.Monitoring.HoldDeadline = r.Monitoring.HoldDeadline.Add(-time.Second)
+		}},
+		{"budget", func(r *PolicyRollout) { r.Monitoring.HoldBudget = MonitoringExtendedCap }},
+		{"extension flag", func(r *PolicyRollout) { r.Monitoring.ExtensionUsed = true }},
+		{"evidence", func(r *PolicyRollout) { r.Monitoring.EvidenceDigest = digestOf('f') }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bad := r
+			tc.change(&bad)
+			candidate, err := HoldExtendApprovalMessage(bad, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+			if err == nil && bytes.Equal(candidate, msg) {
+				t.Fatal("snapshot field not bound")
+			}
+			if got, err := q.HoldExtend(s, bad, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, valid, start.Add(2*time.Hour)); err == nil || !reflect.DeepEqual(got, bad) {
+				t.Fatal("tampered snapshot accepted")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		command, nonce string
+		cap            time.Duration
+	}{
+		{"other", "nonce-1", MonitoringExtendedCap}, {"extend-1", "other", MonitoringExtendedCap},
+		{"", "nonce-1", MonitoringExtendedCap}, {"extend-1", "", MonitoringExtendedCap},
+		{"extend-1", "nonce-1", MonitoringHoldBudget}, {"extend-1", "nonce-1", MonitoringExtendedCap + 1},
+	} {
+		if got, err := q.HoldExtend(s, r, s.SecurityEpoch, tc.command, tc.nonce, tc.cap, valid, start.Add(2*time.Hour)); err == nil || !reflect.DeepEqual(got, r) {
+			t.Fatal("command/cap not bound")
+		}
+	}
+	if _, err := SafetyApprovalMessage(SafetyActionHoldExtend, r.Scope, s.SecurityEpoch, "extend-1", "nonce-1"); err == nil {
+		t.Fatal("unbound generic hold message accepted")
+	}
+	if err := q.VerifySafetyApproval(s, SafetyActionHoldExtend, s.SecurityEpoch, "extend-1", "nonce-1", valid); err == nil {
+		t.Fatal("generic verifier accepted unbound hold")
+	}
+}
+
+func TestSafetyQuorumRejectsDuplicateHumanKeys(t *testing.T) {
+	_, ids, keys, _ := safetyFixture(t)
+	signers := []SafetySigner{{ids[0], keys[0].Public().(ed25519.PublicKey)}, {ids[1], keys[0].Public().(ed25519.PublicKey)}, {ids[2], keys[2].Public().(ed25519.PublicKey)}}
+	if _, err := NewSafetyQuorum(signers); err == nil {
+		t.Fatal("one key counted as two humans")
+	}
+}
+
+func TestSafetyStopReleaseSigningCompatibility(t *testing.T) {
+	// Fixed protocol fixtures intentionally independent of HoldExtend's payload.
+	var digest [32]byte
+	for i := range digest {
+		digest[i] = byte(i)
+	}
+	for _, tc := range []struct {
+		action SafetyAction
+		digest [][32]byte
+		want   string
+	}{
+		{SafetyActionStop, nil, "3fd1ee7d54fd40764793b45d98f4da95805f45b923fa65a0f106327bf411380c"},
+		{SafetyActionRelease, [][32]byte{digest}, "6c37d4c5f9c544f366d038ac935aca3212d2b5dad3951dc100f0db2e392b2c65"},
+	} {
+		msg, err := SafetyApprovalMessage(tc.action, "scope-a", 7, "cmd", "nonce-1", tc.digest...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fmt.Sprintf("%x", sha256.Sum256(msg)); got != tc.want {
+			t.Errorf("%s hash = %s", tc.action, got)
+		}
+	}
+}
 
 func safetyFixture(t *testing.T) (SafetyQuorum, []string, []ed25519.PrivateKey, AuthorityState) {
 	t.Helper()
@@ -196,5 +401,37 @@ func TestSafetyMessageContextAndQuorumConfiguration(t *testing.T) {
 	bad := []SafetySigner{{"a", make([]byte, ed25519.PublicKeySize)}, {"a", make([]byte, ed25519.PublicKeySize)}, {"c", make([]byte, ed25519.PublicKeySize)}}
 	if _, err = NewSafetyQuorum(bad); err == nil {
 		t.Fatal("duplicate signer IDs accepted")
+	}
+}
+
+func TestHoldExtendRevisionBindingAtEqualClockAndInt64Boundary(t *testing.T) {
+	q, ids, keys, _ := safetyFixture(t)
+	s, r, at := monitoringFixture(t)
+	r = recordMonitoring(t, r, DecisionHold, at)
+	sigs := signHoldExtend(t, r, ids[:2], keys[:2])
+	message, err := HoldExtendApprovalMessage(r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := recordMonitoring(t, r, DecisionHold, at)
+	message2, err := HoldExtendApprovalMessage(next, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+	if err != nil || bytes.Equal(message, message2) {
+		t.Fatal("equal-time re-record did not change signing bytes", err)
+	}
+	if _, err := q.HoldExtend(s, next, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, sigs, at); err == nil {
+		t.Fatal("stale revision approval accepted")
+	}
+	for _, revision := range []int64{1 << 53, 1<<53 + 1, math.MaxInt64 - 1, math.MaxInt64} {
+		r.Monitoring.DecisionRevision = revision
+		message, err = HoldExtendApprovalMessage(r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap)
+		if err != nil || bytes.Equal(message, message2) || !bytes.Contains(message, []byte(fmt.Sprintf(`"decision_revision":"%d"`, revision))) {
+			t.Fatal("full int64 not bound exactly", revision, err)
+		}
+		sigs = signHoldExtend(t, r, ids[:2], keys[:2])
+		out, err := q.HoldExtend(s, r, s.SecurityEpoch, "extend-1", "nonce-1", MonitoringExtendedCap, sigs, at)
+		if err != nil || out.Monitoring.DecisionRevision != revision {
+			t.Fatal("extension must preserve revision", revision, err)
+		}
+		message2 = message
 	}
 }

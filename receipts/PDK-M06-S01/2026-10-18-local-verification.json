@@ -1,0 +1,52 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S01",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-PDK-M06-S01",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-18T09:21:19Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142",
+    "dirty": true,
+    "dirty_diff_sha256": "a033ba64b77e525199e0d1c75766047741d08c841a3fe48d5f779a7ccdafc8d1",
+    "dirty_diff_note": "SHA-256 of tracked diff at Runner observation; it excludes untracked files. The four target Go files were untracked, so their individual SHA-256 values are recorded below."
+  },
+  "environment": {
+    "go_version": "go1.27.1",
+    "os": "android",
+    "arch": "arm64",
+    "ci": false
+  },
+  "targets": [
+    {"path": "internal/governance/domain/bundle_verification.go", "sha256": "ef1a5dfc158d20035514035a5c90dbdc23148fadade9420915aa59abf9666d40"},
+    {"path": "internal/governance/domain/bundle_verification_test.go", "sha256": "46f508e67ec0614a8878fb9806d5317a793789fc3bc0f7cfdaaeae3399e499c0"},
+    {"path": "internal/governance/application/bundle_registration.go", "sha256": "02c67efd9755dcb3d8a080db46121b9dec75575408487d89a7b083bc15b8c464"},
+    {"path": "internal/governance/application/bundle_registration_test.go", "sha256": "42554c61d845d3470a52996a63b349d88b1a6934701078c5e9ac10c9b3687fad"},
+    {"path": "Issues.md", "sha256": "fe5720ead38f1f9e8970de5c10d87b45beb4445741bcbb30460caf327022040f"}
+  ],
+  "checks": [
+    {"command": "GOPROXY=off go test ./internal/governance/domain ./internal/governance/application -count=2", "exit_code": 0, "result": "PASS; both affected packages"},
+    {"command": "GOPROXY=off go vet ./internal/governance/domain ./internal/governance/application", "exit_code": 0, "result": "PASS"},
+    {"command": "gofmt -l <four target files>", "exit_code": 0, "result": "PASS; no files listed"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 149 edges"}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only general subagent acting as Adversarial Verifier",
+    "result": "ACCEPT; no actionable findings",
+    "scope": "Diff-first review of all four files against revised Issue acceptance, canonical Bundle and transaction/storage contracts; checked tampering, signature/key, validity boundary, failure/no-insert, ordering, and scope cases.",
+    "limitations": "No database integration body, migration, external key resolution, or CI attestation was run. Verifier reported focused tests/vet and adversarial scenario review; Main independently reran focused package checks and recorded target hashes."
+  },
+  "verdict": "LOCAL_TESTED; reconciled with independent read-only review; no CI attestation",
+  "remaining_risks": [
+    "Production trusted key resolver, trust-root custody, and rotation are not implemented or claimed; O-002 remains OPEN.",
+    "No live PostgreSQL integration test or migration was performed, per effect boundary.",
+    "CI attestation and Verifier-of-Record are absent and not claimed.",
+    "The worktree contains unrelated pre-existing modified and untracked files; this receipt's tracked-diff hash excludes untracked artifacts."
+  ]
+}

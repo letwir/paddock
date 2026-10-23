@@ -1,0 +1,92 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S01",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "2026-10-21T17:32:23Z",
+  "time_finish_utc": "2026-10-21T17:32:24Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "NONE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go version go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/effective_policy_test.go",
+      "sha256": "a60815175d816df953fb1a6891e5ef2d4ff8184967a0633cf83585803836debf"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused Root isolation and global security epoch test repeated 100 times",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain -run '^TestEffectivePolicyCanaryRootIsolationAndGlobalSecurityEpoch$' -count=100",
+      "exit_code": 0,
+      "stdout_sha256": "ff5e1fd5ce6eb73d1805fea8c90de5e6e797b71f1e4323dd4321709a16c75103",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "shuffled Domain suite",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain -count=1 -shuffle=on",
+      "exit_code": 0,
+      "stdout_sha256": "f5a397469480594d9431ba15b036e1aa43662291fc5ac0b643db27c30cc021b5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "Domain vet",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go vet ./internal/governance/domain",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "gofmt check",
+      "command": "gofmt -d internal/governance/domain/effective_policy_test.go",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "target trailing whitespace check",
+      "command": "python3 -c 'from pathlib import Path; p=Path(\"internal/governance/domain/effective_policy_test.go\"); bad=[i for i,line in enumerate(p.read_text().splitlines(),1) if line.rstrip(\" \\t\") != line]; print(\"trailing_whitespace=\", bad); raise SystemExit(bool(bad))'",
+      "exit_code": 0,
+      "stdout_sha256": "8e897b2c46937cb815bbd90625b58ce805996dfbf63250c48304b0f346984602",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "design lint",
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "stdout_sha256": "17e5799599c7cc3e1ffe03e1b41520dd7eee85258725c102c49f320abfaed7e9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "tracked diff whitespace check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS_LOCAL",
+  "remaining_risks": [
+    "Pure Domain source/test coverage only; no PostgreSQL persistence, transaction, or deployed Gateway enforcement is established.",
+    "No DB execution, CI attestation, or Verifier-of-Record.",
+    "Worktree was already dirty; complete dirty-diff hash was not captured."
+  ]
+}

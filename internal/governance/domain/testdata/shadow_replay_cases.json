@@ -1,0 +1,269 @@
+[
+  {
+    "name": "pass_unchanged_both_decisions",
+    "input": {
+      "baseline": [{"request_id":"b","decision":"ALLOW"},{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"},{"request_id":"b","decision":"ALLOW"}],
+      "evidence": [{"request_id":"b","sybil":"CLEAR","forged_evaluator":"CLEAR"},{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"PASS","reason_codes":["COMPLETE_VALID_EVIDENCE"]}
+  },
+  {
+    "name": "pass_allow_to_deny_diff",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"PASS","reason_codes":["COMPLETE_VALID_EVIDENCE"],"diffs":[{"request_id":"a","baseline":"ALLOW","candidate":"DENY"}]}
+  },
+  {
+    "name": "fail_deny_to_allow_diff_sorted_by_id",
+    "input": {
+      "baseline": [{"request_id":"z","decision":"DENY"},{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"DENY"},{"request_id":"z","decision":"ALLOW"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"},{"request_id":"z","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["DENY_TO_ALLOW"],"diffs":[{"request_id":"a","baseline":"ALLOW","candidate":"DENY"},{"request_id":"z","baseline":"DENY","candidate":"ALLOW"}]}
+  },
+  {
+    "name": "fail_explicit_sybil",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"DETECTED","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["SYBIL_EVIDENCE"]}
+  },
+  {
+    "name": "fail_explicit_forged_evaluator",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"DETECTED"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["FORGED_EVALUATOR_EVIDENCE"]}
+  },
+  {
+    "name": "fail_all_findings_unique_reasons",
+    "input": {
+      "baseline": [{"request_id":"b","decision":"DENY"},{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"},{"request_id":"b","decision":"ALLOW"}],
+      "evidence": [{"request_id":"b","sybil":"DETECTED","forged_evaluator":"DETECTED"},{"request_id":"a","sybil":"DETECTED","forged_evaluator":"DETECTED"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["DENY_TO_ALLOW","FORGED_EVALUATOR_EVIDENCE","SYBIL_EVIDENCE"],"diffs":[{"request_id":"a","baseline":"DENY","candidate":"ALLOW"},{"request_id":"b","baseline":"DENY","candidate":"ALLOW"}]}
+  },
+  {
+    "name": "hold_absent_evidence",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}]
+    },
+    "want": {"outcome":"HOLD","reason_codes":["INCOMPLETE_EVIDENCE"]}
+  },
+  {
+    "name": "hold_empty_evidence",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"}],
+      "evidence": []
+    },
+    "want": {"outcome":"HOLD","reason_codes":["INCOMPLETE_EVIDENCE"]}
+  },
+  {
+    "name": "hold_partial_request_coverage",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"},{"request_id":"b","decision":"DENY"}],
+      "candidate": [{"request_id":"b","decision":"DENY"},{"request_id":"a","decision":"ALLOW"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"HOLD","reason_codes":["INCOMPLETE_EVIDENCE"]}
+  },
+  {
+    "name": "hold_omitted_assessment",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR"}]
+    },
+    "want": {"outcome":"HOLD","reason_codes":["INCOMPLETE_EVIDENCE"],"diffs":[{"request_id":"a","baseline":"ALLOW","candidate":"DENY"}]}
+  },
+  {
+    "name": "hold_unknown_assessments",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"UNKNOWN","forged_evaluator":"UNKNOWN"}]
+    },
+    "want": {"outcome":"HOLD","reason_codes":["INCOMPLETE_EVIDENCE"]}
+  },
+  {
+    "name": "fail_regression_over_missing_evidence",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["DENY_TO_ALLOW","INCOMPLETE_EVIDENCE"],"diffs":[{"request_id":"a","baseline":"DENY","candidate":"ALLOW"}]}
+  },
+  {
+    "name": "fail_sybil_over_unknown_forgery",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"DETECTED","forged_evaluator":"UNKNOWN"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["INCOMPLETE_EVIDENCE","SYBIL_EVIDENCE"]}
+  },
+  {
+    "name": "fail_forgery_over_omitted_sybil",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"}],
+      "evidence": [{"request_id":"a","forged_evaluator":"DETECTED"}]
+    },
+    "want": {"outcome":"FAIL","reason_codes":["FORGED_EVALUATOR_EVIDENCE","INCOMPLETE_EVIDENCE"]}
+  },
+  {
+    "name": "abort_zero_input_not_vacuous_pass",
+    "input": {},
+    "want": {"outcome":"ABORT","reason_codes":["EMPTY_REQUESTS"]}
+  },
+  {
+    "name": "abort_empty_request_sets",
+    "input": {"baseline":[],"candidate":[],"evidence":[]},
+    "want": {"outcome":"ABORT","reason_codes":["EMPTY_REQUESTS"]}
+  },
+  {
+    "name": "abort_absent_candidate",
+    "input": {"baseline":[{"request_id":"a","decision":"DENY"}]},
+    "want": {"outcome":"ABORT","reason_codes":["EMPTY_REQUESTS","REQUEST_SET_MISMATCH"]}
+  },
+  {
+    "name": "abort_duplicate_baseline_even_identical",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"},{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["DUPLICATE_BASELINE_REQUEST"]}
+  },
+  {
+    "name": "abort_conflicting_candidate_duplicates",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"},{"request_id":"a","decision":"ALLOW"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["DUPLICATE_CANDIDATE_REQUEST"]}
+  },
+  {
+    "name": "abort_request_id_substitution_same_size",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"b","decision":"ALLOW"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["REQUEST_SET_MISMATCH"]}
+  },
+  {
+    "name": "abort_additional_candidate_request",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"},{"request_id":"b","decision":"ALLOW"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["REQUEST_SET_MISMATCH"]}
+  },
+  {
+    "name": "abort_empty_id",
+    "input": {
+      "baseline": [{"request_id":"","decision":"DENY"}],
+      "candidate": [{"request_id":"","decision":"ALLOW"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_REQUEST"]}
+  },
+  {
+    "name": "abort_noncanonical_id",
+    "input": {
+      "baseline": [{"request_id":" a ","decision":"DENY"}],
+      "candidate": [{"request_id":" a ","decision":"DENY"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_REQUEST"]}
+  },
+  {
+    "name": "abort_missing_decision",
+    "input": {
+      "baseline": [{"request_id":"a"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_REQUEST"]}
+  },
+  {
+    "name": "abort_unknown_decision",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"allow"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_REQUEST"]}
+  },
+  {
+    "name": "abort_duplicate_evidence_even_identical",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"},{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["DUPLICATE_EVIDENCE"]}
+  },
+  {
+    "name": "abort_evidence_request_substitution",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"b","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["EVIDENCE_REQUEST_MISMATCH"]}
+  },
+  {
+    "name": "abort_unknown_sybil_assessment",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"SAFE","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_EVIDENCE"]}
+  },
+  {
+    "name": "abort_unknown_forgery_assessment",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"a","sybil":"CLEAR","forged_evaluator":"clear"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["INVALID_EVIDENCE"]}
+  },
+  {
+    "name": "abort_invalid_evidence_id",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"DENY"}],
+      "evidence": [{"request_id":"","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["EVIDENCE_REQUEST_MISMATCH","INVALID_EVIDENCE"]}
+  },
+  {
+    "name": "abort_structural_error_over_regression_attack_and_gap",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"}],
+      "candidate": [{"request_id":"a","decision":"ALLOW"}],
+      "evidence": [{"request_id":"a","sybil":"DETECTED"},{"request_id":"a","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["DUPLICATE_EVIDENCE"]}
+  },
+  {
+    "name": "abort_multiple_structural_reasons_sorted",
+    "input": {
+      "baseline": [{"request_id":"a","decision":"DENY"},{"request_id":"a","decision":"ALLOW"}],
+      "candidate": [{"request_id":"b","decision":"DENY"},{"request_id":"b","decision":"DENY"}],
+      "evidence": [{"request_id":"x","sybil":"INVALID"},{"request_id":"x","sybil":"CLEAR","forged_evaluator":"CLEAR"}]
+    },
+    "want": {"outcome":"ABORT","reason_codes":["DUPLICATE_BASELINE_REQUEST","DUPLICATE_CANDIDATE_REQUEST","DUPLICATE_EVIDENCE","EVIDENCE_REQUEST_MISMATCH","INVALID_EVIDENCE","REQUEST_SET_MISMATCH"]}
+  }
+]

@@ -63,9 +63,10 @@ func TestRollbackFreezesThenSwitchesAndAdvancesOnlyTargetRoot(t *testing.T) {
 func TestRollbackWithoutUsableLKGSelectsSafeBaseline(t *testing.T) {
 	for name, lkg := range map[string]LKGAssessment{
 		"unavailable": {Status: LKGUnavailable},
-		"invalid":     {Status: LKGInvalid, Digest: validLKG()},
-		"malformed":   {Status: LKGUsable, Digest: Digest("bad")},
-		"unknown":     {Status: LKGStatus("UNKNOWN"), Digest: validLKG()}} {
+		// The injected verifier represents a revoked LKG signature as invalid.
+		"revoked_signature": {Status: LKGInvalid, Digest: validLKG()},
+		"malformed":         {Status: LKGUsable, Digest: Digest("bad")},
+		"unknown":           {Status: LKGStatus("UNKNOWN"), Digest: validLKG()}} {
 		t.Run(name, func(t *testing.T) {
 			frozen, plan, err := BeginRollback(fixtureAuthority(), "root-b")
 			if err != nil {
@@ -82,8 +83,10 @@ func TestRollbackWithoutUsableLKGSelectsSafeBaseline(t *testing.T) {
 			if stopped.ScopeActivationEpoch != 41 || root.AuthorizationEpoch != 21 || done.State != RolloutSafeStopped {
 				t.Fatalf("fallback epochs/state wrong: %+v, %+v", stopped, done)
 			}
-			if _, err := EffectivePolicy(stopped, "root-a"); !errors.Is(err, ErrSafeStopped) {
-				t.Fatalf("Safe Baseline did not deny: %v", err)
+			for id := range stopped.Roots {
+				if _, err := EffectivePolicy(stopped, id); !errors.Is(err, ErrSafeStopped) {
+					t.Fatalf("Safe Baseline did not deny root %q: %v", id, err)
+				}
 			}
 		})
 	}

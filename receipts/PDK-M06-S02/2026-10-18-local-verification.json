@@ -1,0 +1,57 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S02",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-PDK-M06-S02",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-18T10:02:48Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142",
+    "dirty": true,
+    "dirty_diff_sha256": "1a2b2072741da87885361fe28d01f849ec2ba3ad1225806646c5f7b38215a2c0",
+    "dirty_diff_note": "SHA-256 covers tracked diff at Runner observation; new S02 source/test targets are untracked and therefore identified by individual SHA-256 values below."
+  },
+  "environment": {
+    "go_version": "go1.27.1",
+    "os": "android",
+    "arch": "arm64",
+    "ci": false
+  },
+  "targets": [
+    {"path": "internal/governance/domain/kernel_approval.go", "sha256": "d9f882972f74ea99f0d5c2aee982ed2e2276939334b51069a6962fdc927667e5"},
+    {"path": "internal/governance/domain/kernel_approval_test.go", "sha256": "228038c56f84b339b48a73521d2768048319691ae57f398b5beea4edb0500dd3"},
+    {"path": "Issues.md", "sha256": "4722cea2c248c05c02237a71075e7daf1da0a9b852c0205d2a24155cf9684c0a"}
+  ],
+  "checks": [
+    {"command": "GOPROXY=off go test ./internal/governance/domain -count=2", "exit_code": 0, "result": "PASS; full affected Domain package"},
+    {"command": "GOPROXY=off go vet ./internal/governance/domain", "exit_code": 0, "result": "PASS"},
+    {"command": "gofmt -l internal/governance/domain/kernel_approval.go internal/governance/domain/kernel_approval_test.go", "exit_code": 0, "result": "PASS; no files listed"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 149 edges"}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only Adversarial Verifier",
+    "cycle_1": "REJECT/P1: requested capability set was ceiling-checked but omitted from signed approval bytes, permitting reuse for another allowed subset.",
+    "cycle_2": "PASS; no actionable findings. Rechecked read-to-write and read-to-read+write signature substitution rejection; equivalent sorted-set order preserves signing bytes and validity.",
+    "scope": "Both new Domain files, revised Issue acceptance, canonical and Bundle contracts.",
+    "limitations": "No DB integration, migration, external key resolution, or CI run. Separate invocation provides review separation, not organizational or control-domain independence."
+  },
+  "repair": {
+    "kind": "bounded Worker correction, Refactorer diagnosis before repair",
+    "result": "DomainApprovalSigningBytes now signs a copied, lexicographically sorted CapabilityIDs set; caller input is not mutated. Regression tests cover substitution and reordered set equivalence.",
+    "worker_attempt_notes": "Worker reported an initial GOPATH-mode test failure and an intermediate compile error; these were corrected before Worker’s focused pass. Main independently ran the complete affected Domain package twice, plus vet and format checks."
+  },
+  "verdict": "LOCAL_TESTED; P1 finding repaired; separate Verifier PASS; no CI attestation",
+  "remaining_risks": [
+    "Trusted caller must source ProposalContext.ProposerID from an authenticated boundary; this pure Domain verifier does not authenticate that source.",
+    "Unique signer IDs/keys and quorum count do not establish operational/control-domain independence; that evidence remains assigned to PDK-M11-S01/S02.",
+    "Production KernelSnapshot provisioning, trust-root custody, and key rotation remain OPEN under O-002.",
+    "No live DB, migration, or runtime integration was performed; CI and Verifier-of-Record are absent and not claimed.",
+    "The broader worktree contains unrelated dirty and untracked changes; this receipt’s tracked-diff hash excludes untracked artifacts."
+  ]
+}

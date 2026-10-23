@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/letwir/paddock/internal/governance/domain"
 	"github.com/letwir/paddock/internal/governance/port"
@@ -14,16 +15,16 @@ import (
 // or action; a race remains between this check and an external side effect
 // unless that effect is protected by an execution-fencing design.
 type SafetyGate struct {
-	transactor port.Transactor
+	transactor port.SafetyGateTransactor
 }
 
-func NewSafetyGate(transactor port.Transactor) *SafetyGate {
+func NewSafetyGate(transactor port.SafetyGateTransactor) *SafetyGate {
 	return &SafetyGate{transactor: transactor}
 }
 
 // CheckNewDispatch checks fresh authority before creating a dispatch.
 func (g *SafetyGate) CheckNewDispatch(ctx context.Context, scopeID domain.ScopeID, root domain.RootID) error {
-	return g.check(ctx, scopeID, func(state domain.AuthorityState) error {
+	return g.check(ctx, scopeID, func(_ port.SafetyGateTx, state domain.AuthorityState) error {
 		if _, err := domain.EffectivePolicy(state, root); err != nil {
 			return fmt.Errorf("new dispatch denied: %w", err)
 		}
@@ -33,7 +34,7 @@ func (g *SafetyGate) CheckNewDispatch(ctx context.Context, scopeID domain.ScopeI
 
 // CheckNewGrant checks fresh authority before issuing a grant.
 func (g *SafetyGate) CheckNewGrant(ctx context.Context, scopeID domain.ScopeID, root domain.RootID) error {
-	return g.check(ctx, scopeID, func(state domain.AuthorityState) error {
+	return g.check(ctx, scopeID, func(_ port.SafetyGateTx, state domain.AuthorityState) error {
 		if _, err := domain.EffectivePolicy(state, root); err != nil {
 			return fmt.Errorf("new grant denied: %w", err)
 		}
@@ -41,17 +42,24 @@ func (g *SafetyGate) CheckNewGrant(ctx context.Context, scopeID domain.ScopeID, 
 	})
 }
 
-// CheckHighRiskAction verifies a grant against fresh Root policy and epochs.
-func (g *SafetyGate) CheckHighRiskAction(ctx context.Context, scopeID domain.ScopeID, grant domain.Grant) error {
-	return g.check(ctx, scopeID, func(state domain.AuthorityState) error {
-		if err := domain.Authorize(state, grant); err != nil {
+// CheckHighRiskAction checks Root/Security authority and current lease in one
+// short transaction. It neither executes nor fences a subsequent external action.
+func (g *SafetyGate) CheckHighRiskAction(ctx context.Context, scopeID domain.ScopeID, authorization domain.HighRiskAuthorization) error {
+	return g.check(ctx, scopeID, func(tx port.SafetyGateTx, state domain.AuthorityState) error {
+		if err := domain.Authorize(state, authorization.Grant); err != nil {
 			return fmt.Errorf("high-risk action denied: %w", err)
+		}
+		if err := authorization.Lease.Validate(); err != nil {
+			return fmt.Errorf("high-risk action denied: %w", err)
+		}
+		if err := tx.ValidateCurrentLease(ctx, scopeID, authorization.Grant.Root, authorization.Lease); err != nil {
+			return fmt.Errorf("high-risk action lease validation: %w", err)
 		}
 		return nil
 	})
 }
 
-func (g *SafetyGate) check(ctx context.Context, scopeID domain.ScopeID, authorize func(domain.AuthorityState) error) error {
+func (g *SafetyGate) check(ctx context.Context, scopeID domain.ScopeID, authorize func(port.SafetyGateTx, domain.AuthorityState) error) error {
 	if g == nil || g.transactor == nil {
 		return errors.New("safety gate is not initialized")
 	}
@@ -61,11 +69,53 @@ func (g *SafetyGate) check(ctx context.Context, scopeID domain.ScopeID, authoriz
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return g.transactor.WithinTransaction(ctx, func(tx port.GovernanceTx) error {
-		snapshot, err := lockAuthority(ctx, tx, scopeID)
+	return g.transactor.WithinSafetyGateTransaction(ctx, func(tx port.SafetyGateTx) error {
+		snapshot, err := lockGateAuthority(ctx, tx, scopeID)
 		if err != nil {
 			return err
 		}
-		return authorize(snapshotAuthority(snapshot))
+		return authorize(tx, snapshotAuthority(snapshot))
 	})
+}
+
+// Keep the same authority-lock/validation order as SafetyService while exposing
+// no mutation, receipt, or event capability to a gate callback.
+func lockGateAuthority(ctx context.Context, tx port.SafetyGateTx, scopeID domain.ScopeID) (port.ScopeSnapshot, error) {
+	if tx == nil {
+		return port.ScopeSnapshot{}, errors.New("nil safety gate transaction")
+	}
+	if err := scopeID.Validate(); err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	snapshot, err := tx.LockScope(ctx, scopeID)
+	if err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	if snapshot.ScopeID != scopeID {
+		return port.ScopeSnapshot{}, errors.New("malformed scope snapshot: identity mismatch")
+	}
+	if snapshot.LiveRolloutID != nil {
+		rollout, err := tx.LockRollout(ctx, scopeID, *snapshot.LiveRolloutID)
+		if err != nil {
+			return port.ScopeSnapshot{}, err
+		}
+		if rollout.ID != *snapshot.LiveRolloutID || rollout.Scope != scopeID {
+			return port.ScopeSnapshot{}, errors.New("malformed rollout snapshot: identity mismatch")
+		}
+	}
+	if err := snapshotAuthority(snapshot).Validate(); err != nil {
+		return port.ScopeSnapshot{}, fmt.Errorf("malformed authority snapshot: %w", err)
+	}
+	ids := make([]domain.RootID, 0, len(snapshot.Roots))
+	for id := range snapshot.Roots {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	if len(ids) == 0 {
+		return port.ScopeSnapshot{}, errors.New("malformed authority snapshot: no Roots")
+	}
+	if err := tx.ValidateTargets(ctx, scopeID, ids); err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	return snapshot, nil
 }

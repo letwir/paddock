@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func digestOf(ch byte) Digest { return Digest(strings.Repeat(string(ch), 64)) }
@@ -145,6 +146,9 @@ func TestCanaryPromoteRollbackEpochFixture(t *testing.T) {
 	if frozen.Mode != ScopeFrozen || rollout.State != RolloutRollingBack || frozen.ScopeActivationEpoch != 42 || frozen.Roots["root-a"].AuthorizationEpoch != 2 || frozen.Roots["root-b"].AuthorizationEpoch != 2 {
 		t.Fatalf("rollback phase one changed epoch/state: %+v rollout %+v", frozen, rollout)
 	}
+	if rollout.RollbackFrom != RolloutMonitoring {
+		t.Fatalf("rollback phase one lost its origin: %+v", rollout)
+	}
 	if _, err := EffectivePolicy(frozen, "root-a"); !errors.Is(err, ErrScopeFrozen) {
 		t.Fatalf("frozen Scope must deny: %v", err)
 	}
@@ -155,6 +159,12 @@ func TestCanaryPromoteRollbackEpochFixture(t *testing.T) {
 	}
 	if restored.ScopeActivationEpoch != 43 || restored.SecurityEpoch != 5 || restored.Roots["root-a"].AuthorizationEpoch != 3 || restored.Roots["root-b"].AuthorizationEpoch != 3 || restored.Mode != ScopeActive || rollout.State != RolloutRolledBack {
 		t.Fatalf("rollback final state = %+v rollout %+v", restored, rollout)
+	}
+	if rollout.RollbackFrom != "" {
+		t.Fatalf("terminal rollback retained its origin: %+v", rollout)
+	}
+	if err := rollout.Validate(); err != nil {
+		t.Fatalf("terminal rollback is invalid: %v", err)
 	}
 	for _, root := range []RootID{"root-a", "root-b"} {
 		got, err := EffectivePolicy(restored, root)
@@ -182,26 +192,59 @@ func TestCanaryAndRollbackFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, status := range []LKGStatus{LKGUnavailable, LKGInvalid, LKGStatus("UNKNOWN")} {
-		stopped, done, err := FinalizePolicyRollback(frozen, rollout, status)
-		if err != nil {
-			t.Fatalf("status %s: %v", status, err)
-		}
-		if stopped.Mode != ScopeSafeStop || done.State != RolloutSafeStopped || stopped.ScopeActivationEpoch != 42 {
-			t.Errorf("status %s did not select Safe Baseline: %+v %+v", status, stopped, done)
-		}
-		for root, authority := range stopped.Roots {
-			wantEpoch := Epoch(2)
-			if root == "root-b" {
-				wantEpoch = 3
+	tests := []struct {
+		name      string
+		status    LKGStatus
+		wantState RolloutState
+		wantMode  ScopeMode
+	}{
+		{name: "usable LKG", status: LKGUsable, wantState: RolloutRolledBack, wantMode: ScopeActive},
+		{name: "unavailable LKG", status: LKGUnavailable, wantState: RolloutSafeStopped, wantMode: ScopeSafeStop},
+		{name: "invalid LKG", status: LKGInvalid, wantState: RolloutSafeStopped, wantMode: ScopeSafeStop},
+		{name: "unknown LKG status", status: LKGStatus("UNKNOWN"), wantState: RolloutSafeStopped, wantMode: ScopeSafeStop},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopped, done, err := FinalizePolicyRollback(frozen, rollout, tt.status)
+			if err != nil {
+				t.Fatal(err)
 			}
-			if !authority.Policy.SafeBaseline || authority.AuthorizationEpoch != wantEpoch {
-				t.Errorf("status %s root %s = %+v, want epoch %d", status, root, authority, wantEpoch)
+			if stopped.Mode != tt.wantMode || done.State != tt.wantState || stopped.ScopeActivationEpoch != 42 {
+				t.Fatalf("status %s yielded unexpected terminal state: %+v %+v", tt.status, stopped, done)
 			}
-			if _, err := EffectivePolicy(stopped, root); !errors.Is(err, ErrSafeStopped) {
-				t.Errorf("Safe Baseline must deny Root %s: %v", root, err)
+			if done.RollbackFrom != "" {
+				t.Errorf("terminal rollback retained its origin: %+v", done)
 			}
-		}
+			if err := done.Validate(); err != nil {
+				t.Errorf("terminal rollback is invalid: %v", err)
+			}
+			for root, authority := range stopped.Roots {
+				wantEpoch := Epoch(1)
+				if root == "root-b" {
+					wantEpoch = 3
+				}
+				if tt.wantMode == ScopeSafeStop {
+					wantEpoch = 2
+					if root == "root-b" {
+						wantEpoch = 3
+					}
+					if !authority.Policy.SafeBaseline {
+						t.Errorf("status %s root %s did not select Safe Baseline: %+v", tt.status, root, authority)
+					}
+					if _, err := EffectivePolicy(stopped, root); !errors.Is(err, ErrSafeStopped) {
+						t.Errorf("Safe Baseline must deny Root %s: %v", root, err)
+					}
+				} else if authority.Policy.Digest != digestOf('a') {
+					t.Errorf("usable LKG did not restore Root %s baseline: %+v", root, authority)
+				}
+				if authority.AuthorizationEpoch != wantEpoch {
+					t.Errorf("status %s root %s epoch = %d, want %d", tt.status, root, authority.AuthorizationEpoch, wantEpoch)
+				}
+			}
+		})
+	}
+	if rollout.State != RolloutRollingBack || rollout.RollbackFrom != RolloutCanary || frozen.Mode != ScopeFrozen {
+		t.Fatalf("finalization mutated an input snapshot: rollout=%+v authority=%+v", rollout, frozen)
 	}
 }
 
@@ -230,5 +273,34 @@ func TestRolloutRejectsInvalidStateAndUnchangedCandidate(t *testing.T) {
 	stale.Roots["root-b"] = RootAuthority{Policy: PolicyBinding{Digest: digestOf('c')}, AuthorizationEpoch: 3}
 	if _, _, err := Rollback(stale, rollout); !errors.Is(err, ErrInvalidRollout) {
 		t.Fatalf("stale authority state accepted by Rollback: %v", err)
+	}
+}
+
+func TestCompletedRolloutRequiresFreshPass(t *testing.T) {
+	startedAt := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
+	deadline := startedAt.Add(MonitoringActivePeriod)
+	_, rollout, err := StartCanary(rolloutFixture(), "rollout-fresh-pass", "root-b", digestOf('b'))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollout.State = RolloutCompleted
+	rollout.Monitoring = MonitoringWindow{
+		StartedAt:           startedAt,
+		ObservationDeadline: deadline,
+		LastObservedAt:      deadline.Add(time.Second),
+		HoldBudget:          MonitoringHoldBudget,
+		Decision:            DecisionPass,
+		DecisionAt:          startedAt.Add(time.Second),
+		DecisionRevision:    1,
+		EvidenceDigest:      digestOf('e'),
+	}
+	if err := rollout.Validate(); !errors.Is(err, ErrInvalidRollout) {
+		t.Fatalf("completed rollout accepted stale PASS: %v", err)
+	}
+
+	rollout.Monitoring.DecisionAt = deadline
+	rollout.Monitoring.LastObservedAt = deadline
+	if err := rollout.Validate(); err != nil {
+		t.Fatalf("completed rollout rejected fresh PASS: %v", err)
 	}
 }

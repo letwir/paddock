@@ -1,0 +1,55 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S07",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-18-PDK-M06-S07-reverification",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "2026-10-18T08:45:03Z",
+  "time_finish_utc": "2026-10-18T08:45:03Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142",
+    "dirty": true,
+    "dirty_diff_sha256": "cdbf81ec60bf6c6dc051960c43f492296ceb45f576af862adf644a61f7a1f382",
+    "dirty_diff_note": "Hash covers tracked git diff only; untracked WIP/build artifacts are not included."
+  },
+  "environment": {
+    "go_version": "go1.27.1",
+    "os": "android",
+    "arch": "arm64",
+    "ci": false
+  },
+  "targets": [
+    {"path": "go.mod", "sha256": "4f9620671a5f17099b018dec4bd72bc7fbc9570b31f961db9735adcc3a1abb71"},
+    {"path": "go.sum", "sha256": "585c3054410434941243942a4a7060860433637e47d68942c721f196b499eb99"},
+    {"path": "internal/canonical/api_test.go", "sha256": "f28ace9c319173d3f1cec922f2d6c068e9887dac469d7cd7686988ba7966de57"},
+    {"path": "internal/canonical/canonical.go", "sha256": "f9957a58f9573b637fcd125da9f33ae12b10abf6d501b349cf84a57cbd4a0629"},
+    {"path": "internal/canonical/canonical_test.go", "sha256": "6bdf54224ee146ddf3b75726e34f42b08cfcfbc96e5451c2b4e80b83ef73429a"},
+    {"path": "internal/canonical/jcs.go", "sha256": "50b6f320fe2d26737f4a69af6f8e50b2082a8cabdb2de81f045382f32e69b044"},
+    {"path": "internal/governance/domain/canonical_input.go", "sha256": "85a4831fc0781daf038b630591f89509e9db561d4d4814695607b2cd640ac5b0"},
+    {"path": "internal/governance/domain/canonical_input_test.go", "sha256": "322b11c7d8a01be8dc721b1c5c4d134f8d648b0d70a63ef9f00401b4bb920dcb"}
+  ],
+  "checks": [
+    {"command": "go test ./internal/canonical ./internal/governance/domain -count=1", "exit_code": 0, "result": "PASS"},
+    {"command": "go vet ./internal/canonical ./internal/governance/domain", "exit_code": 0, "result": "PASS"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 149 edges"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched read-only general subagent acting as Verifier",
+    "result": "No actionable finding against PDK-M06-S07 acceptance",
+    "scope": "JCS canonicalization, protocol envelope, canonical domain inputs, tests, Issue acceptance",
+    "limitations": "Verifier did not rerun Go tests or independently confirm hashes because shell access was denied; Main Runner independently captured target hashes and reran focused tests."
+  },
+  "verdict": "LOCAL_TESTED; reconciled with independent source review; no CI attestation",
+  "remaining_risks": [
+    "Worktree contains unrelated modified and untracked files; the tracked-diff hash excludes untracked artifacts.",
+    "Only three directed cross-protocol pairs are tested; the pair-direction matrix is not exhaustive.",
+    "Golden vectors are focused regression coverage, not exhaustive RFC 8785 Appendix B coverage or a cryptographic audit.",
+    "Portability checks in the prior receipt were compile-only; target-platform runtime behavior is not claimed.",
+    "No CI attestation or Verifier-of-Record is available or claimed."
+  ]
+}

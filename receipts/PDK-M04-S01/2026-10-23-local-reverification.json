@@ -1,0 +1,38 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M04-S01",
+  "runner": {"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-23T15:48:25Z",
+  "source": {"git_commit":"74750c3d5218fa3dc8f7082123402191def73086","git_tree":"1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED"},
+  "environment": {"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN_THIS_TASK"},
+  "targets": [
+    {"path":"internal/governance/application/bundle_registration.go","sha256":"fbef9b9a92ab177c5ced58a1237e2415092e90fb0433b91c09dacda869764301"},
+    {"path":"internal/governance/application/bundle_registration_test.go","sha256":"93c51e7406bcd73f33331cbd6ca1328cce2f11bd182717cff41ccc95793ff248"},
+    {"path":"internal/governance/application/rollout_service.go","sha256":"abc519259a0f259d3d7c67404e6e89c273236c556647594f8f2e8355e9ad4816"},
+    {"path":"internal/governance/application/rollout_service_test.go","sha256":"4c11646e1653398d3ff5317ca17a353bd1561c032744bfaf114dbb86913d6aa2"},
+    {"path":"internal/governance/domain/rollout_transition_approval.go","sha256":"8bd3287251bd1f879803090c99a183bae1a82b9215f9ce286fa555d2a6664cdd"},
+    {"path":"internal/governance/domain/rollout_transition_approval_test.go","sha256":"4538122fde2a95448921d7f378f3620a86663348d5eb0d11d1eb18bc93561555"},
+    {"path":"internal/governance/domain/kernel_approval.go","sha256":"e794e62bc6cd7d0434b44954f0157361c0186ffa265900f9de8379cdcb7fbeb9"},
+    {"path":"internal/governance/domain/kernel_approval_test.go","sha256":"228038c56f84b339b48a73521d2768048319691ae57f398b5beea4edb0500dd3"},
+    {"path":"internal/governance/port/rollout_transaction.go","sha256":"93ba90831b89e0de9702f39df4190d44f090eead06e4c1f9e57064a970333ff5"},
+    {"path":"internal/governance/port/rollout_transaction_test.go","sha256":"cf0e9acf4ebc9b8b8ee4f79205a5b45fbb563a78b8b85aa93bf187d2844f5d2e"},
+    {"path":"internal/storage/postgres/rollout_transactor.go","sha256":"28a603ed2c88df26c77e7fd9558c9cd768cbc395f5cac310fdb720d7e735a7d4"},
+    {"path":"internal/storage/postgres/rollout_governance_tx.go","sha256":"1e6a813b3c8e55adef012e384c53537a64b975196740635847a83953ad7840a9"},
+    {"path":"internal/storage/postgres/rollout_governance_tx_test.go","sha256":"13c094fb94c0e6924af9dd63a97bcb367dfb6ab1caa34efa9e7f49ce2bf35e65"},
+    {"path":"internal/storage/postgres/rollout_application_integration_test.go","sha256":"fee125fb34b50ec4b1bb8fb70fb2b6f52eaff2edc448f8e256fd328d965378fc"},
+    {"path":"sql/governance_rollout_api.sql","sha256":"644f99eb904e261d53a760dfa64babbf17a0e8dabd817482dcdc29f4400ac53f"},
+    {"path":"tests/test_m04_rollout_api.py","sha256":"4b89d6e4115e65a083327e947f7d9b6883fd07e0f899df3347b4b427796ca043"}
+  ],
+  "checks": [
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; full suite; DB variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; compile-only; no test bodies"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest tests.test_m04_rollout_api tests.test_m07_rollout_deadlines_sql tests.test_m07_s04_safety_lease_api -v","exit_code":0,"result":"PASS; 27/27"},
+    {"command":"gofmt -d on 55 closure Go files; targeted whitespace scan on 68 closure files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; gofmt empty, whitespace clean, design lint 89/152, diff-check clean"}
+  ],
+  "independent_review": {"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Complete current M04-S01 source/test/API implementation plus M06-S01 RegisterWithin and M06-S02 Kernel-helper compatibility; no DB execution"},
+  "historical_runtime_reference": "Issues.md PDK-M04-S01 runtime_rerun records the earlier separately approved TestRolloutApplicationAppOnlyIntegration PASS and fixture cleanup. That DB body was not run in this task and no standalone historical Receipt file was found.",
+  "verdict": "CURRENT SOURCE REVALIDATION PASS; DATABASE BODY NOT RUN THIS TASK",
+  "remaining_risks": ["The current receipt provides source-only revalidation; historical DB acceptance is represented only by the existing Issues.md Runner record, not a standalone receipt file.","No CI/Verifier-of-Record attestation is claimed.","Broad dirty worktree; full dirty diff hash unavailable."]
+}

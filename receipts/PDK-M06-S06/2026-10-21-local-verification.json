@@ -1,0 +1,97 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S06",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "2026-10-21T17:12:01Z",
+  "time_finish_utc": "2026-10-21T17:12:02Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "NONE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go version go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/safety_test.go",
+      "sha256": "fec6584dda5676bce1249a24112c67f26ca35cb0eafc0f82b3158c1e919ff656"
+    },
+    {
+      "path": "internal/governance/application/rollout_service_test.go",
+      "sha256": "01818e5bb3748408c13154dc0c29e0143684f240901041997f63acbb077f68f8"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused rollback and recovery tests repeated 10 times",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain ./internal/governance/application -run '^(TestRollbackWithoutUsableLKGSelectsSafeBaseline|TestRollbackAcceptsExactRootMapAndChecksLKGWithoutIntermediateWrites|TestAuthenticatedReleaseBindsActivationDeterministically|TestReleaseRejectsBadApprovalAndActivation)$' -count=10",
+      "exit_code": 0,
+      "stdout_sha256": "2db50b68f2fa9d7f68c0fd02e0226e6e247f3f723d72b61bed6cbebecec8ea44",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "shuffled Domain Port Application suite",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain ./internal/governance/port ./internal/governance/application -count=1 -shuffle=on",
+      "exit_code": 0,
+      "stdout_sha256": "1424838e6787bac16e8c2eea2a061f3359b28a375f8c797850728e2183560d0f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "Domain Port Application vet",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go vet ./internal/governance/domain ./internal/governance/port ./internal/governance/application",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "gofmt check",
+      "command": "gofmt -d internal/governance/domain/safety_test.go internal/governance/application/rollout_service_test.go",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "target trailing whitespace check",
+      "command": "python3 -c 'from pathlib import Path; files=[Path(\"internal/governance/domain/safety_test.go\"),Path(\"internal/governance/application/rollout_service_test.go\")]; bad=[f\"{p}:{i}\" for p in files for i,line in enumerate(p.read_text().splitlines(),1) if line.rstrip(\" \\t\") != line]; print(\"trailing_whitespace=\", bad); raise SystemExit(bool(bad))'",
+      "exit_code": 0,
+      "stdout_sha256": "8e897b2c46937cb815bbd90625b58ce805996dfbf63250c48304b0f346984602",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "design lint",
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "stdout_sha256": "468e9d8a54ea8f9d727c86f06321f4d1974db5ad562c2acd394b3b4b6391a1a1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "tracked diff whitespace check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS_LOCAL",
+  "remaining_risks": [
+    "Option 1 uses the injected LKGVerifier as the trusted assessment boundary; these tests verify that LKGInvalid/revoked, mismatch, unavailable/missing, and error outcomes fail closed, not that a concrete cryptographic revocation provider exists.",
+    "Human-authenticated new-activation Release is proven at the Domain contract/test level only; persistence and deployed Gateway enforcement are not established here.",
+    "No DB tests, CI attestation, or Verifier-of-Record.",
+    "Worktree was already dirty; full diff hash was not captured. The Application test file was pre-existing untracked and its original whole-file hash was not recorded before the scoped edit."
+  ]
+}

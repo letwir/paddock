@@ -1,0 +1,84 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S05",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-23T12:09:13Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED",
+    "target_files_untracked": true
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/application/worker_policy_sync.go",
+      "sha256": "60e1c6f396b03a6fa5476bd89c75d31d1f25e366eb8295c31cccad1022ecc516"
+    },
+    {
+      "path": "internal/governance/application/worker_policy_sync_test.go",
+      "sha256": "ed4b8b71cbb6eb895df2a1a39355fd171df577e29aea007904bc30e4649cbfc7"
+    }
+  ],
+  "checks": [
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./internal/governance/application -run '^TestWorkerPolicySync' -count=1",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./internal/governance/application ./internal/governance/domain -count=1 -shuffle=on",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on",
+      "exit_code": 0,
+      "result": "PASS; all packages, database environment unset"
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues, 152 edges"
+    },
+    {
+      "command": "gofmt -d internal/governance/application/worker_policy_sync.go internal/governance/application/worker_policy_sync_test.go",
+      "exit_code": 0,
+      "result": "PASS; no output"
+    },
+    {
+      "command": "targeted Python whitespace/line-ending scan of both new files",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "No findings.",
+    "scope": "Complete contents of the two untracked implementation files against PDK-M07-S05 acceptance and selected design; relevant bundle verification, OfflineSession, and CachedOnlineAuthorizer contracts",
+    "limitations": "No tests, DB operations, or external operations by reviewer; targets were untracked, so complete contents were reviewed rather than a Git diff."
+  },
+  "reconciliation": "Main compared the current file hashes, Runner observations, separate no-findings review, and every selected acceptance clause. The service only returns a verified in-memory pull snapshot; stale status compares Root, Policy Digest, Root Authorization Epoch, and Security Epoch. It does not authorize compute or high-risk effects. Existing OfflineGrant remains required for conditional local compute; existing fresh DB-backed authorizer remains required for online/high-risk effects.",
+  "verdict": "LOCAL_ACCEPTANCE_PASS; SOURCE_ONLY",
+  "remaining_risks": [
+    "No concrete PostgreSQL source adapter, HTTP transport, DB connection, or database test body is included or verified; source freshness/consistency remains an interface contract.",
+    "The result is an in-memory source observation, not a Worker installation acknowledgement or durable synchronization record.",
+    "No CI or Verifier-of-Record attestation is claimed.",
+    "The worktree is broadly dirty and untracked; full dirty-diff hash was not captured."
+  ]
+}

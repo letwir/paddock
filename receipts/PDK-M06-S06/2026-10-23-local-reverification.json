@@ -1,0 +1,21 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M06-S06",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-23T15:48:25Z",
+  "source":{"git_commit":"74750c3d5218fa3dc8f7082123402191def73086","git_tree":"1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED"},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN_THIS_TASK"},
+  "targets":[
+    {"path":"internal/governance/domain/safety_test.go","sha256":"fec6584dda5676bce1249a24112c67f26ca35cb0eafc0f82b3158c1e919ff656"},
+    {"path":"internal/governance/application/rollout_service_test.go","sha256":"4c11646e1653398d3ff5317ca17a353bd1561c032744bfaf114dbb86913d6aa2"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; current shared Safe Baseline tests included; DB variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"gofmt -d on 55 closure Go files; targeted whitespace scan on 68 closure files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; gofmt empty, whitespace clean, design lint 89/152, diff-check clean"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Current M06-S06 Safe Baseline fallback acceptance and current shared rollout_service_test.go, including later M07-S06 additions"},
+  "verdict":"POST-M07 TEST-SOURCE REVALIDATION PASS",
+  "remaining_risks":["The LKG signature/revocation assessment remains the injected verifier's responsibility; tests use in-memory fixtures.","No database body or deployed Gateway behavior ran in this task.","No CI/Verifier-of-Record attestation is claimed.","Broad dirty worktree; full dirty diff hash unavailable."]
+}

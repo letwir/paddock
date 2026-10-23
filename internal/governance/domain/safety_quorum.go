@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/binary"
@@ -8,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"time"
 
 	"github.com/letwir/paddock/internal/canonical"
 )
@@ -17,8 +20,9 @@ var ErrInvalidApproval = errors.New("invalid safety approval")
 type SafetyAction string
 
 const (
-	SafetyActionStop    SafetyAction = "EMERGENCY_STOP"
-	SafetyActionRelease SafetyAction = "RELEASE"
+	SafetyActionStop       SafetyAction = "EMERGENCY_STOP"
+	SafetyActionRelease    SafetyAction = "RELEASE"
+	SafetyActionHoldExtend SafetyAction = "HOLD_EXTEND"
 )
 
 // SafetySigner is an externally provisioned PoC identity. No private key is
@@ -26,6 +30,81 @@ const (
 type SafetySigner struct {
 	ID        string
 	PublicKey []byte
+}
+
+// HoldExtendApprovalMessage is the HOLD_EXTEND variant of the human safety
+// protocol. Stop/Release retain their existing signing bytes. HoldUsed binds the
+// persisted closed-episode total; HoldSince and HoldDeadline bind the entire open
+// episode, so verification can use a later DB observation without resigning.
+// Command ID/nonce replay fencing across transactions remains Application's job;
+// the one-shot ExtensionUsed bit rejects reuse against the returned Domain state.
+func HoldExtendApprovalMessage(r PolicyRollout, expectedEpoch Epoch, commandID, nonce string, newCap time.Duration) ([]byte, error) {
+	m := r.Monitoring
+	if r.Validate() != nil || r.State != RolloutMonitoring || m.Validate() != nil || m.Decision != DecisionHold || m.ExtensionUsed || expectedEpoch != r.BaseSecurityEpoch || validateID(commandID) != nil || validateID(nonce) != nil || newCap != MonitoringExtendedCap {
+		return nil, ErrInvalidApproval
+	}
+	payload := map[string]any{
+		"action": SafetyActionHoldExtend, "scope": r.Scope, "rollout_id": r.ID,
+		"security_epoch": expectedEpoch, "hold_used": m.HoldUsed.String(),
+		"hold_budget": m.HoldBudget.String(), "new_cap": newCap.String(),
+		"extension_used":       m.ExtensionUsed,
+		"hold_since":           m.HoldSince.UTC().Format(time.RFC3339Nano),
+		"hold_deadline":        m.HoldDeadline.UTC().Format(time.RFC3339Nano),
+		"started_at":           m.StartedAt.UTC().Format(time.RFC3339Nano),
+		"observation_deadline": m.ObservationDeadline.UTC().Format(time.RFC3339Nano),
+		"last_observed_at":     m.LastObservedAt.UTC().Format(time.RFC3339Nano),
+		"decision_at":          m.DecisionAt.UTC().Format(time.RFC3339Nano),
+		"evidence_digest":      m.EvidenceDigest,
+		// Like ActivationCertificate, encode a decimal string to bind every
+		// int64 exactly despite JCS's IEEE-754 safe-integer restriction.
+		"decision_revision": strconv.FormatInt(m.DecisionRevision, 10),
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, ErrInvalidApproval
+	}
+	codec := canonical.NewJCSCodec()
+	canonicalPayload, err := codec.CanonicalizeJSON(encoded)
+	if err != nil {
+		return nil, ErrInvalidApproval
+	}
+	msg, err := canonical.Envelope(codec, canonical.DomainApproval, canonical.Context{
+		SchemaVersion: "paddock.approval/1", Audience: "governance", RequestID: commandID, Nonce: nonce,
+	}, canonicalPayload)
+	if err != nil {
+		return nil, ErrInvalidApproval
+	}
+	return msg, nil
+}
+
+// HoldExtend authenticates against the current AuthorityState and locked rollout
+// snapshot. It raises the TOTAL cap once (not an extra per-episode allowance),
+// without changing authority, epochs, observation time, or any input maps.
+func (q SafetyQuorum) HoldExtend(state AuthorityState, r PolicyRollout, expectedEpoch Epoch, commandID, nonce string, newCap time.Duration, signatures []SafetySignature, dbNow time.Time) (PolicyRollout, error) {
+	dbNow = dbNow.Round(0).UTC()
+	if !state.DatabaseAvailable {
+		return r, ErrDatabaseUnavailable
+	}
+	if state.Mode != ScopeActive || state.SecurityEpoch != expectedEpoch || checkRolloutState(state, r, RolloutMonitoring) != nil || monitoringInput(r, dbNow) != nil || r.Monitoring.expired(dbNow) {
+		return r, ErrInvalidApproval
+	}
+	msg, err := HoldExtendApprovalMessage(r, expectedEpoch, commandID, nonce, newCap)
+	if err != nil {
+		return r, err
+	}
+	if err := q.verifySignatures(msg, signatures); err != nil {
+		return r, err
+	}
+	out := r
+	m := &out.Monitoring
+	m.HoldBudget, m.ExtensionUsed = newCap, true
+	m.ExtensionCommandID, m.ExtensionNonce = commandID, nonce
+	m.HoldDeadline = m.HoldSince.Add(newCap - m.HoldUsed)
+	m.LastObservedAt = dbNow
+	if out.Validate() != nil {
+		return r, ErrInvalidApproval
+	}
+	return out, nil
 }
 
 type SafetyQuorum struct{ signers map[string]ed25519.PublicKey }
@@ -42,6 +121,11 @@ func NewSafetyQuorum(signers []SafetySigner) (SafetyQuorum, error) {
 		}
 		if _, ok := q.signers[s.ID]; ok {
 			return SafetyQuorum{}, fmt.Errorf("%w: duplicate signer ID", ErrInvalidApproval)
+		}
+		for _, key := range q.signers {
+			if bytes.Equal(key, s.PublicKey) {
+				return SafetyQuorum{}, fmt.Errorf("%w: duplicate signer key", ErrInvalidApproval)
+			}
 		}
 		q.signers[s.ID] = append(ed25519.PublicKey(nil), s.PublicKey...)
 	}
@@ -160,7 +244,11 @@ func (q SafetyQuorum) verify(state AuthorityState, action SafetyAction, expected
 	if err != nil {
 		return err
 	}
-	if len(q.signers) != 3 || len(signatures) < 2 {
+	return q.verifySignatures(msg, signatures)
+}
+
+func (q SafetyQuorum) verifySignatures(msg []byte, signatures []SafetySignature) error {
+	if len(q.signers) != 3 || len(signatures) < 2 || len(signatures) > 3 {
 		return ErrInvalidApproval
 	}
 	seen := make(map[string]bool, len(signatures))

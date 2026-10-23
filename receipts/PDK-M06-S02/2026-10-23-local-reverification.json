@@ -1,0 +1,21 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M06-S02",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-23T15:48:25Z",
+  "source":{"git_commit":"74750c3d5218fa3dc8f7082123402191def73086","git_tree":"1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED"},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN_THIS_TASK"},
+  "targets":[
+    {"path":"internal/governance/domain/kernel_approval.go","sha256":"e794e62bc6cd7d0434b44954f0157361c0186ffa265900f9de8379cdcb7fbeb9"},
+    {"path":"internal/governance/domain/kernel_approval_test.go","sha256":"228038c56f84b339b48a73521d2768048319691ae57f398b5beea4edb0500dd3"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; includes Kernel approval and transition approval tests; DB variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"gofmt -d on 55 closure Go files; targeted whitespace scan on 68 closure files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; gofmt empty, whitespace clean, design lint 89/152, diff-check clean"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Current generic pinned-Kernel signature/quorum helper added by M04-S01; verifies unchanged candidate domain-approval/1 behavior and compatibility tests"},
+  "verdict":"POST-M04 KERNEL HELPER SOURCE REVALIDATION PASS",
+  "remaining_risks":["No database behavior ran in this task.","No CI/Verifier-of-Record attestation is claimed.","Broad dirty worktree; full dirty diff hash unavailable."]
+}

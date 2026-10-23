@@ -1,0 +1,23 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M06-S01",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-23T15:48:25Z",
+  "source":{"git_commit":"74750c3d5218fa3dc8f7082123402191def73086","git_tree":"1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED"},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN_THIS_TASK"},
+  "targets":[
+    {"path":"internal/governance/application/bundle_registration.go","sha256":"fbef9b9a92ab177c5ced58a1237e2415092e90fb0433b91c09dacda869764301"},
+    {"path":"internal/governance/application/bundle_registration_test.go","sha256":"93c51e7406bcd73f33331cbd6ca1328cce2f11bd182717cff41ccc95793ff248"},
+    {"path":"internal/governance/domain/bundle_verification.go","sha256":"ef1a5dfc158d20035514035a5c90dbdc23148fadade9420915aa59abf9666d40"},
+    {"path":"internal/governance/domain/bundle_verification_test.go","sha256":"46f508e67ec0614a8878fb9806d5317a793789fc3bc0f7cfdaaeae3399e499c0"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_RECEIPT_RETENTION_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; includes Bundle registration/verification tests; DB variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"gofmt -d on 55 closure Go files; targeted whitespace scan on 68 closure files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; gofmt empty, whitespace clean, design lint 89/152, diff-check clean"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Current M04-S01 BundleRegistrationService.RegisterWithin extension and M06-S01 standalone-vs-transaction-bound behavior; complete Bundle verification and registration tests"},
+  "verdict":"POST-M04 REGISTERWITHIN SOURCE REVALIDATION PASS",
+  "remaining_risks":["No database or integration body ran in this task.","No CI/Verifier-of-Record attestation is claimed.","Broad dirty worktree; full dirty diff hash unavailable."]
+}
