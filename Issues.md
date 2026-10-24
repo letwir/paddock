@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-23
 project: PADDOCK
 repository_root: .
-phase: M10_S03_DONE_WAITING_MEMORY_INGEST
+phase: M10_S05_DONE_WAITING_MEMORY_INGEST
 active_goal: M10
-active_issue: PDK-M10-S03
+active_issue: PDK-M10-S05
 issue_state: DONE
 execution_state: DONE_WAITING_SCOPED_PUSH_APPROVAL
 current_branch: main
 verified_commit: NONE
 preflight_commit: 74750c3d5218fa3dc8f7082123402191def73086
 preflight_tree: 1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142
-preflight_worktree: "After M10-S02 partial DB verification and M10-S03 completion, current read-only status is 486 entries (31 tracked modified, 455 untracked); M10-S03's nine source paths and Receipt are untracked/modified, and all other existing dirty paths are preserved. HEAD/origin remain `6d21a1514b9426e86a2e5bfaf2d78216eaea0100`; no VCS mutation since M10-S01 push."
-last_receipt: receipts/PDK-M10-S03/2026-10-24-local-verification.json
-last_verified_test: "Main Runner independently passed `go test ./... -count=1 -shuffle=on`, `go vet ./...`, integration compile-only with DB variables unset/no bodies, gofmt/whitespace and lint 89/152. Separate read-only Verifier reported No findings. Receipt `receipts/PDK-M10-S03/2026-10-24-local-verification.json` records exact 9 target hashes/commands. No DB/HTTP/network Probe body, CI attestation, or numeric TTL policy is claimed."
-next_action: "M10-S03 Receipt is ingested to llm-memory ID `9423b5a0-8b5d-47f0-b225-32a93ced9e2e`. Proposed push candidate is exactly 12 paths: the 9 M10-S03 source/test files, its Receipt, the Cursor+M10-S03 Issue hunk, and generated index from that staged Issue snapshot. Verify partial-stage isolation and origin/main range, obtain fresh explicit VCS approval, then commit/push only that M10-S03 batch. Do not include the unresolved M10-S02/M06/M07 DB anomaly work or any other dirty path; preserve it and do not select M10-S05 until the VCS gate completes or user redirects."
-confidence: "M10-S03 source acceptance is Main Runner-verified and separately reviewed No findings: Pull requires/invokes trusted Probe, rejects Worker-supplied observations/claims, enforces freshness before gates, and legacy Postgres source callers use deterministic fake/time. Receipt `receipts/PDK-M10-S03/2026-10-24-local-verification.json` was successfully memory-ingested as knowledge ID `9423b5a0-8b5d-47f0-b225-32a93ced9e2e`. No DB body, network Probe, hardware verification, TTL value, or CI attestation. The unrelated Security Epoch anomaly remains unresolved; preserve 476 dirty paths."
+preflight_worktree: "After M10-S03 push and M10-S05 completion, current 2026-10-24 status is 479 entries (29 tracked modified, 450 untracked); 2 source/test additions and one Receipt are M10-S05, all others pre-existing. HEAD/origin are `08c7cae4cee5ff15a1d675afd981dfab15910a78`; no VCS change since M10-S03 push."
+last_receipt: receipts/PDK-M10-S05/2026-10-24-local-verification.json
+last_verified_test: "Main Runner independently passed full shuffled Go tests, full vet, exact M10-S05 unittest (2/2), gofmt/whitespace/lint 89/152 and scoped diff-check. Separate read-only Verifier reported No findings. Receipt `receipts/PDK-M10-S05/2026-10-24-local-verification.json` records target hashes/checks. No DB/network/credential effects or CI attestation."
+next_action: "M10-S05 non-secret Receipt was ingested as knowledge ID `7812df47-8a25-4aad-9605-b0d2b2864612` using an Issue-specific title after the basename collision. Before any VCS write, present exact five-path M10-S05-only include/exclude hunks, current origin/main range, then obtain fresh scoped approval. Preserve the unresolved Epoch anomaly and all other dirty paths; do not select next Issue until push gate completes or user redirects."
+confidence: "M10-S05 selected option 1 and disabled-enrollment runtime/static regressions pass Main Runner and independent review; quotas/TTL/cost/rate-limits remain unimplemented. Verified non-secret Receipt is in memory ID `7812df47-8a25-4aad-9605-b0d2b2864612`. Security Epoch anomaly remains unresolved; no DB action. VCS push awaits exact M10-S05 approval; preserve other dirty paths."
 
 
 
@@ -938,10 +938,22 @@ confidence: "M10-S03 source acceptance is Main Runner-verified and separately re
   - `acceptance`: Q0〜Q3が能力別。通信断をIntegrity違反扱いしない。
   - `evidence_expected`: Trust Profile遷移テスト。
 
-- [ ] `PDK-M10-S05` — Open Enrollment EndpointのDoS/登録枯渇対策。
+- [x] `PDK-M10-S05` — Open Enrollment EndpointのDoS/登録枯渇対策。
   - `depends_on`: PDK-M10-S01, PDK-M00-S05
   - `acceptance`: 匿名全体Quota、IP単独非依存の適応制限、Challenge TTLとコスト上限、登録数急増の隔離と監査が機能。PoC未実装時は公開エンドポイントを無効化。
   - `evidence_expected`: Burst/Replay/費用枯渇の負荷Fixtureと拒否ログ。
+  - `selected_design`: User selected the explicit PoC fallback: keep public/Open Enrollment absent and the current Coordinator listener loopback-only; add a deterministic regression test for no enrollment routes/loopback boundary. This does NOT implement or claim anonymous quotas, adaptive rate limits, Challenge TTL/cost caps, or surge audit. No external/public listener is added.
+  - `difficulty_assignment`: Main publishes `D_pub=MEDIUM` because this is a bounded Coordinator HTTP exposure-boundary regression test. Worker must report comparable `D_worker` after bounded inspection and before edits.
+  - `code_scope`: Modify only `internal/harness/poc_test.go` to test that the Coordinator handler has no enrollment/challenge routes; add `tests/test_m10_s05_enrollment_disabled.py` to assert `cmd/coordinator` rejects non-loopback listeners and the handler registers only `/healthz` and `/pull`. No production source/SQL/DB/API/HTTP route changes.
+  - `effect_boundary`: Repository-local tests/source inspection only. Do not open listeners beyond in-memory `httptest`, make external/network requests, touch DB/credentials, dependencies, PROD_DEP, VCS, or other dirty files. Security Epoch anomaly remains unresolved; no DB operations.
+  - `pre_code_design_gate`: User selected option 1 on 2026-10-24: maintain the existing PoC fallback with public enrollment disabled; source/unit regressions only. Quota/TTL/cost/adaptive rate-limit implementation remains unimplemented and unclaimed. Selection is scope only.
+  - `difficulty_result`: Worker reported D_worker=MEDIUM matching D_pub=MEDIUM; bounded task remained test-only/source-static and deterministic. No named model/provider identity is claimed.
+  - `implementation`: Added a runtime `httptest` regression for representative enrollment/challenge/register paths returning 404 while `/healthz` and `/pull` remain reachable; added a static guard that the coordinator listener rejects non-loopback addresses before DB configuration/connection. No production source changed.
+  - `runner_receipt`: `receipts/PDK-M10-S05/2026-10-24-local-verification.json`.
+  - `current_evidence`: Main Runner independently ran full shuffled Go suite, full `go vet ./...`, the focused Python test 2/2, gofmt/target whitespace, design lint 89/152, and scoped diff-check; all Exit 0. Receipt records both target hashes and commands.
+  - `independent_review`: Separate read-only Verifier reviewed both files and handler/listener context; `No findings.` It confirmed the representative 404 paths, health/pull remain, static loopback-before-DB ordering, and no quota/TTL claims. Verifier ran no tests/DB/network actions.
+  - `d016_reconciliation`: Main matched the selected fallback acceptance, two target hashes, Runner exits, and independent review. The accepted M10-S05 PoC fallback is demonstrated: external/public enrollment remains absent and the coordinator binds loopback. This does NOT demonstrate the separate quota/rate/TTL/cost acceptance clauses as implemented; they remain explicitly unimplemented. Mark DONE only for the selected disabled-endpoint fallback scope, with residual scope stated.
+  - `memory_ingest`: Actual llm-memory ingest succeeded with issue-specific title after the default basename identity collided: ID `7812df47-8a25-4aad-9605-b0d2b2864612` (v1, ACTIVE), knowledge category; only the verified non-secret receipt was included.
 
 
 ### M11 / P1 / Evidence Graph・Risk-Adaptive Trust

@@ -11,6 +11,48 @@ import (
 
 type fakeDBProbe struct{ err error }
 
+func TestCoordinatorExposesOnlyHealthAndPullRoutes(t *testing.T) {
+	handler, err := NewCoordinatorHandler("coord-a", fakeDBProbe{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	for _, route := range []string{"/enroll", "/enrollment", "/challenge", "/register", "/registration", "/api/v1/enroll"} {
+		t.Run(route, func(t *testing.T) {
+			resp, err := server.Client().Get(server.URL + route)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNotFound {
+				t.Fatalf("GET %s status=%d, want 404", route, resp.StatusCode)
+			}
+		})
+	}
+
+	for _, test := range []struct {
+		method, path string
+	}{
+		{http.MethodGet, "/healthz"},
+		{http.MethodPost, "/pull"},
+	} {
+		req, err := http.NewRequest(test.method, server.URL+test.path, strings.NewReader(`{"worker_id":"worker-a"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			t.Errorf("%s %s unexpectedly returned 404", test.method, test.path)
+		}
+	}
+}
+
 func (f fakeDBProbe) Ping(context.Context) error { return f.err }
 
 func TestCoordinatorHealthAndPull(t *testing.T) {
