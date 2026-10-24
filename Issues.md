@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-23
 project: PADDOCK
 repository_root: .
-phase: M10_S01_DONE_WAITING_MEMORY_INGEST
+phase: M10_S03_DONE_WAITING_MEMORY_INGEST
 active_goal: M10
-active_issue: PDK-M10-S01
+active_issue: PDK-M10-S03
 issue_state: DONE
-execution_state: DONE_WAITING_ISSUE_PUSH_SCOPE_APPROVAL
+execution_state: DONE_WAITING_SCOPED_PUSH_APPROVAL
 current_branch: main
 verified_commit: NONE
 preflight_commit: 74750c3d5218fa3dc8f7082123402191def73086
 preflight_tree: 1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142
-preflight_worktree: "After closure push, pre-M10 read-only status was 452 entries (19 tracked modified, 433 untracked). Current 2026-10-24 read-only status is 466 entries (19 tracked modified, 447 untracked) after the 12 allowlisted M10-S01 files, two local Receipts/Issue updates. All unrelated paths remain preserved. No VCS changes since closure push."
-last_receipt: receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json
-last_verified_test: "Main Runner full shuffled Go suite/vet, SQL static 4/4, tagged compile-only, formatting/whitespace/lint, and the exact opt-in TestWorkerEnrollmentIntegration body all exited 0. Fresh read-only preflight confirmed paddock_test/PostgreSQL 18 and expected migrator/app roles; additive migration applied once; postflight confirmed both tables empty, three APIs fixed-path/app-EXECUTE-only, and no app direct table/column privileges. Target hashes and raw Runner observations: `receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json`; no CI attestation."
-next_action: "M10-S01's verified non-secret runtime Receipt was ingested successfully to llm-memory knowledge as ID `338b9dea-2172-4216-a47b-c5a182f11637`. Before any VCS write, present the exact M10-S01 allowlist (12 new source/test/SQL files, 2 Receipts, Cursor+M10-S01 hunks, staged-snapshot generated index), exclusions, range from current HEAD to one new commit, and target origin/main; obtain explicit current-task approval. Do not select another Issue before this issue-scoped push completes or is redirected."
-confidence: "PDK-M10-S01 acceptance passed under Main local Runner plus one approved paddock_test migration/integration run, read-only pre/postflight, and separate review with its only cleanup concern reconciled. Current Receipt is `receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json`. Migration remains installed; down not run. Memory ingest succeeded as knowledge ID `338b9dea-2172-4216-a47b-c5a182f11637`; no VCS write for M10-S01 yet. No CI/Verifier-of-Record; TTL/DoS remains M10-S05; 452 unrelated paths were observed after closure push and all remain excluded."
+preflight_worktree: "After M10-S02 partial DB verification and M10-S03 completion, current read-only status is 486 entries (31 tracked modified, 455 untracked); M10-S03's nine source paths and Receipt are untracked/modified, and all other existing dirty paths are preserved. HEAD/origin remain `6d21a1514b9426e86a2e5bfaf2d78216eaea0100`; no VCS mutation since M10-S01 push."
+last_receipt: receipts/PDK-M10-S03/2026-10-24-local-verification.json
+last_verified_test: "Main Runner independently passed `go test ./... -count=1 -shuffle=on`, `go vet ./...`, integration compile-only with DB variables unset/no bodies, gofmt/whitespace and lint 89/152. Separate read-only Verifier reported No findings. Receipt `receipts/PDK-M10-S03/2026-10-24-local-verification.json` records exact 9 target hashes/commands. No DB/HTTP/network Probe body, CI attestation, or numeric TTL policy is claimed."
+next_action: "M10-S03 Receipt is ingested to llm-memory ID `9423b5a0-8b5d-47f0-b225-32a93ced9e2e`. Proposed push candidate is exactly 12 paths: the 9 M10-S03 source/test files, its Receipt, the Cursor+M10-S03 Issue hunk, and generated index from that staged Issue snapshot. Verify partial-stage isolation and origin/main range, obtain fresh explicit VCS approval, then commit/push only that M10-S03 batch. Do not include the unresolved M10-S02/M06/M07 DB anomaly work or any other dirty path; preserve it and do not select M10-S05 until the VCS gate completes or user redirects."
+confidence: "M10-S03 source acceptance is Main Runner-verified and separately reviewed No findings: Pull requires/invokes trusted Probe, rejects Worker-supplied observations/claims, enforces freshness before gates, and legacy Postgres source callers use deterministic fake/time. Receipt `receipts/PDK-M10-S03/2026-10-24-local-verification.json` was successfully memory-ingested as knowledge ID `9423b5a0-8b5d-47f0-b225-32a93ced9e2e`. No DB body, network Probe, hardware verification, TTL value, or CI attestation. The unrelated Security Epoch anomaly remains unresolved; preserve 476 dirty paths."
 
 
 
@@ -912,10 +912,27 @@ confidence: "PDK-M10-S01 acceptance passed under Main local Runner plus one appr
   - `depends_on`: PDK-M10-S01, PDK-M08-S03
   - `acceptance`: Credentialは鍵・Worker・Attempt・Epoch・Audienceに束縛され、失効後拒否。
   - `evidence_expected`: 期限切れ・盗用・失効試験。
-- [ ] `PDK-M10-S03` — Capability Claim/Evidence/Probe。
+- [x] `PDK-M10-S03` — Capability Claim/Evidence/Probe。
   - `depends_on`: PDK-M10-S01
   - `acceptance`: 自己申告・観測・ハードウェア証明を区別し、Dynamic Evidence期限切れを配車に反映。
   - `evidence_expected`: Manifest, Probe結果, 期限検証。
+  - `difficulty_assignment`: Main initially published `D_pub=MEDIUM`; bounded Worker inspection reported `D_worker=HARD` because the task crosses new Domain, Port, Application and Scheduler types plus dispatch-ordering/freshness invariants. Per `worker.difficulty-escalation`, the medium Worker stopped before edits; no files changed. Main replanned `D_pub=HARD`; one worker-hard owner implemented the revised nine-path scope and reported matching `D_worker=HARD`.
+  - `selected_implementation_boundary`: User selected a Coordinator Probe port/Application seam feeding the Scheduler dispatch gate. No database registry, migration, external/HTTP probe, or hardware attestation verifier is added.
+  - `selected_evidence_provenance`: Claims are untrusted metadata only and never satisfy Scheduler requirements. Fresh Coordinator-observed Probe evidence may satisfy dispatch. Hardware Attestation remains a distinct type/provenance but is not accepted as verified dispatch evidence until a later Issue supplies an attestation verifier. Evidence classification itself grants no Trust, Tier, Scope, Authority, or Credential.
+  - `selected_freshness`: Evidence carries `observed_at`/`valid_until`; the trusted Coordinator supplies `evaluated_at`, not Worker input. Reject Dynamic evidence when `evaluated_at >= valid_until`; missing/invalid provenance/time or future/expired evidence fails closed. This Issue chooses no TTL duration/value; O-006/M10-S05 remain open.
+  - `code_scope`: Add only `internal/governance/domain/capability_evidence.go` and `_test.go`; `internal/governance/port/capability_probe.go` and `_test.go`; `internal/governance/application/capability_evidence.go` and `_test.go`; modify `internal/governance/scheduler/pull.go` and `pull_test.go` so Pull owns/requires the trusted Probe dependency and accepts only Coordinator-generated observations; modify `internal/storage/postgres/pull_integration_test.go` only to supply a deterministic fake Probe and trusted evaluation time to legacy calls. No other source/SQL/Issue/doc/dependency/transport files.
+  - `effect_boundary`: Reversible source/unit checks only. No DB connection/migration/body, HTTP/network probe, credential access, external effect, PROD_DEP, staging/commit/push. Preserve all unrelated dirty paths and the unresolved Security Epoch DB anomaly.
+  - `pre_code_design_gate`: User selected on 2026-10-24: Coordinator Probe port/Application seam; only fresh Coordinator-observed evidence satisfies dispatch; claims are metadata; Attestation is distinct and non-accepted absent verifier; trusted caller `evaluated_at >= valid_until` rejects; no TTL numeric value; no DB or HTTP. Selections are scope only.
+  - `work_owner`: one `worker-hard` owner is assigned to the revised nine-path scope; no parallel writer.
+  - `difficulty_escalation`: The medium Worker reported D_worker=HARD>D_pub=MEDIUM before edits; Main read `worker.difficulty-scale`/`worker.difficulty-escalation`, replanned D_pub=HARD, then dispatched exactly one worker-hard. The medium Worker made no edits.
+  - `worker_report`: Initial HARD Worker reported 8 files, but separate review found two blockers. After user approved one-path expansion, the same single worker-hard revised the nine-path allowlist. Worker claims are not verification evidence.
+  - `runner_receipt`: `receipts/PDK-M10-S03/2026-10-24-local-verification.json`.
+  - `current_evidence`: Main Runner independently passed full shuffled Go suite, `go vet ./...`, integration compile-only with DB variables unset/no bodies, gofmt, nine-file whitespace, lint 89/152 and scoped diff-check. Exact target hashes/commands are in the Receipt.
+  - `independent_review_final`: Separate read-only Verifier reviewed all nine files and Pull callers; `No findings.` It confirmed Pull invokes required Probe, discards caller observations/claims for dispatch, validates fresh results before all gates, and binds the observation snapshot to Permit. Reviewer ran no tests/DB operations; CI attestation absent.
+  - `d016_reconciliation`: Main matched current target hashes, Runner checks, final Verifier report, and selected acceptance. Pull itself invokes Probe; caller-forged evidence cannot enter the accepted path; Claims/Attestations cannot satisfy requirements; expiry/future/malformed evidence rejects before gates; legacy PostgreSQL source callers provide deterministic Probe/evaluation time. Acceptance for the selected offline source scope is met; mark DONE under D-016.
+  - `memory_ingest`: Actual `llm-mem ingest -file receipts/PDK-M10-S03/2026-10-24-local-verification.json -cat knowledge` succeeded: `[ADD]`, ID `9423b5a0-8b5d-47f0-b225-32a93ced9e2e` (v1, ACTIVE), 1 section, 4 nodes, 3 edges. No credentials, DB URL, or unverified claims were ingested.
+  - `remaining_risks`: Probe trust depends on Coordinator composition; no cryptographic attestation, real hardware/network Probe, persistence, HTTP endpoint, O-006/M10-S05 TTL policy, CI or Verifier-of-Record is implemented/claimed. The unrelated Security Epoch anomaly remains unresolved; no DB operation ran for M10-S03.
+  - `selected_dispatch_security`: After separate Verifier findings, user approved exactly one extra source/test path, `internal/storage/postgres/pull_integration_test.go`, and selected that Pull must invoke a required trusted Application Probe dependency itself. Worker-provided Worker/Observations/Provenance cannot satisfy dispatch; existing PostgreSQL test callers must use a deterministic fake trusted Probe and Coordinator evaluatedAt. No DB body or other scope extension is approved.
 - [ ] `PDK-M10-S04` — Worker信頼段階を能力別に管理。
   - `depends_on`: PDK-M10-S03, PDK-M11-S02
   - `acceptance`: Q0〜Q3が能力別。通信断をIntegrity違反扱いしない。

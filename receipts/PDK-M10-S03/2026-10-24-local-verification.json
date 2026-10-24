@@ -1,0 +1,39 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M10-S03",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-24T19:42:34Z",
+  "source":{"git_commit":"6d21a1514b9426e86a2e5bfaf2d78216eaea0100","git_tree":"e1c8015797602c008e982e62fe7b797d1e04969e","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED","targets_untracked_or_modified":true},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN"},
+  "targets":[
+    {"path":"internal/governance/domain/capability_evidence.go","sha256":"1b56cd8ded403fef909b4c8d2dbab39a6932c81ecad35afad03f681e2eafbe2d"},
+    {"path":"internal/governance/domain/capability_evidence_test.go","sha256":"daf96695f110217dd25115144af4538b12e5301bf764b53f3b2213da82be1bf5"},
+    {"path":"internal/governance/port/capability_probe.go","sha256":"1cc2a60c2518f795cccf7fd867fd20d6385d403baa66236ddee9f840cdf24c8c"},
+    {"path":"internal/governance/port/capability_probe_test.go","sha256":"2d89366f29f2e6ca9b738eae1e99facc495662309ca4e7d786bf442568493488"},
+    {"path":"internal/governance/application/capability_evidence.go","sha256":"ab917f286169095692ca52702250673480d955049d5903407ce86379c93cbb02"},
+    {"path":"internal/governance/application/capability_evidence_test.go","sha256":"bbcca926b18b16f658ca42f8b21559fcd4772fb73f536c2fe34eb0c98a0f2f83"},
+    {"path":"internal/governance/scheduler/pull.go","sha256":"15447975016fb919d2777fec0b2ec71ca013dd47ce3fb0eb7de4527d981c0c0a"},
+    {"path":"internal/governance/scheduler/pull_test.go","sha256":"18c43c0b5d6cf00d9bd7cc219b9b9db944d9b67b63dd46955390cebb9a33c556"},
+    {"path":"internal/storage/postgres/pull_integration_test.go","sha256":"1005b8ecd36b02cd280cfb12175498cfe8b9ffff059fe845c44ce40914dcc255"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; DB/integration opt-in variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='integration paddock_test' ./... -run '^$' -count=1","exit_code":0,"result":"PASS; compile-only; no test bodies"},
+    {"command":"gofmt -d on all 9 target Go files","exit_code":0,"result":"PASS; no output"},
+    {"command":"targeted whitespace scan on all 9 paths","exit_code":0,"result":"PASS"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues, 152 edges"},
+    {"command":"git diff --check -- <nine target paths>","exit_code":0,"result":"PASS"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"All nine selected files, Probe origin enforcement in Pull, legacy Postgres Pull source callers, freshness and gate ordering.","limitations":"No tests, DB, network or VCS operations by Verifier."},
+  "reconciliation":"Main independently ran full shuffled Go suite, vet, integration compile-only, format/whitespace, design lint and scoped diff-check; current target hashes are recorded above. The two prior findings are closed in source: Pull owns and invokes a required Probe dependency, discards caller-supplied observations/claims for dispatch, validates the Probe result before all gates, and existing PostgreSQL Pull test callers now use a deterministic fake Probe/time. Separate read-only Verifier found no findings.",
+  "verdict":"SOURCE ACCEPTANCE PASS; DB RUNTIME NOT RUN",
+  "iteration_notes":"The implementation Worker reported intermediate insertion/build/vet failures during its iteration and corrected them; final Main Runner checks listed above independently passed. No test body was run for the PostgreSQL integration source.",
+  "remaining_risks":[
+    "Probe origin is trusted through Coordinator composition/interface injection, not a cryptographic attestation or runtime sandbox.",
+    "No real hardware Probe, hardware attestation verifier, persistence, HTTP/Network Probe or production path is implemented.",
+    "No numeric TTL or O-006 freshness policy was selected; evidence validity windows are Coordinator-supplied.",
+    "No DB body, CI attestation or Verifier-of-Record; unrelated DB Security Epoch anomaly remains unresolved and no DB operation was performed for M10-S03."
+  ]
+}

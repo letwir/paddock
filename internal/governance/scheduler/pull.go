@@ -8,14 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/letwir/paddock/internal/governance/domain"
+	"github.com/letwir/paddock/internal/governance/port"
 )
 
 var ErrRejected = errors.New("worker pull rejected")
 
-type CapabilityRequirement struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
+type CapabilityRequirement domain.CapabilityRequirement
 
 func snapshotCandidate(c Candidate) Candidate {
 	c.Requirements = append([]CapabilityRequirement(nil), c.Requirements...)
@@ -24,13 +24,14 @@ func snapshotCandidate(c Candidate) Candidate {
 
 func snapshotWorker(w Worker) Worker {
 	w.Evidence = append([]Evidence(nil), w.Evidence...)
+	w.observations = append([]domain.CoordinatorProbeEvidence(nil), w.observations...)
+	w.Attestations = append([]domain.HardwareAttestation(nil), w.Attestations...)
 	return w
 }
 
-type Evidence struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
+// Evidence preserves the storage-facing name/value representation. Incoming
+// values are only Worker claims; Pull rebuilds it from its own Probe snapshot.
+type Evidence domain.WorkerCapabilityClaim
 type Candidate struct {
 	WorkOrderID  string
 	Requirements []CapabilityRequirement
@@ -39,8 +40,19 @@ type Worker struct {
 	ID string
 	// SessionID is an opaque session bound by the trusted Coordinator; it is not
 	// authentication and must not be interpreted as proof of identity.
-	SessionID string
-	Evidence  []Evidence
+	SessionID    string
+	Evidence     []Evidence
+	Attestations []domain.HardwareAttestation
+	// Only Pull constructs the accepted snapshot; public claims and descriptive
+	// provenance supplied by callers cannot populate it.
+	observations []domain.CoordinatorProbeEvidence
+	evaluatedAt  time.Time
+}
+
+// ProbeEvidence returns a detached view for gates and reservation adapters.
+// It is descriptive evidence, not authentication or cryptographic attestation.
+func (w Worker) ProbeEvidence() []domain.CoordinatorProbeEvidence {
+	return append([]domain.CoordinatorProbeEvidence(nil), w.observations...)
 }
 
 // Gates are injectable decision seams, not worker authentication, trust formation,
@@ -82,10 +94,15 @@ func (p Permit) Authorizes(c Candidate, w Worker) bool {
 	return p.binding != ([32]byte{}) && p.binding == requestBinding(c, w)
 }
 func requestBinding(c Candidate, w Worker) [32]byte {
-	b, _ := json.Marshal(struct {
-		C Candidate
-		W Worker
-	}{c, w})
+	b, err := json.Marshal(struct {
+		C            Candidate
+		W            Worker
+		Observations []domain.CoordinatorProbeEvidence
+		EvaluatedAt  time.Time
+	}{c, w, w.observations, w.evaluatedAt})
+	if err != nil {
+		return [32]byte{}
+	}
 	return sha256.Sum256(b)
 }
 
@@ -97,6 +114,8 @@ type PullResult struct {
 	Reservation Reservation
 }
 type Puller struct {
+	// Probe is injected only by trusted Coordinator composition, never a Worker.
+	Probe                    port.CapabilityProbe
 	Authority, Trust, Budget Gate
 	Store                    Reserver
 	// LeaseTTL is supplied only by trusted Coordinator configuration.
@@ -165,21 +184,54 @@ func CapabilityMatch(required []CapabilityRequirement, evidence []Evidence) bool
 
 // Pull performs capability matching and the Authority/Trust/Budget decision seams
 // before issuing a request-bound permit to the reservation adapter.
-func (p *Puller) Pull(ctx context.Context, c Candidate, w Worker) (PullResult, error) {
+// evaluatedAt is a required trusted Coordinator time; there is no clock fallback.
+func (p *Puller) Pull(ctx context.Context, c Candidate, w Worker, evaluatedAt time.Time) (PullResult, error) {
 	var zero PullResult
 	// Detach from caller-owned backing arrays before any callback can observe them.
 	c = snapshotCandidate(c)
-	w = snapshotWorker(w)
-	if ctx == nil || p == nil || c.WorkOrderID == "" || w.ID == "" || w.SessionID == "" || p.LeaseTTL <= 0 {
+	// Even a snapshot from an earlier Pull must be observed again. Incoming
+	// claims, attestations and private snapshot state are never accepted here.
+	w = Worker{ID: w.ID, SessionID: w.SessionID}
+	if ctx == nil || p == nil || p.Probe == nil || c.WorkOrderID == "" || w.ID == "" || w.SessionID == "" || p.LeaseTTL <= 0 || evaluatedAt.IsZero() {
 		return zero, ErrRejected
 	}
-	if !CapabilityMatch(c.Requirements, w.Evidence) {
-		return zero, ErrRejected
+	if _, err := evaluatedAt.MarshalJSON(); err != nil {
+		return zero, fmt.Errorf("%w: evaluation time: %w", ErrRejected, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, fmt.Errorf("%w: %w", ErrRejected, err)
+	}
+	request := domain.CapabilityProbeRequest{WorkerID: w.ID, SessionID: w.SessionID}
+	for _, requirement := range c.Requirements {
+		request.Requirements = append(request.Requirements, domain.CapabilityRequirement(requirement))
+	}
+	if err := request.Validate(); err != nil {
+		return zero, fmt.Errorf("%w: %w", ErrRejected, err)
+	}
+	probeRequest := request
+	probeRequest.Requirements = append([]domain.CapabilityRequirement(nil), request.Requirements...)
+	observations, err := p.Probe.Observe(ctx, probeRequest, evaluatedAt)
+	if err != nil {
+		return zero, fmt.Errorf("%w: capability probe: %w", ErrRejected, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, fmt.Errorf("%w: %w", ErrRejected, err)
+	}
+	w.observations = append([]domain.CoordinatorProbeEvidence(nil), observations...)
+	if err := domain.ValidateCapabilityObservations(request, w.observations, evaluatedAt); err != nil {
+		return zero, fmt.Errorf("%w: %w", ErrRejected, err)
+	}
+	w.evaluatedAt = evaluatedAt
+	for _, e := range w.observations {
+		w.Evidence = append(w.Evidence, Evidence{Name: e.Name, Value: e.Value})
 	}
 	for _, gate := range []struct {
 		name string
 		g    Gate
 	}{{"authority", p.Authority}, {"trust", p.Trust}, {"budget", p.Budget}} {
+		if err := ctx.Err(); err != nil {
+			return zero, fmt.Errorf("%w: %w", ErrRejected, err)
+		}
 		if gate.g == nil {
 			return zero, fmt.Errorf("%w: missing %s gate", ErrRejected, gate.name)
 		}
@@ -195,6 +247,9 @@ func (p *Puller) Pull(ctx context.Context, c Candidate, w Worker) (PullResult, e
 	}
 	if p.Store == nil {
 		return zero, fmt.Errorf("%w: missing reservation store", ErrRejected)
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, fmt.Errorf("%w: %w", ErrRejected, err)
 	}
 	permit := Permit{binding: requestBinding(c, w)}
 	r, err := p.Store.Reserve(ctx, snapshotCandidate(c), snapshotWorker(w), permit, p.LeaseTTL)

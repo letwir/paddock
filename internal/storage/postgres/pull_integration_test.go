@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/letwir/paddock/internal/governance/domain"
 	"github.com/letwir/paddock/internal/governance/scheduler"
 )
 
@@ -23,6 +24,32 @@ func workerID(suffix string) string { return "pull_it_worker_" + suffix }
 
 func (pullAllow) Allow(context.Context, scheduler.Candidate, scheduler.Worker) (bool, error) {
 	return true, nil
+}
+
+// This deterministic in-process Coordinator dependency observes a fixed CPU
+// capability, never copies caller claims or echoes requested values as evidence.
+type pullCapabilityProbe struct {
+	workerID, sessionID     string
+	evaluatedAt, validUntil time.Time
+	extraObservation        bool
+}
+
+func (p pullCapabilityProbe) Observe(ctx context.Context, r domain.CapabilityProbeRequest, evaluatedAt time.Time) ([]domain.CoordinatorProbeEvidence, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if r.WorkerID != p.workerID || r.SessionID != p.sessionID || !evaluatedAt.Equal(p.evaluatedAt) {
+		return nil, domain.ErrCapabilityEvidence
+	}
+	if len(r.Requirements) == 0 && !p.extraObservation {
+		return nil, nil
+	}
+	return []domain.CoordinatorProbeEvidence{{
+		Name: "cpu", Value: "x",
+		Provenance: domain.ProbeProvenance{Source: domain.CoordinatorObservedProbe,
+			CoordinatorID: "pull_it_coordinator", ProbeID: "pull_it_probe", WorkerID: p.workerID, SessionID: p.sessionID},
+		ObservedAt: p.evaluatedAt, ValidUntil: p.validUntil,
+	}}, nil
 }
 
 // Requires operator-applied M08-S01/S02 migrations; this test never applies migrations.
@@ -137,9 +164,11 @@ func TestPullReservationConcurrentOneWinner(t *testing.T) {
 	if _, err := store.Reserve(ctx, candidate, worker, scheduler.Permit{}, leaseTTL); err == nil {
 		t.Fatal("direct zero-permit bypass succeeded")
 	}
-	puller := scheduler.Puller{Authority: pullAllow{}, Trust: pullAllow{}, Budget: pullAllow{}, Store: store, Lifecycle: store, LeaseTTL: leaseTTL}
+	evaluatedAt := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	probe := pullCapabilityProbe{workerID: worker.ID, sessionID: worker.SessionID, evaluatedAt: evaluatedAt, validUntil: evaluatedAt.Add(leaseTTL)}
+	puller := scheduler.Puller{Probe: probe, Authority: pullAllow{}, Trust: pullAllow{}, Budget: pullAllow{}, Store: store, Lifecycle: store, LeaseTTL: leaseTTL}
 	mismatch := scheduler.Candidate{WorkOrderID: wo, Requirements: []scheduler.CapabilityRequirement{{Name: "cpu", Value: "different"}}}
-	if _, err := puller.Pull(ctx, mismatch, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID, Evidence: []scheduler.Evidence{{Name: "cpu", Value: "different"}}}); err == nil {
+	if _, err := puller.Pull(ctx, mismatch, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID, Evidence: []scheduler.Evidence{{Name: "cpu", Value: "different"}}}, evaluatedAt); err == nil {
 		t.Fatal("candidate requirements that differ from canonical DB requirements were accepted")
 	}
 	const n = 2
@@ -155,7 +184,7 @@ func TestPullReservationConcurrentOneWinner(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			r, e := puller.Pull(ctx, candidate, worker)
+			r, e := puller.Pull(ctx, candidate, worker, evaluatedAt)
 			results <- pullOutcome{r, e}
 		}()
 	}
@@ -221,7 +250,7 @@ func TestPullReservationConcurrentOneWinner(t *testing.T) {
 	if err := setupPool.QueryRow(ctx, "SELECT pull_state FROM raw.work_orders WHERE work_order_id=$1", wo).Scan(&state); err != nil || state != "READY" {
 		t.Fatal("reaper did not release WorkOrder to READY")
 	}
-	second, err := puller.Pull(ctx, candidate, worker)
+	second, err := puller.Pull(ctx, candidate, worker, evaluatedAt)
 	if err != nil {
 		t.Fatal("re-pull after reaping failed")
 	}
@@ -270,11 +299,14 @@ func TestPullReservationConcurrentOneWinner(t *testing.T) {
 	if !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatal("empty policy accepted non-empty evidence")
 	}
-	if _, err := puller.Pull(ctx, scheduler.Candidate{WorkOrderID: emptyWO}, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID}); err != nil {
+	if _, err := puller.Pull(ctx, scheduler.Candidate{WorkOrderID: emptyWO}, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID}, evaluatedAt); err != nil {
 		t.Fatal("explicit empty policy reservation failed")
 	}
-	if _, err := puller.Pull(ctx, scheduler.Candidate{WorkOrderID: emptyWO}, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID, Evidence: []scheduler.Evidence{{Name: "cpu", Value: "x"}}}); err == nil {
-		t.Fatal("explicit empty policy accepted non-empty worker evidence")
+	probe.extraObservation = true
+	rejectingPuller := puller
+	rejectingPuller.Probe = probe
+	if _, err := rejectingPuller.Pull(ctx, scheduler.Candidate{WorkOrderID: emptyWO}, scheduler.Worker{ID: worker.ID, SessionID: worker.SessionID, Evidence: []scheduler.Evidence{{Name: "cpu", Value: "x"}}}, evaluatedAt); err == nil {
+		t.Fatal("explicit empty policy accepted unsolicited probe evidence")
 	}
 }
 
