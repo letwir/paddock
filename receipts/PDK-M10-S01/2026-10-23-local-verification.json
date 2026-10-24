@@ -1,0 +1,33 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M10-S01",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-23T23:47:23Z",
+  "source":{"git_commit":"d7cd2e32a69de488279d28886bceaa52aae8d386","git_tree":"10b779378fba0855fbb6fdbd439b120b17c6f4d8","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED","target_files_untracked":true},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN"},
+  "targets":[
+    {"path":"internal/governance/domain/worker_enrollment.go","sha256":"e76128e4df8394be2b4be7d032ee829fd2fe341121fb849ea50469a1a2a805c6"},
+    {"path":"internal/governance/domain/worker_enrollment_test.go","sha256":"7b2cec10622f313a18f663aacc0a247c3e9aa1d6f0ea56fff456f9702d496efd"},
+    {"path":"internal/governance/port/worker_enrollment.go","sha256":"6e6d9a90dd72a052d3e2eceaffc65a4b4fe2fa4d0da6a0bba02def56d85a495e"},
+    {"path":"internal/governance/port/worker_enrollment_test.go","sha256":"5dcfa9fc0d492318468655d324e2c15bddb30dd886649b5575381bbec4b1bbbd"},
+    {"path":"internal/governance/application/worker_enrollment.go","sha256":"b06aae6ef0904f06e2944a825336609b39e01adcffc35c64c391166904749da0"},
+    {"path":"internal/governance/application/worker_enrollment_test.go","sha256":"2550411a76a2802a1e289e5405a9af256bd8d00f9bdc5160cc209ff26ab7f137"},
+    {"path":"internal/storage/postgres/worker_enrollment_store.go","sha256":"e0610e96460402d31d817bdb2e4e6546144fa2f90953f22afe673aee80e2e419"},
+    {"path":"internal/storage/postgres/worker_enrollment_store_test.go","sha256":"522024301170e1e0d8259cc9d6302542870a02aed3ae63900226a70bac90ddba"},
+    {"path":"internal/storage/postgres/worker_enrollment_integration_test.go","sha256":"d85f2b0e27054710fcfd296d2e342796d0383faee9065c8f58b3514a4b19bf0e"},
+    {"path":"sql/governance_worker_enrollment.sql","sha256":"d4afcb110fbfc770921c19b0df0c659148106e56e84b605157ce113b2de13aaa"},
+    {"path":"sql/governance_worker_enrollment_down.sql","sha256":"7cc7245ae78ca0d5712808908b843efd31cd7d242215467606c97e6ab80605cc"},
+    {"path":"tests/test_m10_s01_worker_enrollment_sql.py","sha256":"20c6c175b8bd2ae2055450bfb45d25a92c580783c18b444222b512ae4ef47846"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_ENROLLMENT_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; all packages; DB and integration opt-in variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_ENROLLMENT_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_ENROLLMENT_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='paddock_test integration' -run '^$' ./internal/storage/postgres -count=1","exit_code":0,"result":"PASS; integration source compiled; no test bodies"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -p 'test_m10_s01_worker_enrollment_sql.py' -v","exit_code":0,"result":"PASS; 4/4 SQL static tests"},
+    {"command":"gofmt -d on nine new Go files; targeted whitespace scan on all 12 new files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; no formatting/whitespace issues; design lint 89/152; diff-check clean"}
+  ],
+  "independent_review":{"kind":"Separate read-only Verifier subagent","scope":"All 12 M10-S01 files, including transaction/replay, SQL ACLs, Q0 boundary and exact-fixture cleanup.","reported_finding":"One P2/Medium claim stated challenge cleanup before Worker cleanup violates the FK.","main_reconciliation":"Main checked SQL: challenge.consumed_worker_id is the child FK to worker_enrollment_workers.worker_id. The integration cleanup deletes child challenge rows first, then Worker parent rows, so the FK reference is removed before deleting parents; the finding is not actionable. No code change was needed. No other actionable findings were reported.","limitations":"Verifier ran no tests/DB operations; no CI attestation."},
+  "verdict":"LOCAL SOURCE CHECKS PASS; DB RUNTIME NOT RUN",
+  "remaining_risks":["PostgreSQL runtime/ACL/concurrency and DB cleanup were not executed; the integration source was compile-only.","Challenge TTL/anonymous quota/rate limiting remain deferred to PDK-M10-S05.","Ed25519 PoP proves key possession only, not real-world identity; Q0 has no Trust/Scope/Authority.","No CI/Verifier-of-Record attestation is claimed."]
+}

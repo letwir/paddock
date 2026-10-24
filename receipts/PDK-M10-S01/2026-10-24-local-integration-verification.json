@@ -1,0 +1,34 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M10-S01",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-24T00:35:27Z",
+  "source":{"git_commit":"d7cd2e32a69de488279d28886bceaa52aae8d386","git_tree":"10b779378fba0855fbb6fdbd439b120b17c6f4d8","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED","target_files_untracked":true},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"PostgreSQL major 18; minor not captured"},
+  "targets":[
+    {"path":"internal/governance/domain/worker_enrollment.go","sha256":"e76128e4df8394be2b4be7d032ee829fd2fe341121fb849ea50469a1a2a805c6"},
+    {"path":"internal/governance/domain/worker_enrollment_test.go","sha256":"7b2cec10622f313a18f663aacc0a247c3e9aa1d6f0ea56fff456f9702d496efd"},
+    {"path":"internal/governance/port/worker_enrollment.go","sha256":"6e6d9a90dd72a052d3e2eceaffc65a4b4fe2fa4d0da6a0bba02def56d85a495e"},
+    {"path":"internal/governance/port/worker_enrollment_test.go","sha256":"5dcfa9fc0d492318468655d324e2c15bddb30dd886649b5575381bbec4b1bbbd"},
+    {"path":"internal/governance/application/worker_enrollment.go","sha256":"b06aae6ef0904f06e2944a825336609b39e01adcffc35c64c391166904749da0"},
+    {"path":"internal/governance/application/worker_enrollment_test.go","sha256":"2550411a76a2802a1e289e5405a9af256bd8d00f9bdc5160cc209ff26ab7f137"},
+    {"path":"internal/storage/postgres/worker_enrollment_store.go","sha256":"e0610e96460402d31d817bdb2e4e6546144fa2f90953f22afe673aee80e2e419"},
+    {"path":"internal/storage/postgres/worker_enrollment_store_test.go","sha256":"522024301170e1e0d8259cc9d6302542870a02aed3ae63900226a70bac90ddba"},
+    {"path":"internal/storage/postgres/worker_enrollment_integration_test.go","sha256":"d85f2b0e27054710fcfd296d2e342796d0383faee9065c8f58b3514a4b19bf0e"},
+    {"path":"sql/governance_worker_enrollment.sql","sha256":"d4afcb110fbfc770921c19b0df0c659148106e56e84b605157ce113b2de13aaa"},
+    {"path":"sql/governance_worker_enrollment_down.sql","sha256":"7cc7245ae78ca0d5712808908b843efd31cd7d242215467606c97e6ab80605cc"},
+    {"path":"tests/test_m10_s01_worker_enrollment_sql.py","sha256":"20c6c175b8bd2ae2055450bfb45d25a92c580783c18b444222b512ae4ef47846"}
+  ],
+  "checks":[
+    {"command":"scripts/init_test_db.sh --check","exit_code":0,"result":"PASS; output redirected; database identity/version/raw relation count inspected read-only"},
+    {"command":"Custom read-only psql preflight via PADDOCK_DB_URL and PADDOCK_APP_DB_URL (values not printed)","exit_code":0,"result":"PASS; paddock_test, PostgreSQL major 18, migrator/app identities and non-elevated roles, raw schema owner, pg_catalog.sha256(bytea), M10-S01 tables/functions absent"},
+    {"command":"psql PADDOCK_DB_URL -X --no-psqlrc -q -v ON_ERROR_STOP=1 -f sql/governance_worker_enrollment.sql (URL not printed)","exit_code":0,"result":"PASS; additive migration applied once to paddock_test as paddock_migrator; no retry/down/reset"},
+    {"command":"PADDOCK_WORKER_ENROLLMENT_INTEGRATION=1 GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='paddock_test integration' ./internal/storage/postgres -run '^TestWorkerEnrollmentIntegration$' -count=1 -v","exit_code":0,"result":"PASS; named body once (0.798s)"},
+    {"command":"Custom read-only psql postflight of identity, empty enrollment tables, function owner/path/ACL/grantees, and app table/column privileges (URL not printed)","exit_code":0,"result":"PASS; both enrollment tables empty, three guarded fixed-path APIs migrator-owned and app EXECUTE only, no unexpected grants or app direct table/column rights"}
+  ],
+  "independent_review":{"kind":"Separate read-only Verifier subagent","scope":"All 12 M10-S01 files, including transaction/replay behavior, SQL ACLs, Q0 boundary and exact-fixture cleanup.","reported_finding":"One P2/Medium claim stated challenge cleanup before Worker cleanup violates the FK.","main_reconciliation":"Main checked SQL: challenge.consumed_worker_id is the child FK to worker_enrollment_workers.worker_id. The integration cleanup deletes child challenge rows first, then Worker parent rows, removing the FK reference before deleting parents. The reported finding is not actionable; no code change was needed. No other actionable findings were reported.","limitations":"Verifier ran no tests/DB operations; no CI attestation. Main performed the read-only database preflight/postflight and ran the named integration body."},
+  "reconciliation":"Main matched the selected challenge binding, success-only consumption, duplicate-key denial, single transaction, Q0-only state, current file hashes, Runner observations, and independent review. DB runtime acceptance for the selected paddock_test scope was observed and exact cleanup/ACL postflight passed.",
+  "verdict":"PADDOCK_TEST ACCEPTANCE PASS; SOURCE AND DB RUNTIME VERIFIED LOCALLY",
+  "remaining_risks":["Migration remains installed in paddock_test; down migration was not run.","No public HTTP route/listener is implemented; external/public enrollment remains out of scope.","Challenge TTL, anonymous admission quota, rate limiting and DoS bounds are deferred to PDK-M10-S05.","Ed25519 PoP proves key possession only, not real-world Worker identity; Q0 receives no Trust/Scope/Authority.","No CI/Verifier-of-Record attestation is claimed; 452 unrelated dirty entries remain preserved."]
+}

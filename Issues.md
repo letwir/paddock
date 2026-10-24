@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-23
 project: PADDOCK
 repository_root: .
-phase: M07_S05_DONE_WAITING_MEMORY_INGEST
-active_goal: M07
-active_issue: PDK-M07-S05
+phase: M10_S01_DONE_WAITING_MEMORY_INGEST
+active_goal: M10
+active_issue: PDK-M10-S01
 issue_state: DONE
-execution_state: CLOSURE_PUSH_AUTHORIZED_PENDING_EXECUTION
+execution_state: DONE_WAITING_ISSUE_PUSH_SCOPE_APPROVAL
 current_branch: main
 verified_commit: NONE
 preflight_commit: 74750c3d5218fa3dc8f7082123402191def73086
 preflight_tree: 1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142
-preflight_worktree: "Initial 2026-10-23 audit observed 115 collapsed git-status entries (30 tracked modifications and 85 displayed untracked paths; 492 untracked files). Current read-only `git status --porcelain=v1 --untracked-files=all` observes 530 entries (30 tracked modified, 500 untracked files). HEAD/tree remain 74750c3d5218fa3dc8f7082123402191def73086/1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142. No VCS mutation."
-last_receipt: receipts/PDK-M07-S05/2026-10-23-local-verification.json
-last_verified_test: "PDK-M07-S05 source-only acceptance passed at target HEAD `74750c3d5218fa3dc8f7082123402191def73086`, tree `1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142`, with new target file hashes recorded in `receipts/PDK-M07-S05/2026-10-23-local-verification.json`: focused sync tests Exit 0; Application/Domain shuffled suites Exit 0; full `go test ./... -count=1 -shuffle=on` Exit 0 with DB vars unset; `go vet ./...` Exit 0; design lint PASS 89/152; gofmt/target whitespace PASS. Separate read-only Verifier reported no findings. No DB or HTTP runtime ran."
-next_action: "The user approved the exact 80-path closure batch to `origin/main`: 60 source/test/SQL paths, 18 named Receipts, Cursor plus 13 Issue blocks, and the generated index from the staged snapshot. Stage only the approved allowlist/hunks, verify the staged names/content/index exactly, then create one commit and non-force push to the existing upstream. If the upstream ref changed, any out-of-scope path appears, or Issue/index isolation fails, stop without commit/push and preserve the staged state for report. After a successful push and range verification, update Cursor and select the next Issue with `scripts/continue_plan.py`."
-confidence: "M07-S05 is locally DONE and its receipt is ingested. All 12 upstream dependency Issues have local Runner/reviewer evidence and verified memory references; four receipts refresh changed target hashes. Current worktree remains broadly dirty (530 entries), but no path was staged before the exact approval. No CI/Verifier-of-Record attestation; no production/HTTP adapter or new DB behavior claimed. PDK-M04-S05 remains [~] pending its DB gate. Only the approved closure batch may be pushed; preserve every other path/hunk."
+preflight_worktree: "After closure push, pre-M10 read-only status was 452 entries (19 tracked modified, 433 untracked). Current 2026-10-24 read-only status is 466 entries (19 tracked modified, 447 untracked) after the 12 allowlisted M10-S01 files, two local Receipts/Issue updates. All unrelated paths remain preserved. No VCS changes since closure push."
+last_receipt: receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json
+last_verified_test: "Main Runner full shuffled Go suite/vet, SQL static 4/4, tagged compile-only, formatting/whitespace/lint, and the exact opt-in TestWorkerEnrollmentIntegration body all exited 0. Fresh read-only preflight confirmed paddock_test/PostgreSQL 18 and expected migrator/app roles; additive migration applied once; postflight confirmed both tables empty, three APIs fixed-path/app-EXECUTE-only, and no app direct table/column privileges. Target hashes and raw Runner observations: `receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json`; no CI attestation."
+next_action: "M10-S01's verified non-secret runtime Receipt was ingested successfully to llm-memory knowledge as ID `338b9dea-2172-4216-a47b-c5a182f11637`. Before any VCS write, present the exact M10-S01 allowlist (12 new source/test/SQL files, 2 Receipts, Cursor+M10-S01 hunks, staged-snapshot generated index), exclusions, range from current HEAD to one new commit, and target origin/main; obtain explicit current-task approval. Do not select another Issue before this issue-scoped push completes or is redirected."
+confidence: "PDK-M10-S01 acceptance passed under Main local Runner plus one approved paddock_test migration/integration run, read-only pre/postflight, and separate review with its only cleanup concern reconciled. Current Receipt is `receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json`. Migration remains installed; down not run. Memory ingest succeeded as knowledge ID `338b9dea-2172-4216-a47b-c5a182f11637`; no VCS write for M10-S01 yet. No CI/Verifier-of-Record; TTL/DoS remains M10-S05; 452 unrelated paths were observed after closure push and all remain excluded."
 
 
 
@@ -885,10 +885,29 @@ confidence: "M07-S05 is locally DONE and its receipt is ingested. All 12 upstrea
 
 **中目標:** 未知Workerを隔離から受け入れてもAuthorityを混同しない。
 
-- [ ] `PDK-M10-S01` — 公開鍵Challenge、Enrollment、Quarantine登録。
+- [x] `PDK-M10-S01` — 公開鍵Challenge、Enrollment、Quarantine登録。
   - `depends_on`: PDK-M06-S01
   - `acceptance`: 未知Workerは申請可能、Replayや再利用Ticketは拒否、通常Scopeには参加不可。
   - `evidence_expected`: 認証・異常系Fixture。
+  - `work_owner`: `worker-hard`; single owner for the 12 new allowlisted source/test/SQL files.
+  - `difficulty_assignment`: Main publishes `D_pub=HARD` because this crosses cryptographic Worker proof, single-use replay state, active-active persistence, and Q0 authorization isolation. Worker must report comparable `D_worker` after bounded inspection and before edits.
+  - `selected_persistence`: User selected PostgreSQL shared state with separate challenge-ticket and Worker/Q0 identity records. Ticket consumption and Q0 registration are one transaction; app role uses fixed-path app-only capabilities, with no direct protected-table grants. No DB apply/body is authorized.
+  - `selected_identity`: User selected Coordinator-generated opaque random WorkerID, stored separately from the Ed25519 public-key fingerprint; duplicate key registration is rejected. WorkerID/key possession proves no real-world identity, Trust, or Authority.
+  - `selected_proof`: User selected Ed25519 proof-of-possession over a versioned RFC 8785 JCS envelope with dedicated `paddock.worker-enrollment` domain; bind challenge ID, nonce, audience, schema and key fingerprint. Challenge/nonce generation uses cryptographic randomness. Failed/mismatched proof does not consume the ticket; successful enrollment consumes it atomically with Q0 registration. Reuse after success is rejected.
+  - `selected_audience`: User selected cluster-common audience `paddock.coordinator` so a challenge issued by one Coordinator can be completed by another Active-Active Coordinator sharing PostgreSQL. Fixed schema is `paddock.worker-enrollment/1`; this does not authorize public HTTP exposure.
+  - `selected_transport`: User selected Application/DB service only; do not add HTTP route/listener or enable public/external enrollment in this Issue.
+  - `deferred_policy`: Challenge TTL, anonymous admission quota, rate limiting and DoS bounds remain with PDK-M10-S05; this Issue chooses no numeric expiry/limit. Until then, no public listener is added.
+  - `code_scope`: Add only `internal/governance/domain/worker_enrollment.go` and `worker_enrollment_test.go`; `internal/governance/port/worker_enrollment.go` and `worker_enrollment_test.go`; `internal/governance/application/worker_enrollment.go` and `worker_enrollment_test.go`; `internal/storage/postgres/worker_enrollment_store.go`, `worker_enrollment_store_test.go`, and `worker_enrollment_integration_test.go`; `sql/governance_worker_enrollment.sql`, `sql/governance_worker_enrollment_down.sql`; `tests/test_m10_s01_worker_enrollment_sql.py`. No edits to existing source, canonical package, HTTP transport, dependencies, or other Issues.
+  - `effect_boundary`: Local source, deterministic unit/static tests, and integration-tag compile-only only. No credential access, external access, DB connection/migration/body, PROD_DEP, staging, commit, or push. Each DB effect needs separate exact current-task approval.
+  - `pre_code_design_gate`: User selected on 2026-10-23: shared PostgreSQL storage; separate Challenge/Worker records; one-transaction consume+Q0 insert; Coordinator-opaque WorkerID; Ed25519/JCS domain-separated proof with cluster-common audience; failed proof leaves ticket unused, success consumes it; Application/DB only, no HTTP; TTL/DoS numbers deferred to M10-S05. Selections set scope only.
+  - `implementation`: Added typed Domain PoP validation, Coordinator Application service with crypto/rand challenge and WorkerID, narrow enrollment Store port, PostgreSQL app-only fixed-path capabilities, guarded up/down SQL, offline SQL contract tests, and opt-in exact-fixture Active-Active integration test source. Invalid proofs do not consume tickets; a successful SQL function atomically inserts one Q0 Worker and consumes the ticket. No Trust promotion, Scope, Authority, TTL, quota, HTTP listener, or production identity claim.
+  - `runner_receipt`: `receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json`.
+  - `source_receipt`: `receipts/PDK-M10-S01/2026-10-23-local-verification.json` records the source-only tests and compile-only check before DB approval.
+  - `current_evidence`: Main Runner independently passed full shuffled Go tests/vet, integration compile-only with DB variables unset, SQL static tests 4/4, gofmt/12-file whitespace, design lint 89/152 and diff-check. After exact user approval, fresh read-only preflight verified `paddock_test`/PostgreSQL 18, expected non-elevated migrator/app roles, `raw` owner, SHA-256 support and absent M10 objects; migration applied once (Exit 0); only `TestWorkerEnrollmentIntegration` ran once (Exit 0, 0.798s). Read-only postflight verified both enrollment tables empty, 3 fixed-path migrator-owned APIs with app EXECUTE-only and no direct app table/column grants. Receipt records the current hashes and exact commands; no down/reset/other DB body.
+  - `independent_review`: Separate read-only Verifier reviewed all 12 files and reported one P2 cleanup-order concern. Main resolved it after inspecting SQL FK direction: challenge rows are the referencing children and are deleted before Worker parents, so no FK violation occurs. No other actionable findings remain. Reviewer ran no tests/DB operations; Main's Runner supplies execution evidence.
+  - `d016_reconciliation`: Main matched the 12-file allowlist/current hashes, Runner Exit Codes, independent review report and every selected acceptance clause. Invalid proof remained retryable; valid proof produced one Q0 Worker; successful Ticket reuse and duplicate-key enrollment were denied; shared-DB race fixtures had exactly one winner. Pre/postflight confirmed exact cleanup and app-only ACLs. The Verifier cleanup concern was resolved as a false positive by FK direction and exact delete order. Mark DONE under D-016 for the selected `paddock_test` scope; no CI attestation.
+  - `remaining_gate`: NONE for selected `paddock_test` acceptance after current Runner/preflight/postflight. The additive migration remains installed and no down migration ran; Security Epoch is unchanged. Residuals: no public HTTP/external enrollment, real-world identity attestation, TTL/rate/quota policy, production keys, CI, or Verifier-of-Record claim; TTL/DoS bounds remain M10-S05. 452 unrelated dirty paths remain untouched.
+  - `memory_ingest`: Actual `llm-mem ingest -file receipts/PDK-M10-S01/2026-10-24-local-integration-verification.json -cat knowledge` succeeded: `[ADD]`, ID `338b9dea-2172-4216-a47b-c5a182f11637` (v1, ACTIVE), 1 section, 3 nodes, 2 edges. No credential, database URL, or unverified claim was included.
 - [ ] `PDK-M10-S02` — Session/Attempt CredentialとIssuer Ceiling。
   - `depends_on`: PDK-M10-S01, PDK-M08-S03
   - `acceptance`: Credentialは鍵・Worker・Attempt・Epoch・Audienceに束縛され、失効後拒否。
