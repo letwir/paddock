@@ -6,50 +6,41 @@
 # PADDOCK CONTINUE/1 · handover snapshot · 2026-10-25
 
 §0 REFRESH ∧ AUTHORITY
-Snapshot:=point_in_time∧stale_possible. On every refresh, re-observe and replace this ENTIRE file; ¬append∨merge(old snapshot). This file≠canonical truth≠permission. Authority=system/developer/current-user instructions + PADDOCK routed LRF + `decisions.md` ACCEPTED; `Issues.md` records work/Cursor; Git/Receipts provide observations. Unknown→preserve+report.
+Snapshot:=point_in_time∧stale_possible. On refresh, re-observe and replace this ENTIRE file; ¬append∨merge(old snapshot). This file≠canonical truth≠permission. Authority=system/developer/current-user instructions + PADDOCK routed LRF + `decisions.md` ACCEPTED; `Issues.md` records work/Cursor; Git/Receipts provide observations. Unknown→preserve+report.
 
-Legend: `A`=ACCEPTED+LRF; `P`=DESIGN_BASELINE/OPEN; `Cursor`=navigation hint; `R`=Runner/Receipt; `W`=worktree; `→`=ordered action only; `∧`=AND; `∨`=inclusive OR; `¬`=NOT; `≠`=not equal. Symbols are representation only, not authorization or evidence.
+Legend: `A`=ACCEPTED+LRF; `P`=DESIGN_BASELINE/OPEN; `Cursor`=navigation hint; `R`=Runner/Receipt; `W`=worktree; `→`=ordered action only; `∧`=AND; `∨`=inclusive OR; `¬`=NOT; `≠`=not equal. Symbols are representation only, not authorization/evidence.
 
 §1 REPOSITORY SNAPSHOT
 - Repo=PADDOCK; branch=`main`.
-- Fresh read-only observation 2026-10-25: `HEAD=origin/main=df40050e93ef671afe2e98b0b0360cd65bb00caf`; tree=`db01542126570afb398d75ba10964f7e02d3a425`; divergence=0/0.
-- Worktree has 478 changed/untracked entries (29 tracked modified/deleted, 449 untracked). Exactly these three paths are staged: `Issues.md`, `docs/handover.md`, and `docs/issue-dependencies.generated.md`. Preserve all remaining unstaged/untracked paths, including tracked `AGENTS.md` deletion and all source, SQL, receipt, rules, and `.build` work.
-- Recent history: `df40050` POLYGLYPH prompt/develop/handover docs; `647cdb5` design evaluation/handover guides; `4475b6f` M11-S01 Evidence Graph; `c623b6c` M10-S05; `08c7cae` M10-S03.
-- `prompt.md` and `docs/develop.md` are already committed at HEAD `df40050`; they are unchanged in the current worktree. The staged Issue diff contains only approved Cursor fields (`phase`, `execution_state`, `preflight_commit`, `preflight_tree`, `preflight_worktree`, `last_verified_test`, `next_action`, `confidence`) and the PDK-M11-S01 `memory_ingest` field. All other Issue hunks remain unstaged.
+- Fresh observation 2026-10-25: `HEAD=origin/main=321b92e44cd42b292b561806f1b37158ada244da`; tree=`4aeda1b29674f831afd6ba22d664b5c8e256f805`; divergence=0/0.
+- Status has 481 entries: 29 tracked modified/deleted, 3 staged additions, 449 untracked. Exactly six paths are staged: `Issues.md`, `docs/handover.md`, `docs/issue-dependencies.generated.md`, `internal/governance/domain/independent_evidence.go`, `internal/governance/domain/independent_evidence_test.go`, and `receipts/PDK-M11-S02/2026-10-25-local-verification.json`. Preserve every other path, including tracked `AGENTS.md` deletion and unrelated source, SQL, receipt, rules, `.build`, and untracked work.
+- `prompt.md` and `docs/develop.md` are already in HEAD ancestry and are not part of this batch.
 
-§2 CURSOR ∧ CHECKS
-- Cursor: active=`PDK-M11-S01`, state=`[x] DONE`; Receipt=`receipts/PDK-M11-S01/2026-10-24-local-verification.json`; exact docs VCS scope is approved and staged; commit/push remain pending.
-- Receipt SHA-256=`e4c4e09299b19d7acab52b467f0d244c5a359003b397a7f05063ff55d7bf3c6e`. It records local source-only full shuffled Go tests/vet, formatting, lint, scoped diff check, and a separate read-only no-findings review. It does not claim DB execution, CI attestation, production behavior, external payload resolution, key custody, organizational independence, or durable single-use replay.
-- Current-task `llm-mem ingest` of the non-secret Receipt-derived outcome returned `[ADD]`, knowledge ID `2c5de9d9-427c-425b-9971-2ab92cfbf6d5` (v1, ACTIVE); title search returned the same ID. Only verified outcome and receipt evidence were recorded.
-- Selected/staged Issue snapshot lint: `python3 scripts/lint_design.py --emit-summary` Exit 0 and `python3 scripts/lint_design.py` Exit 0; 89 Issues/151 edges; staged `Issues.md` SHA-256=`8afb211d1ded1245399358538d9c20a613636ef5c7ecd24d1882913f7f9f07a8`.
-- Full worktree lint: `python3 scripts/lint_design.py` Exit 0; 89 Issues/152 edges; `python3 scripts/continue_plan.py` Exit 0 selects `PDK-M11-S02` (`first_ready_incomplete`). The unstaged worktree index represents the full local Issue snapshot; the staged generated index matches only the selected staged Issue snapshot.
-- No CI attestation. Staged diff whitespace and exact three-path/hunk verification remain part of the pre-commit gate.
+§2 PDK-M11-S02 · DONE, LOCAL SOURCE ONLY
+- Cursor: active=`PDK-M11-S02`, state=`[x] DONE`; Receipt=`receipts/PDK-M11-S02/2026-10-25-local-verification.json`, SHA-256=`8796769f59911aab717cfbc1524427f19fb28b564d50800ae18d43023d8a9ebd`.
+- Target SHA-256: `internal/governance/domain/independent_evidence.go`=`2426672c12fb90e3c8131079db0c64f5fdf6a1d66022b9401692c1fccf8cbea8`; `_test.go`=`573f7186261c46770cb5a09c68140c39fd02129002e3e070320c2e36b3084837`.
+- Main Runner: offline focused Domain tests, Domain vet, gofmt, design lint and target diff-check all Exit 0. Receipt records exact commands, target revision/hashes and dirty-state limitation. No DB body or CI attestation.
+- Separate final read-only Verifier reviewed the final hashes and acceptance; verdict `NO_FINDINGS`. It ran no tests or DB/network operations.
+- Design: separate immutable caller-trusted signer→ControlDomain mapping; at most one count per exact `(Subject, PayloadDigest)`; unknown mapping=zero. This deduplicates declared labels only; it does not prove real-world/organizational independence, mapping provenance, key custody, risk-tier thresholds, Trust promotion, or production quorum.
+- Memory ingest returned `[ADD]`, knowledge ID=`1280a653-9cfd-47be-b56f-a988b76edc62` (v1, ACTIVE); title search returned the same ID. Only the non-secret verified Receipt-derived outcome was ingested.
+- Full worktree Lint Exit 0 (89 Issues/152 edges). The selected staged Issue snapshot has SHA-256=`443dbd9424b0474c3fbb36cf2b099e9d59f544e53e7372ac611be46a9a9135ab`; its official generated index matches and staged-snapshot Lint passed Exit 0 (89 Issues/151 edges). Full worktree index remains separately regenerated at 152 edges and unstaged outside the approved index blob.
 
 §3 APPROVED VCS GATE · COMMIT/PUSH PENDING
-- The user explicitly approved staging, one docs-only commit, and push for the exact scope below, including `preflight_commit` and `preflight_tree` after a scope correction. Current staged paths are exactly the approved three; no commit or push has occurred yet.
-- Include: (1) full-file `docs/handover.md`; (2) only the listed Cursor fields and PDK-M11-S01 `memory_ingest` hunk in `Issues.md`; (3) `docs/issue-dependencies.generated.md` generated and lint-verified against the selected staged Issue snapshot (151 edges).
-- Base=`df40050e93ef671afe2e98b0b0360cd65bb00caf`, current `HEAD=origin/main`, divergence=0/0; target existing upstream=`origin/main`; approved operation=one docs-only commit on `main`, then push that commit to `origin/main`.
-- Exclude `prompt.md`/`docs/develop.md` (already in HEAD), every other Issue block/hunk—including M04-S03/S04/S05, M06-S04/S05, M07-S03/S04/S07, M10-S02 and M13-S01 changes—every source/test/SQL/Receipt/rules path, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, and all unrelated dirty/untracked paths. No force-push, remote change, history rewrite, or unrelated staging.
-- Before commit: verify exact staged names/hunks, staged index SHA equals staged Issues SHA, staged whitespace clean, and HEAD/upstream still match approved range. If any mismatch occurs, stop without committing/pushing and preserve staged/worktree state.
+- User explicitly approved one issue-scoped commit and push for the six staged paths, including the `verified_commit` Cursor field. No S02 commit or push has occurred yet.
+- Include exactly: two new pure-Domain files; the S02 local verification Receipt; `Issues.md` Cursor and PDK-M11-S02 block only (no other Issue hunk); this full-overwrite handover; and the generated index from the selected staged Issue snapshot. Staged Issue/index SHA equality is verified; staged DAG has 151 edges.
+- Base=`321b92e44cd42b292b561806f1b37158ada244da`; current `HEAD=origin/main`; target existing upstream=`origin/main`; divergence=0/0. Approved operation=one issue-scoped commit on `main`, then push to `origin/main`.
+- Exclude every other Issue hunk/path (including M01/M04/M06/M07/M10/M13 changes), all unrelated source/test/receipt/SQL/rules paths, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, all remaining dirty/untracked work, and `prompt.md`/`docs/develop.md`. No force-push, remote change, history rewrite, or unrelated staging.
+- Before commit: reverify exact six staged names/hunks, staged Issue/index SHA, staged and worktree diff checks, and base/upstream. Then commit once and push normally. Any mismatch=stop without push and preserve state.
 
-§4 COMPLETED WORK / LIMITS
-- M07-S05, M10-S01, M10-S03, M10-S05 and M11-S01 have issue-scoped commits in the observed upstream history.
-- M11-S01 is the pure Domain Evidence Graph scope. The Receipt and separate review support source/unit acceptance only. Limits remain: digest-only external payload reference is not resolved; trusted verifier key/domain snapshot is an input; no persistence, key lifecycle, durable single-use replay, Trust/Quorum promotion, CI attestation or production claim.
-- CI/Verifier-of-Record attestation is absent unless a later verified record establishes otherwise. Local test/source review≠CI or DB runtime evidence.
+§4 OTHER STATE / LIMITS
+- PDK-M11-S01 local source-only Receipt remains `receipts/PDK-M11-S01/2026-10-24-local-verification.json`; Memory ID=`2c5de9d9-427c-425b-9971-2ab92cfbf6d5`. No CI/Verifier-of-Record or DB runtime claim.
+- Earlier records describe unresolved Security Epoch anomaly around M10-S02 (4→5 without attributable event) and later approved M07 activity (5→6). These are historical observations, not fresh DB observations in this task. Cause remains UNKNOWN. No DB operation or credential access occurred here; do not touch DB before separate reconciliation/approval.
+- All unrelated pre-existing dirty work remains and must be preserved.
 
-§5 DATABASE ANOMALY · NO ACTION THIS TASK
-- Earlier handover/Issue records describe an unresolved Security Epoch anomaly around the M10-S02 DB sequence (observed 4→5 without an attributable event), followed by an approved M07 integration sequence advancing 5→6. Cause/actor was recorded as UNKNOWN; never infer approval or attribution. Those are historical recorded observations, not fresh DB observations in this task.
-- Current Issue worktree records M10-S02 and related M06/M07 work as incomplete/reopened. No DB operation or credential access occurred in this task. Do not perform further DB actions until the anomaly is reconciled and separately authorized.
-
-§6 AUTOMATIC DESIGN EVALUATION · CURRENT-TASK ONLY
-- The user explicitly invoked `prompt.md` for this continuation. It remains experimental/non-canonical; `.harness`/`~/.harness` is reference-only under PADDOCK rules.
-- Design option selection is task-local and cannot change `decisions.md`, routed LRF, or effect approvals. No DB/live/credential/network/production/dependency/charge/destructive/VCS effect follows from prompt invocation or design selection.
-
-§7 RESUME
-1. Re-read current instructions, routed LRF, `decisions.md`→`method.md`→`THREAT_MODEL.md`→`Issues.md`, Git and Receipts; this snapshot may be stale.
-2. Verify the exact staged three-path scope, staged Issue/index equality, whitespace, and approved upstream range; then commit and push only the approved batch.
-3. Verify the upstream push, rerun design lint and planner, and continue with `PDK-M11-S02` only if it remains READY; reassess acceptance, dependencies, material choices, and effect gates first.
-4. Preserve all unrelated local work and the unresolved Security Epoch boundary.
-5. On the next handover refresh, replace this entire file from fresh observations; never append stale state.
+§5 RESUME
+1. Re-read current instructions, routed LRF, decisions→method→threat model→Issues, Git and Receipts; this snapshot may be stale.
+2. Verify the approved staged six-path scope and base/upstream, then commit/push only this batch.
+3. Verify remote push, rerun design lint/planner, and select the next READY Issue only if still eligible. Reassess dependencies, design choices, and effect gates first.
+4. Preserve unrelated work and the unresolved Security Epoch boundary. On refresh, replace this entire file from new observations; never append stale state.
 
 POLYGLYPH invariants: Meaning∧Constraints∧Authority∧Uncertainty preserved; compression≠semantic-loss permission; snapshot≠evidence; prompt≠canonical authority; no document grants effects.

@@ -1,0 +1,78 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M11-S02",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-25T04:07:02Z",
+  "source": {
+    "git_commit": "321b92e44cd42b292b561806f1b37158ada244da",
+    "git_tree": "4aeda1b29674f831afd6ba22d664b5c8e256f805",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED",
+    "target_files_untracked": true
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/independent_evidence.go",
+      "sha256": "2426672c12fb90e3c8131079db0c64f5fdf6a1d66022b9401692c1fccf8cbea8"
+    },
+    {
+      "path": "internal/governance/domain/independent_evidence_test.go",
+      "sha256": "573f7186261c46770cb5a09c68140c39fd02129002e3e070320c2e36b3084837"
+    }
+  ],
+  "checks": [
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./internal/governance/domain -count=1",
+      "exit_code": 0,
+      "result": "PASS; offline focused Domain suite; database and credential integration variables unset"
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./internal/governance/domain",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "gofmt -d internal/governance/domain/independent_evidence.go internal/governance/domain/independent_evidence_test.go",
+      "exit_code": 0,
+      "result": "PASS; no output"
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues, 152 edges"
+    },
+    {
+      "command": "python3 scripts/continue_plan.py",
+      "exit_code": 0,
+      "result": "PASS; selected PDK-M11-S02 with reason resume_cursor_wip"
+    },
+    {
+      "command": "git diff --check -- internal/governance/domain/independent_evidence.go internal/governance/domain/independent_evidence_test.go",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "NO_FINDINGS",
+    "scope": "Final target hashes for the two new files; direct EvidenceGraph verifier contracts and PDK-M11-S02 acceptance/design",
+    "limitations": "Source-only; no test execution, DB/live state, credentials, network, or CI attestation"
+  },
+  "reconciliation": "Main matched the exact measurement key (Subject, PayloadDigest), trusted control-domain label deduplication, zero contribution for unmapped signers, graph/signature verification, constructor validation/immutability, Runner commands/hashes, and final separate No Findings review. The selected acceptance is met for caller-trusted declared labels only. No real-world independence, risk-tier threshold, Trust promotion, DB behavior, production behavior, or CI attestation is claimed.",
+  "verdict": "LOCAL ACCEPTANCE PASS; PURE DOMAIN SOURCE ONLY",
+  "remaining_risks": [
+    "ControlDomain assignments are trusted caller assertions; this code does not prove real-world identity, organizational independence, or mapping provenance.",
+    "This helper reports a deduplicated count only; risk-tier thresholds and Trust/Quorum promotion are outside this Issue scope.",
+    "No persistence, DB, CI, production, key custody, or external attestation behavior is implemented or claimed."
+  ]
+}
