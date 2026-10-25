@@ -1,14 +1,12 @@
 package domain
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"sort"
 
@@ -16,8 +14,9 @@ import (
 )
 
 const (
-	KernelSnapshotSchema = "paddock.kernel-snapshot/1"
-	DomainApprovalSchema = "paddock.domain-approval/1"
+	KernelSnapshotSchema   = "paddock.kernel-snapshot/1"
+	KernelSnapshotSchemaV2 = "paddock.kernel-snapshot/2"
+	DomainApprovalSchema   = "paddock.domain-approval/1"
 )
 
 var ErrKernelApproval = errors.New("invalid kernel approval")
@@ -45,17 +44,27 @@ type IssuerCeiling struct {
 	Capabilities []string `json:"capabilities"`
 }
 type KernelSnapshot struct {
-	SchemaVersion  string          `json:"schema_version"`
-	Version        uint64          `json:"version"`
-	Signers        []KernelSigner  `json:"signers"`
-	Thresholds     []TierThreshold `json:"thresholds"`
-	Capabilities   []string        `json:"capabilities"`
-	IssuerCeilings []IssuerCeiling `json:"issuer_ceilings"`
+	SchemaVersion         string                 `json:"schema_version"`
+	Version               uint64                 `json:"version"`
+	Signers               []KernelSigner         `json:"signers"`
+	Thresholds            []TierThreshold        `json:"thresholds"`
+	Capabilities          []string               `json:"capabilities"`
+	IssuerCeilings        []IssuerCeiling        `json:"issuer_ceilings"`
+	EvolutionKernelConfig *EvolutionKernelConfig `json:"evolution_kernel_config,omitempty"`
 }
 
 func (s KernelSnapshot) CanonicalBytes() ([]byte, error) {
-	if s.SchemaVersion != KernelSnapshotSchema || s.Version == 0 || len(s.Signers) == 0 {
-		return nil, fmt.Errorf("%w: malformed snapshot header", ErrKernelApproval)
+	switch s.SchemaVersion {
+	case KernelSnapshotSchema:
+		if s.EvolutionKernelConfig != nil || s.Version == 0 || len(s.Signers) == 0 {
+			return nil, fmt.Errorf("%w: malformed snapshot header", ErrKernelApproval)
+		}
+	case KernelSnapshotSchemaV2:
+		if err := validateEvolutionKernel(s); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("%w: unsupported snapshot schema", ErrKernelApproval)
 	}
 	codec := canonical.NewJCSCodec()
 	b, e := json.Marshal(s)
@@ -73,29 +82,42 @@ func (s KernelSnapshot) Digest() (Digest, error) {
 	return Digest(hex.EncodeToString(h[:])), nil
 }
 func DecodeKernelSnapshot(data []byte) (KernelSnapshot, error) {
-	var s KernelSnapshot
-	d := json.NewDecoder(bytes.NewReader(data))
-	d.DisallowUnknownFields()
-	if err := d.Decode(&s); err != nil {
-		return s, fmt.Errorf("%w: malformed snapshot: %v", ErrKernelApproval, err)
+	// Validate the ORIGINAL bytes before any map/typed decoding can discard
+	// duplicate members or round unsafe numbers.
+	cb, err := canonical.NewJCSCodec().CanonicalizeJSON(data)
+	if err != nil {
+		return KernelSnapshot{}, fmt.Errorf("%w: snapshot JSON: %v", ErrKernelApproval, err)
 	}
-	var trailing any
-	if err := d.Decode(&trailing); err != io.EOF {
-		return s, fmt.Errorf("%w: trailing or malformed snapshot data", ErrKernelApproval)
+	if err := evolutionKernelFields(cb); err != nil {
+		return KernelSnapshot{}, fmt.Errorf("%w: snapshot fields: %v", ErrKernelApproval, err)
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil || len(fields) != 6 {
-		return s, fmt.Errorf("%w: missing or malformed snapshot fields", ErrKernelApproval)
+	// Decode through an alias so UnmarshalJSON cannot recursively re-enter.
+	type wireSnapshot KernelSnapshot
+	var wire wireSnapshot
+	if err := json.Unmarshal(cb, &wire); err != nil {
+		return KernelSnapshot{}, fmt.Errorf("%w: snapshot decode: %v", ErrKernelApproval, err)
 	}
-	for _, name := range []string{"schema_version", "version", "signers", "thresholds", "capabilities", "issuer_ceilings"} {
-		if _, ok := fields[name]; !ok {
-			return s, fmt.Errorf("%w: missing snapshot field %s", ErrKernelApproval, name)
-		}
+	s := KernelSnapshot(wire)
+	if s.SchemaVersion == KernelSnapshotSchema {
+		err = validateKernel(s)
+	} else {
+		err = validateEvolutionKernel(s)
 	}
-	if _, err := s.CanonicalBytes(); err != nil {
-		return s, err
+	if err != nil {
+		return KernelSnapshot{}, err
 	}
 	return s, nil
+}
+
+// UnmarshalJSON keeps direct encoding/json callers on the same strict boundary.
+// Failed decoding leaves the receiver unchanged.
+func (s *KernelSnapshot) UnmarshalJSON(data []byte) error {
+	value, err := DecodeKernelSnapshot(data)
+	if err != nil {
+		return err
+	}
+	*s = value
+	return nil
 }
 
 type DomainCandidate struct {
@@ -228,7 +250,7 @@ func VerifyDomainApproval(snapshot KernelSnapshot, expectedKernel Digest, candid
 	return ev
 }
 func validateKernel(s KernelSnapshot) error {
-	if s.SchemaVersion != KernelSnapshotSchema || s.Version == 0 || len(s.Signers) == 0 {
+	if s.SchemaVersion != KernelSnapshotSchema || s.EvolutionKernelConfig != nil || s.Version == 0 || len(s.Signers) == 0 {
 		return ErrKernelApproval
 	}
 	ids, keys := map[string]bool{}, map[string]bool{}

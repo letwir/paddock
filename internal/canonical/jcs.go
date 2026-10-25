@@ -10,26 +10,24 @@ import (
 	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
-
-	"github.com/deszhou/jcs"
 )
 
-// JCSCodec implements RFC 8785 canonicalization using the pure-Go deszhou/jcs
-// transform. Construct it explicitly with NewJCSCodec; there is intentionally no
+// JCSCodec implements RFC 8785 canonicalization using only the standard library.
+// Construct it explicitly with NewJCSCodec; there is intentionally no
 // implicit package-global codec or identity fallback.
 type JCSCodec struct{}
 
 // NewJCSCodec returns a production JCS codec.
 func NewJCSCodec() *JCSCodec { return &JCSCodec{} }
 
-// CanonicalizeJSON converts valid JSON input to RFC 8785 canonical bytes. The
-// dependency handles canonical serialization; this boundary additionally
-// rejects duplicate members and unsafe integer values required by I-JSON/JCS.
+// CanonicalizeJSON converts valid JSON input to RFC 8785 canonical bytes.
+// This repository's stricter I-JSON profile also rejects duplicate members and
+// integral binary64 values outside the safe-integer range.
 func (JCSCodec) CanonicalizeJSON(input []byte) ([]byte, error) {
 	if err := validateInput(input); err != nil {
 		return nil, err
 	}
-	return jcs.Transform(input)
+	return transformJCS(input)
 }
 
 func validateInput(input []byte) error {

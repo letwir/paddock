@@ -1,0 +1,37 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M11-S04",
+  "target_revision": "cc3e4b8be68a327381614d33d310b242e3094718 plus nine-file dirty implementation overlay",
+  "scope": "Pure Domain EvolutionApprovalGraph/1 and standard-library-only local RFC 8785 JCS; no CI attestation",
+  "runner": "Main independently executed targeted offline checks; implementation author was worker-hard",
+  "checks": [
+    {"command": "GOPROXY=off go test ./internal/canonical ./internal/governance/domain -count=1", "exit_code": 0},
+    {"command": "GOPROXY=off go vet ./internal/canonical ./internal/governance/domain", "exit_code": 0},
+    {"command": "gofmt -d (seven approved Go files)", "exit_code": 0, "output": "empty"},
+    {"command": "harness-lint.exe -path rules/m11-evolution.lrf -level 2 -strict -json", "exit_code": 0, "output": "null"},
+    {"command": "python.exe scripts/lint_design.py", "exit_code": 0, "output": "PASS issues=89 edges=152"},
+    {"command": "git -c core.whitespace=cr-at-eol diff --check", "exit_code": 0},
+    {"command": "git diff --check", "exit_code": 2, "note": "Unconfigured Windows CRLF generated-index lines reported trailing whitespace. Explicit cr-at-eol check passes; no claim that unconfigured check passed."}
+  ],
+  "sha256": {
+    "internal/canonical/jcs.go": "897040a4c485fc62f06e55af9924da5338f9e9a99417f5e00644525f6469eb9e",
+    "internal/canonical/jcs_transform.go": "0918d2834ba00990613b7ff1a8dfb013e949401ab7a85ce91bdbb9f149888a9b",
+    "internal/canonical/canonical_test.go": "3b10b828e528f6cde8ccf071ee12465df7d160bfe5c5ef0b6d9e2ddad0296b55",
+    "internal/canonical/jcs_transform_test.go": "1464fb6762540ff44dfcf04fff104ba11f92bcdef0371b2d16071054a0098557",
+    "go.mod": "b440f5badcae6f497ae52f34c4104fa04bad7bd7360f43583eb88da33158206a",
+    "go.sum": "a5e7a8db07eba28dbde48bf9a54c4e9084a5a95ded581c0ff44c08b74e3dfe69",
+    "internal/governance/domain/kernel_approval.go": "a475c971719e2eae08a6a24ec3a94e2532b63908d60b4bdaaaee79f2d5ad84ae",
+    "internal/governance/domain/evolution_approval.go": "a577d145263d01aa4eabb35eb1364214c601b51d4d0883adf0d7a284b86e8af1",
+    "internal/governance/domain/evolution_approval_test.go": "343ab8047b7035d1cb2514d40cc9a16e3e857acc73a7172a98b18ab630d55b10"
+  },
+  "independent_review": {
+    "run_id": "fd1bbf08-ee7d-4821-96b6-fa5151113ae4",
+    "runtime": "openai-codex/gpt-6-luna medium",
+    "verdict": "PASS_WITH_ADVISORIES",
+    "reviewer_ran_tests": false,
+    "blocking_findings": [],
+    "advisories": ["Separate contract/Issue/generated-index change provenance was outside code review scope; Main reconciled prior approved contract work.", "docs/canonicalization.md retains stale dependency prose; explicitly outside approved scope."]
+  },
+  "main_reconciliation": "Exact v1 bytes/digest, raw duplicate rejection, RFC vectors, fixed graph/signature/digest goldens, bounds, roles and control-domain quorums reconciled with actual checks and distinct review. Local source acceptance only.",
+  "residuals": ["Caller-trusted digests, proposer identity and domain labels; no authenticity/freshness/real-world independence proof", "No replay prevention or persistence", "No CI, production, product DB or operational key-custody verification", "Stale canonicalization dependency prose remains separately scoped"]
+}

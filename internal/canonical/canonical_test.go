@@ -5,8 +5,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"testing"
-
-	"github.com/deszhou/jcs"
 )
 
 func TestJCSCodecGoldenVectors(t *testing.T) {
@@ -40,17 +38,6 @@ func TestJCSCodecAcceptsValidSurrogatePair(t *testing.T) {
 	}
 	if string(got) != `"😀"` {
 		t.Fatalf("canonical pair = %s, want %s", got, `"😀"`)
-	}
-}
-
-func TestDependencyBehaviorForRestrictedInputs(t *testing.T) {
-	// v1.1.0 itself rejects duplicate members, but accepts integral values outside
-	// the I-JSON safe-integer range. The adapter's preflight is required for the latter.
-	if _, err := jcs.Transform([]byte(`{"x":1,"x":2}`)); err == nil {
-		t.Fatal("dependency unexpectedly accepted duplicate member")
-	}
-	if _, err := jcs.Transform([]byte(`9007199254740992`)); err != nil {
-		t.Fatalf("dependency behavior changed for unsafe integer: %v", err)
 	}
 }
 
