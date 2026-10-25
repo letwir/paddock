@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-25
 project: PADDOCK
 repository_root: .
-phase: M11_S01_DONE_WAITING_DOCS_PUSH
+phase: M11_S01_DOCS_PROMPT_HANDOVER_PUSH_PENDING
 active_goal: M11
 active_issue: PDK-M11-S01
 issue_state: DONE
-execution_state: DONE_WAITING_FOUR_PATH_DOCS_PUSH_APPROVAL
+execution_state: DONE_WAITING_FIVE_PATH_DOCS_PUSH_APPROVAL
 current_branch: main
 verified_commit: NONE
-preflight_commit: 4475b6f8985a4eacca497eccb161fbc4f48bf38d
-preflight_tree: 8076616900921aa4871655a016ea577d7d0d636b
-preflight_worktree: "After M11-S01 push and creation of `docs/develop.md`/`docs/handover.md`, current status is 478 entries (28 tracked modified, 450 untracked). Candidate batch is the two docs plus Cursor/M11-S01 and generated-index corrections only; all other dirty paths remain excluded. HEAD/origin are `4475b6f8985a4eacca497eccb161fbc4f48bf38d`, divergence 0/0."
+preflight_commit: 647cdb5a68e0aa874728eeaba5e49abd7c48c04d
+preflight_tree: 3386dc3d693d6c1c7acff6c625abcbc4c96d6b62
+preflight_worktree: "Fresh pre-document observation 2026-10-25: branch main; HEAD=origin/main `647cdb5a68e0aa874728eeaba5e49abd7c48c04d`, divergence 0/0; status 478 entries (29 tracked modified, 449 untracked), cached index empty. New prompt/develop/handover docs and the Issue/index corrections remain unstaged."
 last_receipt: receipts/PDK-M11-S01/2026-10-24-local-verification.json
-last_verified_test: "M11-S01 full shuffled Go suite, full vet, formatting, lint 89/152, and scoped diff-check passed at target HEAD `c623b6ccd0649a4448718d5b2e1e1595cc0520e5`; separate read-only Verifier reported No findings. Receipt `receipts/PDK-M11-S01/2026-10-24-local-verification.json` records exact target hashes and commands. Pure Domain only; no DB/production claim or CI attestation."
-next_action: "After the docs are ready and lint/Planner pass, request exact VCS approval for four paths only: `docs/develop.md`, full-overwrite `docs/handover.md`, Issues.md Cursor+M11-S01 block, and generated index from that staged snapshot. HEAD/origin is `4475b6f8985a4eacca497eccb161fbc4f48bf38d` (0/0); source/Receipt commit already pushed. Exclude all other hunks/files, especially M10-S02/M06/M07 DB anomaly data. After authorized docs push and upstream verification, Cursor can advance to M11-S02 and the Planner can resume. Preserve all other dirty paths."
-confidence: "M11-S01 source/Receipt batch is pushed as `4475b6f8985a4eacca497eccb161fbc4f48bf38d`; local `current_evidence` planner pointer and the requested develop/handover docs are in an exact four-path candidate batch. No VCS approval yet. The design-choice evaluator procedure in `docs/develop.md` is non-normative and does not override ACCEPTED decisions or effect approvals. M10-S02/M06/M07 anomaly remains unresolved; preserve all excluded dirty paths."
+last_verified_test: "M11-S01 Main Runner/full suite, vet, gofmt, scoped diff check and separate read-only review are recorded in `receipts/PDK-M11-S01/2026-10-24-local-verification.json`; Issue block now has `current_evidence` linked to that Receipt. Current `python3 scripts/lint_design.py --emit-summary` and follow-up lint pass (89/152); planner selects M11-S02. No CI attestation."
+next_action: "Reconcile current_evidence/Receipt pointer, finish POLYGLYPH prompt.md/develop/handover content, then run `python3 scripts/lint_design.py --emit-summary`, lint and Planner. Request fresh VCS approval for exactly five paths: prompt.md, docs/develop.md, full-overwrite docs/handover.md, Issues.md Cursor+M11-S01 block, and generated index from staged snapshot. Target origin/main=`647cdb5a68e0aa874728eeaba5e49abd7c48c04d` (0/0), one docs-only commit. Exclude every other Issue hunk/path and all anomaly DB records. No M11-S02 until approved push/verification; preserve unrelated dirty work."
+confidence: "M11-S01 is DONE and its source/Receipt/Memory ID `6f82df01-219f-4a4f-8396-ea2f94698d76` are pushed/recorded. Current_evidence and the three requested POLYGLYPH docs are local; five-path docs batch has no approval/write yet. Prompt/handover remain experimental and non-authoritative. M10-S02/M06/M07 anomaly remains unresolved; no DB operation. Preserve other dirty paths."
 
 
 

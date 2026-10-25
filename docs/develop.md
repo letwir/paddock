@@ -1,67 +1,33 @@
-# Development Guide — Independent Design-Choice Evaluation
+@meta=text/POLYGLYPH×SIGMA/1
+@codec=nearest_ancestor(POLYGLYPH.md);read_before_body=true
+@authority=SIGMA/1+routed-LRF-only;PG=representation-only
+@decode_failure=STOP;unknown=preserve;action=blocked;ask=true
 
-> Status: user-directed workflow proposal for PADDOCK Main. This Markdown is not an ACCEPTED entry in `decisions.md` and is not a normative LRF rule. It grants no tool, database, network, credential, VCS, or other effect permission.
->
-> Activation: the user explicitly requested this automatic design-choice workflow in the current conversation on 2026-10-25. Use it when that user directive applies; a later or more specific instruction may narrow, suspend, or replace it.
+# Independent Design Evaluation — experimental guide
 
-## Purpose and authority
+§0 STATUS ∧ AUTHORITY
+Status=EXPERIMENTAL∧NON_CANONICAL. This guide, the developing PADDOCK harness and `prompt.md` are not the project’s canonical source of truth; existence≠activation. Only explicit user invocation of `prompt.md` activates its automatic design-choice workflow for that current task. `.harness`/`~/.harness` is reference-only if `method.md` allows it; never infer authority/policy from it. `decisions.md` ACCEPTED register+routed LRF remain governing sources. This guide cannot grant effects or change `decisions.md`.
 
-This procedure lets Main resolve a material design choice without an extra user prompt when a distinct read-only evaluator finds a clearly superior feasible option to Main’s recommendation.
+Legend: `A`=ACCEPTED decisions+routed LRF; `P`=DESIGN_BASELINE/OPEN; `R`=independent read-only evaluator; `M`=Main; `I`=Issue; `E`=effect. `∧`=AND; `∨`=OR; `¬`=NOT; `⇒`=requires; `≠`=distinct. Symbols are semantic shorthand only; prose controls.
 
-`A` = `decisions.md` **ACCEPTED** register plus its routed LRF rules. `P` = `DESIGN_BASELINE` or `OPEN` material, which is not an accepted decision. `R` = the independent read-only evaluator. `M` = Main/orchestrator. `≻` = demonstrably strictly preferable under the criteria below. These symbols are shorthand only; the accompanying prose controls.
+§1 TRIGGER
+Material choice `c` exists when an unspecified alternative may materially affect safety, correctness, compatibility, cost or Issue scope. Before CODE, M examines the real repository/interfaces/dependencies/platform and available evidence. Do not treat an incomplete DESIGN_BASELINE fixture as immutable ground truth; do not silently change ACCEPTED decisions.
 
-- Compare options against `A` and the task’s recorded acceptance/scope. Never promote `P`, a recommendation, a memory entry, a Worker report, or a verifier report into an ACCEPTED decision.
-- This procedure does not modify `decisions.md`; a change to ACCEPTED decisions follows the project’s explicit superseding process.
-- Design selection sets implementation scope only. It does not approve DB, live, credential, external, production, dependency, charge, destructive, or VCS effects. Those effects still require their own current-task authorization.
+§2 OPTIONS
+When three distinct honest feasible options exist, enumerate exactly three, tradeoffs, and a Main recommendation `rec`. If fewer than three honest feasible options exist, explain why, never invent candidates/facts, and STOP+ask as required by the governing design-choice rule. Design choice sets scope only, not effect permission.
 
-## Procedure
+§3 INDEPENDENT REVIEW
+Dispatch `R≠implementer` with the exact options, relevant `A`, Issue acceptance/scope, source/API/dependency/platform evidence. R is read-only: no edits/tests/DB/credentials/network/VCS. R compares implementation feasibility, ACCEPTED compatibility, safety/correctness/compatibility/cost/scope, uncertainty, and whether any candidate is strictly superior to `rec`. R’s opinion≠decision/evidence/authority.
 
-### 1. Define the choice before CODE
+`SUPERIOR(x,rec) := feasible_in_actual_repo(x) ∧ compatible_with_A_and_acceptance(x) ∧ safeguards_preserved(x) ∧ no_unapproved_scope_or_effect(x) ∧ evidence_supported(x) ∧ materially_better(x,rec)`.
+Gloss: x must be implementable with actual repo/tools, satisfy ACCEPTED requirements, retain safeguards, add no unapproved scope/effect, have supporting evidence, and improve at least one stated material criterion.
 
-Main records the task/Issue, why the choice materially affects behavior, safety, compatibility, cost, or scope, and the existing acceptance/effect boundary. State the candidate options and Main’s current recommendation, with concise tradeoffs.
+§4 CURRENT-TASK AUTO-SELECTION
+When `prompt.md` is explicitly invoked by the user for this task, that current-task instruction delegates option selection to Main after the independent evaluation. This may satisfy a lower-priority PADDOCK project-document option prompt (including routed `formal.design-choice`) only to the extent the current instruction hierarchy permits. If any system/developer instruction or more-specific current user instruction requires a direct confirmation, ask/STOP. The automatic choice is not persistent and never grants effects.
 
-Use exactly three **distinct, honestly feasible** options when three exist. Do not invent an option to reach three. If fewer than three honest options exist, explain the limit and STOP for user direction.
+This auto mode is task-local, not persistent project policy. It cannot override system/developer/current user instructions, ACCEPTED decisions, routed normative LRF, safety stops, or independent effect approvals. A specific current user stop/narrowing instruction takes precedence. Missing/conflicting `A`, R/Main disagreement, tied/incomparable ranking, insufficient evidence, unknown feasibility, a new material choice, or required effect/scope expansion ⇒ STOP and ask. Effect permission never follows from SUPERIOR or selection.
 
-### 2. Obtain a separate read-only evaluation
+§5 RECORD + LIMITS
+Before CODE record Issue/options/recommendation/evaluator/result/ACCEPTED IDs/feasibility/effect gates/risks. This is process documentation, not a Runner Receipt or approval. Do not claim CI/DB/key/identity/production proof from design review. Current LRF and exact user approval govern every live/write effect.
 
-Dispatch one evaluator invocation distinct from the implementer and Main Runner. Give it the exact candidate options, relevant `decisions.md` ACCEPTED entries, current Issue acceptance, constraints, and necessary source/API context. Its scope is comparison only: no edits, tests, live DB, credentials, network, or VCS effects.
-
-Ask the evaluator to:
-
-- assess every option against each relevant ACCEPTED decision and acceptance constraint;
-- state compatibility, safety, correctness, implementation scope, cost/complexity, reversibility, and material risks;
-- identify unsupported assumptions, missing evidence, hidden effect expansion, or unresolved sub-choices;
-- rank feasible options and say whether any candidate is strictly superior to Main’s recommendation;
-- distinguish a design opinion from implementation evidence, authority, or approval.
-
-The evaluator may not create a fourth option, invent facts/permissions, or resolve an unrelated OPEN item as if accepted.
-
-### 3. Apply the automatic selection rule
-
-A candidate `X` is **strictly superior** to recommended option `Y` only when the evaluator’s reasoning and Main’s source/decision cross-check establish all of the following:
-
-1. `X` is feasible within the current Issue acceptance and allowed design scope.
-2. `X` conflicts with no relevant ACCEPTED decision and weakens no mandatory safety, integrity, compatibility, or fail-closed requirement.
-3. `X` does not silently add effects, files, dependencies, external services, identity/key custody, thresholds, expiry values, or operational claims that are not selected.
-4. `X` is no worse on the material safety and compatibility criteria for this choice, and is demonstrably better on at least one stated material criterion.
-5. Its advantage does not depend on an unknown fact or unresolved choice.
-
-Critical natural-language rule: **If one feasible option is clearly strictly superior to Main’s recommendation under all five conditions, Main adopts that option and proceeds without asking the same design question again. If no option is strictly superior, Main’s recommendation stands only because the user has enabled this automatic-evaluation workflow, and Main may proceed within that selected scope.**
-
-The automatic choice fails closed: STOP and ask the user if evaluators materially disagree; the ranking is tied or incomparable; evidence is insufficient; feasibility depends on an unresolved assumption; a new material sub-choice appears; the best option conflicts with `A`; or the choice would require effect/scope authorization beyond the current task. Do not resolve such cases by majority vote or by treating the evaluator’s preference as an ACCEPTED decision.
-
-### 4. Record before CODE
-
-Before implementation, Main records in the active Issue/Cursor or other appropriate project record:
-
-- the exact choice and selected option;
-- Main’s original recommendation and the evaluator’s comparative conclusion;
-- applicable ACCEPTED decision IDs and acceptance/effect constraints;
-- why the superior-option test passed, or why the original recommendation stands;
-- residual risks, deferred OPEN items, and separate effect approvals still required.
-
-Keep the record factual and concise. A review/choice record is not a Runner Receipt, test result, CI attestation, key/identity proof, DB approval, or VCS approval.
-
-## Stop conditions
-
-STOP before CODE if the candidate set is dishonest or incomplete, ACCEPTED authority is ambiguous, required verification evidence is absent, no distinct evaluator is available when required, the evaluator’s report is not independently inspectable, or any selected option silently widens effects or ownership. Replan or ask; do not bypass the gate.
+POLYGLYPH goal: compress wording while preserving meaning, polarity, scope, modality, exceptions, authority and decision boundary. Uncertainty→preserve; ambiguity→STOP; never let notation authorize behavior.
