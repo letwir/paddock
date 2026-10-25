@@ -23,23 +23,23 @@
 
 ```yaml
 cursor_schema: paddock.cursor/1
-snapshot_date: 2026-10-23
+snapshot_date: 2026-10-25
 project: PADDOCK
 repository_root: .
-phase: M11_S01_PURE_DOMAIN_EVIDENCE_GRAPH_IMPLEMENTATION
+phase: M11_S01_DONE_WAITING_DOCS_PUSH
 active_goal: M11
 active_issue: PDK-M11-S01
 issue_state: DONE
-execution_state: DONE_WAITING_ISSUE_PUSH_SCOPE_APPROVAL
+execution_state: DONE_WAITING_FOUR_PATH_DOCS_PUSH_APPROVAL
 current_branch: main
 verified_commit: NONE
-preflight_commit: 74750c3d5218fa3dc8f7082123402191def73086
-preflight_tree: 1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142
-preflight_worktree: "After M10-S05 push and M11-S01 local completion, current 2026-10-24 status is 479 entries (28 tracked modified, 451 untracked). M11-S01 candidate paths are 2 new Domain files, 1 Receipt, and Issues/index hunks; all other dirty paths remain preserved. HEAD/origin are `c623b6ccd0649a4448718d5b2e1e1595cc0520e5`, divergence 0/0."
+preflight_commit: 4475b6f8985a4eacca497eccb161fbc4f48bf38d
+preflight_tree: 8076616900921aa4871655a016ea577d7d0d636b
+preflight_worktree: "After M11-S01 push and creation of `docs/develop.md`/`docs/handover.md`, current status is 478 entries (28 tracked modified, 450 untracked). Candidate batch is the two docs plus Cursor/M11-S01 and generated-index corrections only; all other dirty paths remain excluded. HEAD/origin are `4475b6f8985a4eacca497eccb161fbc4f48bf38d`, divergence 0/0."
 last_receipt: receipts/PDK-M11-S01/2026-10-24-local-verification.json
 last_verified_test: "M11-S01 full shuffled Go suite, full vet, formatting, lint 89/152, and scoped diff-check passed at target HEAD `c623b6ccd0649a4448718d5b2e1e1595cc0520e5`; separate read-only Verifier reported No findings. Receipt `receipts/PDK-M11-S01/2026-10-24-local-verification.json` records exact target hashes and commands. Pure Domain only; no DB/production claim or CI attestation."
-next_action: "Verified non-secret M11-S01 Receipt ingested as knowledge ID `6f82df01-219f-4a4f-8396-ea2f94698d76` (v1, ACTIVE) using an Issue-specific title after the basename collision. Before VCS, verify a strict M11-S01-only path/hunk batch, commit range and origin/main target, then obtain separate explicit approval. Preserve the unresolved Security Epoch anomaly and all other dirty work; do not select the next Issue until the push gate completes or user redirects."
-confidence: "M11-S01 is DONE under local D-016 pure-Domain acceptance; its verified Receipt is ingested to llm-memory as `6f82df01-219f-4a4f-8396-ea2f94698d76` after an Issue-specific-title retry resolved a basename identity collision. No DB/Trust/key-custody/CI claim. M10-S02/reopened M06/M07 DB Issues remain [~] due unexplained Security Epoch anomaly. M11-S01 VCS push awaits separate exact approval; preserve unrelated dirty paths."
+next_action: "After the docs are ready and lint/Planner pass, request exact VCS approval for four paths only: `docs/develop.md`, full-overwrite `docs/handover.md`, Issues.md Cursor+M11-S01 block, and generated index from that staged snapshot. HEAD/origin is `4475b6f8985a4eacca497eccb161fbc4f48bf38d` (0/0); source/Receipt commit already pushed. Exclude all other hunks/files, especially M10-S02/M06/M07 DB anomaly data. After authorized docs push and upstream verification, Cursor can advance to M11-S02 and the Planner can resume. Preserve all other dirty paths."
+confidence: "M11-S01 source/Receipt batch is pushed as `4475b6f8985a4eacca497eccb161fbc4f48bf38d`; local `current_evidence` planner pointer and the requested develop/handover docs are in an exact four-path candidate batch. No VCS approval yet. The design-choice evaluator procedure in `docs/develop.md` is non-normative and does not override ACCEPTED decisions or effect approvals. M10-S02/M06/M07 anomaly remains unresolved; preserve all excluded dirty paths."
 
 
 
@@ -975,7 +975,7 @@ confidence: "M11-S01 is DONE under local D-016 pure-Domain acceptance; its verif
   - `effect_boundary`: Pure Domain deterministic tests/source checks only. No DB/network/key lookup/credential access/production key custody/dependency/VCS effects, Trust promotion, Scope, Authority, or real-world identity/independence claim. Preserve unresolved Security Epoch anomaly and all unrelated dirty paths.
   - `pre_code_design_gate`: User selected the pure Domain scope and trusted verifier snapshot; relation enum, signature coverage, signer→domain binding, digest-only payload, node identity/snapshot replay context, and JCS Evidence/1 format were resolved by independent evaluation under ACCEPTED D-003/D-015. Recommendation was option 1 in each evaluation and no strictly superior feasible alternative was found. Selection grants scope only.
   - `worker_difficulty`: Main published D_pub=HARD; the selected worker reported D_worker=HARD before CODE. It edited only the two allowlisted new Domain files.
-  - `runner_receipt`: `receipts/PDK-M11-S01/2026-10-24-local-verification.json`.
+  - `current_evidence`: Selected pure Domain acceptance is evidenced by the Main Runner command/target hashes in `receipts/PDK-M11-S01/2026-10-24-local-verification.json`, the separate read-only `No findings.` review, and `d016_reconciliation` below. This evidence is local source/unit verification only; no external payload/key lookup, DB, Trust/Quorum or CI behavior is claimed.
   - `current_runner_evidence`: Main Runner independently passed full shuffled Go tests, full `go vet ./...`, gofmt, design lint 89/152 and scoped diff-check at the target HEAD/Hashes in the Receipt. No DB/body was run.
   - `independent_review`: Separate read-only Verifier reviewed both files against M11-S01, D-003/D-015 and canonical JCS context; `No findings.` It ran no tests or DB operations.
   - `d016_reconciliation`: Main compared exact two-path diff, current hashes, Runner evidence, test coverage and independent No Findings review. The selected pure Domain contract validates content-addressed Nodes, closed relations, full signed node+edges, trusted signer/domain mapping, graph closure and cycle rejection; no payload/identity/independence/Trust/Authority overclaim. Acceptance is met for selected scope; mark DONE under D-016 with residuals in Receipt.
