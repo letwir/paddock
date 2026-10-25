@@ -1,0 +1,30 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M11-S01",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-24T23:56:44Z",
+  "source":{"git_commit":"c623b6ccd0649a4448718d5b2e1e1595cc0520e5","git_tree":"59ed397daa9a5d01973f4789a962fc531e5787f6","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED","target_files_untracked":true},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN"},
+  "targets":[
+    {"path":"internal/governance/domain/evidence_graph.go","sha256":"f6c0677094023768ba02adac2658fcf5b941e669107eaccb7536ce6710b83547"},
+    {"path":"internal/governance/domain/evidence_graph_test.go","sha256":"ee117603ce529d031e958348efb4f8631525172c467f3fd62251436c0089ee6e"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; full offline suite; DB/credential integration variables unset"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"gofmt -d internal/governance/domain/evidence_graph.go internal/governance/domain/evidence_graph_test.go","exit_code":0,"result":"PASS; no output"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"result":"PASS; 89 issues, 152 edges"},
+    {"command":"git diff --check -- internal/governance/domain/evidence_graph.go internal/governance/domain/evidence_graph_test.go","exit_code":0,"result":"PASS"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Both complete new Domain files against PDK-M11-S01, D-003/D-015, trusted signer/domain snapshot, JCS/anti-replay and cycle/immutability requirements.","limitations":"Verifier ran no tests, DB or external operations; no CI attestation."},
+  "reconciliation":"Main independently ran the full shuffled Go suite and vet, reviewed the two-file change, target hashes, tests and separate No Findings review. Domain content IDs and graph snapshot ID are deterministic; full immutable node+sorted edges are signed; graph closure/cycles and trusted signer/domain context fail closed. Pure Domain source/test scope only.",
+  "verdict":"LOCAL ACCEPTANCE PASS; SOURCE ONLY",
+  "remaining_risks":[
+    "PayloadDigest is only a reference; this Domain does not resolve/existence-check or verify external Artifact bytes.",
+    "Trusted verifier snapshot supplies signer keys/domains; no key custody, rotation or real-world identity/organizational-independence proof is included.",
+    "Snapshot-bound replay is idempotent for the same immutable graph; no persistent single-use replay ledger exists.",
+    "No persistence/DB, CI, Trust/Quorum promotion, Scope, Authority, hardware-attestation verifier, or production claim.",
+    "Unrelated Security Epoch anomaly remains unresolved; no DB operation was performed for M11-S01."
+  ]
+}

@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-23
 project: PADDOCK
 repository_root: .
-phase: M10_S05_DONE_WAITING_MEMORY_INGEST
-active_goal: M10
-active_issue: PDK-M10-S05
+phase: M11_S01_PURE_DOMAIN_EVIDENCE_GRAPH_IMPLEMENTATION
+active_goal: M11
+active_issue: PDK-M11-S01
 issue_state: DONE
-execution_state: DONE_WAITING_SCOPED_PUSH_APPROVAL
+execution_state: DONE_WAITING_ISSUE_PUSH_SCOPE_APPROVAL
 current_branch: main
 verified_commit: NONE
 preflight_commit: 74750c3d5218fa3dc8f7082123402191def73086
 preflight_tree: 1a1dd8ce116a1b8c2f4416e2f5fec19bf1948142
-preflight_worktree: "After M10-S03 push and M10-S05 completion, current 2026-10-24 status is 479 entries (29 tracked modified, 450 untracked); 2 source/test additions and one Receipt are M10-S05, all others pre-existing. HEAD/origin are `08c7cae4cee5ff15a1d675afd981dfab15910a78`; no VCS change since M10-S03 push."
-last_receipt: receipts/PDK-M10-S05/2026-10-24-local-verification.json
-last_verified_test: "Main Runner independently passed full shuffled Go tests, full vet, exact M10-S05 unittest (2/2), gofmt/whitespace/lint 89/152 and scoped diff-check. Separate read-only Verifier reported No findings. Receipt `receipts/PDK-M10-S05/2026-10-24-local-verification.json` records target hashes/checks. No DB/network/credential effects or CI attestation."
-next_action: "M10-S05 non-secret Receipt was ingested as knowledge ID `7812df47-8a25-4aad-9605-b0d2b2864612` using an Issue-specific title after the basename collision. Before any VCS write, present exact five-path M10-S05-only include/exclude hunks, current origin/main range, then obtain fresh scoped approval. Preserve the unresolved Epoch anomaly and all other dirty paths; do not select next Issue until push gate completes or user redirects."
-confidence: "M10-S05 selected option 1 and disabled-enrollment runtime/static regressions pass Main Runner and independent review; quotas/TTL/cost/rate-limits remain unimplemented. Verified non-secret Receipt is in memory ID `7812df47-8a25-4aad-9605-b0d2b2864612`. Security Epoch anomaly remains unresolved; no DB action. VCS push awaits exact M10-S05 approval; preserve other dirty paths."
+preflight_worktree: "After M10-S05 push and M11-S01 local completion, current 2026-10-24 status is 479 entries (28 tracked modified, 451 untracked). M11-S01 candidate paths are 2 new Domain files, 1 Receipt, and Issues/index hunks; all other dirty paths remain preserved. HEAD/origin are `c623b6ccd0649a4448718d5b2e1e1595cc0520e5`, divergence 0/0."
+last_receipt: receipts/PDK-M11-S01/2026-10-24-local-verification.json
+last_verified_test: "M11-S01 full shuffled Go suite, full vet, formatting, lint 89/152, and scoped diff-check passed at target HEAD `c623b6ccd0649a4448718d5b2e1e1595cc0520e5`; separate read-only Verifier reported No findings. Receipt `receipts/PDK-M11-S01/2026-10-24-local-verification.json` records exact target hashes and commands. Pure Domain only; no DB/production claim or CI attestation."
+next_action: "Verified non-secret M11-S01 Receipt ingested as knowledge ID `6f82df01-219f-4a4f-8396-ea2f94698d76` (v1, ACTIVE) using an Issue-specific title after the basename collision. Before VCS, verify a strict M11-S01-only path/hunk batch, commit range and origin/main target, then obtain separate explicit approval. Preserve the unresolved Security Epoch anomaly and all other dirty work; do not select the next Issue until the push gate completes or user redirects."
+confidence: "M11-S01 is DONE under local D-016 pure-Domain acceptance; its verified Receipt is ingested to llm-memory as `6f82df01-219f-4a4f-8396-ea2f94698d76` after an Issue-specific-title retry resolved a basename identity collision. No DB/Trust/key-custody/CI claim. M10-S02/reopened M06/M07 DB Issues remain [~] due unexplained Security Epoch anomaly. M11-S01 VCS push awaits separate exact approval; preserve unrelated dirty paths."
 
 
 
@@ -960,10 +960,27 @@ confidence: "M10-S05 selected option 1 and disabled-enrollment runtime/static re
 
 **中目標:** 多数決の自作自演とPolicyの自己認可を防ぐ。
 
-- [ ] `PDK-M11-S01` — Evidence Node/Relation/署名/Domain識別。
+- [x] `PDK-M11-S01` — Evidence Node/Relation/署名/Domain識別。
   - `depends_on`: PDK-M06-S01, PDK-M10-S03
   - `acceptance`: DERIVED_FROM、OBSERVED_BY、CONTROLLED_BY等の出所を追跡し、循環Evidenceを拒否。
   - `evidence_expected`: Graph Fixture、署名証拠。
+  - `difficulty_assignment`: Main publishes `D_pub=HARD` because this is a cryptographic provenance graph with signature/domain binding and cycle-rejection security invariants, even though implementation is pure Domain. Worker must report comparable `D_worker` after bounded inspection before edits.
+  - `work_owner`: one worker-hard owner for the two new pure-Domain files; Main owns Runner/review/Issue/Receipt reconciliation.
+  - `code_scope`: Add only new `internal/governance/domain/evidence_graph.go` and `internal/governance/domain/evidence_graph_test.go`. No edits to existing source, Application/Port, SQL/DB, dependency, transport, generated index, Decisions or other Issue blocks.
+  - `selected_relations`: Closed schema/1 enum `{DERIVED_FROM, OBSERVED_BY, CONTROLLED_BY}`. Unknown relation kinds are rejected; adding kinds requires a schema/code revision.
+  - `selected_signing`: Every immutable node signs the complete canonical node record, including Subject, signer/domain identity, payload digest, and sorted outgoing typed edges. Use RFC 8785 JCS and dedicated domain `paddock.evidence`, schema `paddock.evidence-node/1`, fixed audience `evidence-graph`. Trusted verifier snapshot maps exact SignerID→Ed25519 public key and one EvidenceDomainID; mismatch fails closed. This binding does not claim real-world identity or organizational independence.
+  - `selected_payload`: The node carries an immutable payload/artifact SHA-256 digest reference, not payload bytes or a typed measurement taxonomy. Evidence Domain signs the reference but does not claim to resolve or verify external content; that remains outside M11-S01. This follows ACCEPTED D-003 immutable Artifact-by-Digest sharing.
+  - `selected_identity_replay`: EvidenceNodeID is content-addressed from the canonical semantic node record excluding ID/signature. `GraphSnapshotID` is deterministically derived as SHA-256 over JCS of the sorted unique EvidenceNodeIDs in the exact graph. The JCS envelope uses RequestID=NodeID and Nonce=GraphSnapshotID; the verifier recomputes both and verifies each signature. Reverification of an identical snapshot is idempotent; a changed node/edge/membership changes the context and needs new signatures. No consume ledger or single-use semantics are claimed; this is contextual anti-replay per D-015.
+  - `independent_design_evaluation`: Per user instruction, a separate evaluator compared three payload representations against ACCEPTED D-003/D-015 and recommended digest-only reference; inline JCS payload and an invented typed-claim taxonomy were inferior. It also compared three envelope formats and found dedicated JCS Evidence/1 with `paddock.evidence` superior to Approval-domain reuse or a custom binary transcript. A follow-up comparison found deterministic GraphSnapshotID=`SHA256(JCS(sorted(unique EvidenceNodeID)))` the best fit for the selected pure-Domain anti-replay context; opaque/random caller IDs would add state without a replay ledger. A separate Audience evaluation retained the fixed protocol literal `evidence-graph`; per-domain or runtime caller Audience added coupling/configuration without an ACCEPTED requirement. No automatically superior alternative was found; recommendations were adopted.
+  - `effect_boundary`: Pure Domain deterministic tests/source checks only. No DB/network/key lookup/credential access/production key custody/dependency/VCS effects, Trust promotion, Scope, Authority, or real-world identity/independence claim. Preserve unresolved Security Epoch anomaly and all unrelated dirty paths.
+  - `pre_code_design_gate`: User selected the pure Domain scope and trusted verifier snapshot; relation enum, signature coverage, signer→domain binding, digest-only payload, node identity/snapshot replay context, and JCS Evidence/1 format were resolved by independent evaluation under ACCEPTED D-003/D-015. Recommendation was option 1 in each evaluation and no strictly superior feasible alternative was found. Selection grants scope only.
+  - `worker_difficulty`: Main published D_pub=HARD; the selected worker reported D_worker=HARD before CODE. It edited only the two allowlisted new Domain files.
+  - `runner_receipt`: `receipts/PDK-M11-S01/2026-10-24-local-verification.json`.
+  - `current_runner_evidence`: Main Runner independently passed full shuffled Go tests, full `go vet ./...`, gofmt, design lint 89/152 and scoped diff-check at the target HEAD/Hashes in the Receipt. No DB/body was run.
+  - `independent_review`: Separate read-only Verifier reviewed both files against M11-S01, D-003/D-015 and canonical JCS context; `No findings.` It ran no tests or DB operations.
+  - `d016_reconciliation`: Main compared exact two-path diff, current hashes, Runner evidence, test coverage and independent No Findings review. The selected pure Domain contract validates content-addressed Nodes, closed relations, full signed node+edges, trusted signer/domain mapping, graph closure and cycle rejection; no payload/identity/independence/Trust/Authority overclaim. Acceptance is met for selected scope; mark DONE under D-016 with residuals in Receipt.
+  - `memory_ingest`: File ingest failed on the date-derived identity collision (unique active memory identity); retrying the same verified Receipt with Issue-specific title succeeded as knowledge ID `6f82df01-219f-4a4f-8396-ea2f94698d76` (v1, ACTIVE). Only the non-secret Receipt was ingested.
+  - `remaining_risks`: Payload digest reference is not resolved/verified against an external artifact; verifier snapshot/key lifecycle is external; no persistent single-use replay ledger; repeated validation of the same immutable graph is idempotent. No CI/Verifier-of-Record or DB/Trust/Quorum behavior is claimed.
 - [ ] `PDK-M11-S02` — 独立性とQuorum判定。
   - `depends_on`: PDK-M11-S01
   - `acceptance`: 同じ測定を10体で評価しても独立10票にならず、独立不明はカウントしない。

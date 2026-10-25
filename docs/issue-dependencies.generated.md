@@ -3,7 +3,7 @@
 > AUTO-GENERATED. **DO NOT EDIT**. Source: `Issues.md`.
 > Generator: `python3 scripts/lint_design.py --emit-summary`.
 > 中目標への集約は表示専用。**依存DAGは小目標IDでのみ成立**。
-> Issues.md SHA-256: `463d0a0aa679f8b3adf9c0c9442323b108dab9e362b3a88091278c7f6e0ca3f1`
+> Issues.md SHA-256: `f34d403d3bbac4492af38b4624c5f709e0f8b3400e7c36c4352db82931a73b45`
 
 **小目標: 89件 / 依存辺: 151本 / 中目標: 16領域。**
 
@@ -94,7 +94,7 @@
 | `PDK-M10-S03` | `[x]` | `PDK-M10-S01` |
 | `PDK-M10-S04` | `[ ]` | `PDK-M10-S03`, `PDK-M11-S02` |
 | `PDK-M10-S05` | `[x]` | `PDK-M10-S01`, `PDK-M00-S05` |
-| `PDK-M11-S01` | `[ ]` | `PDK-M06-S01`, `PDK-M10-S03` |
+| `PDK-M11-S01` | `[x]` | `PDK-M06-S01`, `PDK-M10-S03` |
 | `PDK-M11-S02` | `[ ]` | `PDK-M11-S01` |
 | `PDK-M11-S03` | `[ ]` | `PDK-M11-S02`, `PDK-M06-S02` |
 | `PDK-M11-S04` | `[ ]` | `PDK-M11-S03` |
