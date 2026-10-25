@@ -3,58 +3,53 @@
 @authority=SIGMA/1+routed-LRF-only;PG=representation-only
 @decode_failure=STOP;unknown=preserve;action=blocked;ask=true
 
-# PADDOCK continuation snapshot · 2026-10-25
+# PADDOCK CONTINUE/1 · handover snapshot · 2026-10-25
 
 §0 REFRESH ∧ AUTHORITY
-Snapshot:=point_in_time∧stale_possible. On every refresh, re-observe state and replace this ENTIRE file; ¬append∨merge(old_snapshot). This file≠canonical truth≠permission. Authority=system/developer/current-user + PADDOCK routed LRF + `decisions.md` ACCEPTED; `Issues.md` is work/Cursor state, Git/Receipts are observations. Unknown→preserve+report.
+Snapshot:=point_in_time∧stale_possible. On every refresh, re-observe and replace this ENTIRE file; ¬append∨merge(old snapshot). This file≠canonical truth≠permission. Authority=system/developer/current-user instructions + PADDOCK routed LRF + `decisions.md` ACCEPTED; `Issues.md` records work/Cursor; Git/Receipts provide observations. Unknown→preserve+report.
 
-Legend: `A`=ACCEPTED+LRF; `Cursor`=navigation hint; `R`=actual Runner/Receipt observation; `W`=working tree; `→`=ordered action only; `∧`=AND; `∨`=OR; `¬`=NOT; `≠`=not equal. Symbols are display/shorthand only.
+Legend: `A`=ACCEPTED+LRF; `P`=DESIGN_BASELINE/OPEN; `Cursor`=navigation hint; `R`=Runner/Receipt; `W`=worktree; `→`=ordered action only; `∧`=AND; `∨`=inclusive OR; `¬`=NOT; `≠`=not equal. Symbols are representation only, not authorization or evidence.
 
-§1 LIVE REPOSITORY
+§1 REPOSITORY SNAPSHOT
 - Repo=PADDOCK; branch=`main`.
-- Observed HEAD=origin/main=`647cdb5a68e0aa874728eeaba5e49abd7c48c04d`; divergence=0 ahead/0 behind.
-- Current `git status --porcelain=v1 --untracked-files=all`: 479 entries (30 tracked modified, 449 untracked); cached index empty. These counts are pre-push, point-in-time only; recount before action. Preserve all unrelated dirty/untracked paths.
-- Recent pushed commits: M07-S05 closure `d7cd2e3`; M10-S01 `6d21a15`; M10-S03 `08c7cae`; M10-S05 `c623b6c`; M11-S01 Evidence Graph `4475b6f`; docs proposal/snapshot `647cdb5`.
-- Current local docs: `prompt.md`, `docs/develop.md`, `docs/handover.md`; all are experimental/reference. `docs/handover.md` MUST be full-file overwritten at each refresh.
+- Fresh read-only observation 2026-10-25: `HEAD=origin/main=df40050e93ef671afe2e98b0b0360cd65bb00caf`; tree=`db01542126570afb398d75ba10964f7e02d3a425`; divergence=0/0.
+- Worktree has 478 changed/untracked entries (29 tracked modified/deleted, 449 untracked). Exactly these three paths are staged: `Issues.md`, `docs/handover.md`, and `docs/issue-dependencies.generated.md`. Preserve all remaining unstaged/untracked paths, including tracked `AGENTS.md` deletion and all source, SQL, receipt, rules, and `.build` work.
+- Recent history: `df40050` POLYGLYPH prompt/develop/handover docs; `647cdb5` design evaluation/handover guides; `4475b6f` M11-S01 Evidence Graph; `c623b6c` M10-S05; `08c7cae` M10-S03.
+- `prompt.md` and `docs/develop.md` are already committed at HEAD `df40050`; they are unchanged in the current worktree. The staged Issue diff contains only approved Cursor fields (`phase`, `execution_state`, `preflight_commit`, `preflight_tree`, `preflight_worktree`, `last_verified_test`, `next_action`, `confidence`) and the PDK-M11-S01 `memory_ingest` field. All other Issue hunks remain unstaged.
 
-§2 CURSOR ∧ PLANNER
-- Cursor active=`PDK-M11-S01`, state=`[x] DONE`, execution=`DONE_WAITING_FIVE_PATH_DOCS_PUSH_APPROVAL`, `last_receipt=receipts/PDK-M11-S01/2026-10-24-local-verification.json`. `Issues.md` M11-S01 block has the required `current_evidence` pointer; receipt issue ID matches active Cursor.
-- Main ran `python3 scripts/lint_design.py --emit-summary`; design lint then PASS (89 issues/152 edges). `python3 scripts/continue_plan.py` selects `PDK-M11-S02` as first READY incomplete Issue.
-- Do NOT start M11-S02 until the exact five-path docs push below is approved, completed and upstream-verified; then re-read current instructions/Git/Receipts and rerun Planner.
+§2 CURSOR ∧ CHECKS
+- Cursor: active=`PDK-M11-S01`, state=`[x] DONE`; Receipt=`receipts/PDK-M11-S01/2026-10-24-local-verification.json`; exact docs VCS scope is approved and staged; commit/push remain pending.
+- Receipt SHA-256=`e4c4e09299b19d7acab52b467f0d244c5a359003b397a7f05063ff55d7bf3c6e`. It records local source-only full shuffled Go tests/vet, formatting, lint, scoped diff check, and a separate read-only no-findings review. It does not claim DB execution, CI attestation, production behavior, external payload resolution, key custody, organizational independence, or durable single-use replay.
+- Current-task `llm-mem ingest` of the non-secret Receipt-derived outcome returned `[ADD]`, knowledge ID `2c5de9d9-427c-425b-9971-2ab92cfbf6d5` (v1, ACTIVE); title search returned the same ID. Only verified outcome and receipt evidence were recorded.
+- Selected/staged Issue snapshot lint: `python3 scripts/lint_design.py --emit-summary` Exit 0 and `python3 scripts/lint_design.py` Exit 0; 89 Issues/151 edges; staged `Issues.md` SHA-256=`8afb211d1ded1245399358538d9c20a613636ef5c7ecd24d1882913f7f9f07a8`.
+- Full worktree lint: `python3 scripts/lint_design.py` Exit 0; 89 Issues/152 edges; `python3 scripts/continue_plan.py` Exit 0 selects `PDK-M11-S02` (`first_ready_incomplete`). The unstaged worktree index represents the full local Issue snapshot; the staged generated index matches only the selected staged Issue snapshot.
+- No CI attestation. Staged diff whitespace and exact three-path/hunk verification remain part of the pre-commit gate.
 
-§3 PENDING VCS GATE — EXACT FIVE PATHS
-Fresh current-task approval has NOT yet been obtained for this batch. Proposed include:
-1. `prompt.md` — experimental POLYGLYPH automatic Issue-resolution prompt, only activated by explicit current-task user invocation.
-2. `docs/develop.md` — experimental independent design-evaluation guide; it is not canonical and cannot override ACCEPTED decisions/LRF/effect approvals.
-3. `docs/handover.md` — this complete POLYGLYPH snapshot, committed as a full-file overwrite.
-4. `Issues.md` — Cursor block and M11-S01 Issue block only, including `current_evidence`/receipt consistency and pending next action.
-5. `docs/issue-dependencies.generated.md` — generated from the staged `Issues.md` snapshot using `python3 scripts/lint_design.py --emit-summary`; do not hand-edit.
+§3 APPROVED VCS GATE · COMMIT/PUSH PENDING
+- The user explicitly approved staging, one docs-only commit, and push for the exact scope below, including `preflight_commit` and `preflight_tree` after a scope correction. Current staged paths are exactly the approved three; no commit or push has occurred yet.
+- Include: (1) full-file `docs/handover.md`; (2) only the listed Cursor fields and PDK-M11-S01 `memory_ingest` hunk in `Issues.md`; (3) `docs/issue-dependencies.generated.md` generated and lint-verified against the selected staged Issue snapshot (151 edges).
+- Base=`df40050e93ef671afe2e98b0b0360cd65bb00caf`, current `HEAD=origin/main`, divergence=0/0; target existing upstream=`origin/main`; approved operation=one docs-only commit on `main`, then push that commit to `origin/main`.
+- Exclude `prompt.md`/`docs/develop.md` (already in HEAD), every other Issue block/hunk—including M04-S03/S04/S05, M06-S04/S05, M07-S03/S04/S07, M10-S02 and M13-S01 changes—every source/test/SQL/Receipt/rules path, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, and all unrelated dirty/untracked paths. No force-push, remote change, history rewrite, or unrelated staging.
+- Before commit: verify exact staged names/hunks, staged index SHA equals staged Issues SHA, staged whitespace clean, and HEAD/upstream still match approved range. If any mismatch occurs, stop without committing/pushing and preserve staged/worktree state.
 
-Proposed range=one docs-only commit starting at `647cdb5a68e0aa874728eeaba5e49abd7c48c04d`, target existing `origin/main`. Exclude every other Issue block/hunk and path, all source/Receipts, `.build`, `.HARNESS`, M10-S02/M06/M07 anomaly evidence, and unrelated dirty work. Index must be empty before stage; inspect partial staged Issue hunks, generated-index equality and exact five staged names before commit. No stage/commit/push before fresh explicit approval. No force-push, remote change or history rewrite.
+§4 COMPLETED WORK / LIMITS
+- M07-S05, M10-S01, M10-S03, M10-S05 and M11-S01 have issue-scoped commits in the observed upstream history.
+- M11-S01 is the pure Domain Evidence Graph scope. The Receipt and separate review support source/unit acceptance only. Limits remain: digest-only external payload reference is not resolved; trusted verifier key/domain snapshot is an input; no persistence, key lifecycle, durable single-use replay, Trust/Quorum promotion, CI attestation or production claim.
+- CI/Verifier-of-Record attestation is absent unless a later verified record establishes otherwise. Local test/source review≠CI or DB runtime evidence.
 
-§4 COMPLETED / EVIDENCE
-- M07-S05, M10-S01, M10-S03, M10-S05 and M11-S01 are recorded DONE and their issue-scoped commits are on origin/main.
-- M11-S01: pure Domain signed Evidence Graph. Main local suite/vet and separate read-only Verifier found no issue. Receipt=`receipts/PDK-M11-S01/2026-10-24-local-verification.json`; memory ID=`6f82df01-219f-4a4f-8396-ea2f94698d76`. Limits: digest-only external payload reference is not resolved; key custody/domain snapshot is externally trusted; no durable single-use replay ledger, DB, Trust, Quorum or production claim.
-- M10-S05: selected PoC fallback only—public enrollment remains absent, Coordinator loopback-only. Quotas, adaptive rate limits, challenge TTL/cost caps and surge audit remain unimplemented. Receipt memory ID=`7812df47-8a25-4aad-9605-b0d2b2864612`.
-- No CI/Verifier-of-Record attestation is claimed unless a current Receipt says otherwise.
+§5 DATABASE ANOMALY · NO ACTION THIS TASK
+- Earlier handover/Issue records describe an unresolved Security Epoch anomaly around the M10-S02 DB sequence (observed 4→5 without an attributable event), followed by an approved M07 integration sequence advancing 5→6. Cause/actor was recorded as UNKNOWN; never infer approval or attribution. Those are historical recorded observations, not fresh DB observations in this task.
+- Current Issue worktree records M10-S02 and related M06/M07 work as incomplete/reopened. No DB operation or credential access occurred in this task. Do not perform further DB actions until the anomaly is reconciled and separately authorized.
 
-§5 DATABASE ANOMALY ∧ STOP
-- Target=`paddock_test`, PostgreSQL 18.6. Before the approved M10-S02 DB sequence, preflight saw Security Epoch=4.
-- After M10-S02 Credential body, Epoch=5 was observed, `updated_at=2026-10-24 22:34:47+09`; no remaining `SafetyStopped` Event/Outbox was found. M10 source/migration contains no `security_generation` mutation. Cause/actor remains UNKNOWN; never infer an authorized writer.
-- After fresh preflight at Epoch=5, the separately approved M07 shared `TestRolloutApplicationAppOnlyIntegration` passed and its selected Safety Stop advanced Epoch 5→6. Final read-only fixture/ACL postflight passed; **current final Security Epoch=6**, never rewind.
-- `PDK-M10-S02`, reopened `PDK-M06-S05`, `PDK-M07-S03`, `PDK-M07-S04`, `PDK-M07-S07` remain `[~]` pending anomaly attribution/current-hash revalidation. The M10-S02 migration remains installed; no down/reset/drop. **No further DB operation** until user/DB owner reconciles the unexplained 4→5 transition.
-- Receipt=`receipts/PDK-M10-S02/2026-10-24-current-hash-db-verification.json`; partial history=`receipts/PDK-M10-S02/2026-10-24-partial-db-verification.json`.
-
-§6 PROMPT / AUTOMATIC DESIGN EVALUATION
-- The user requested the same automatic Issue-continuation process. `prompt.md` is an experimental task prompt; automatic design choice activates only when the current user explicitly invokes it. `.harness`/`~/.harness` is reference-only under PADDOCK rules, not PADDOCK canonical authority.
-- For material choices, explicit prompt invocation delegates selection to Main after a separate read-only evaluator compares feasible options against ACCEPTED decisions, current repository/API feasibility, safety and scope. Main adopts a strictly superior evidenced option; otherwise keeps the recommendation. Unknown, conflict, evaluator disagreement, or effect expansion→STOP. Design selection≠effect approval.
-- `docs/develop.md` is an experimental non-canonical explanation of the same process; neither file changes `decisions.md` or routed LRF.
+§6 AUTOMATIC DESIGN EVALUATION · CURRENT-TASK ONLY
+- The user explicitly invoked `prompt.md` for this continuation. It remains experimental/non-canonical; `.harness`/`~/.harness` is reference-only under PADDOCK rules.
+- Design option selection is task-local and cannot change `decisions.md`, routed LRF, or effect approvals. No DB/live/credential/network/production/dependency/charge/destructive/VCS effect follows from prompt invocation or design selection.
 
 §7 RESUME
-1. Read this whole snapshot, active root instructions and current routed LRF; reconcile actual Git/Issues/Receipts. Run lint/planner.
-2. Finish only the exact docs VCS gate in §3 after fresh approval. If isolation/upstream/index/Issue state differs, stop and ask.
-3. After successful docs push/upstream verification, rerun lint/planner; select `PDK-M11-S02` only if it is still READY. Before CODE use the explicitly invoked `prompt.md` independent-choice workflow; Main publishes difficulty/effect/scope and assigns one writer/file.
-4. Keep the Security Epoch anomaly isolated and unresolved; no further DB/credential/network action without fresh exact approval and safe preflight.
-5. When refreshing this handover, replace the entire document from newly observed state. Never append stale facts.
+1. Re-read current instructions, routed LRF, `decisions.md`→`method.md`→`THREAT_MODEL.md`→`Issues.md`, Git and Receipts; this snapshot may be stale.
+2. Verify the exact staged three-path scope, staged Issue/index equality, whitespace, and approved upstream range; then commit and push only the approved batch.
+3. Verify the upstream push, rerun design lint and planner, and continue with `PDK-M11-S02` only if it remains READY; reassess acceptance, dependencies, material choices, and effect gates first.
+4. Preserve all unrelated local work and the unresolved Security Epoch boundary.
+5. On the next handover refresh, replace this entire file from fresh observations; never append stale state.
 
-POLYGLYPH contract: meaning/constraints/authority/uncertainty preserved; compression≠permission; handover≠evidence; no statement here authorizes an effect.
+POLYGLYPH invariants: Meaning∧Constraints∧Authority∧Uncertainty preserved; compression≠semantic-loss permission; snapshot≠evidence; prompt≠canonical authority; no document grants effects.

@@ -26,20 +26,20 @@ cursor_schema: paddock.cursor/1
 snapshot_date: 2026-10-25
 project: PADDOCK
 repository_root: .
-phase: M11_S01_DOCS_PROMPT_HANDOVER_PUSH_PENDING
+phase: M11_S01_APPROVED_DOCS_PUSH_PENDING
 active_goal: M11
 active_issue: PDK-M11-S01
 issue_state: DONE
-execution_state: DONE_WAITING_FIVE_PATH_DOCS_PUSH_APPROVAL
+execution_state: DONE_APPROVED_DOCS_COMMIT_PUSH_PENDING
 current_branch: main
 verified_commit: NONE
-preflight_commit: 647cdb5a68e0aa874728eeaba5e49abd7c48c04d
-preflight_tree: 3386dc3d693d6c1c7acff6c625abcbc4c96d6b62
-preflight_worktree: "Fresh pre-document observation 2026-10-25: branch main; HEAD=origin/main `647cdb5a68e0aa874728eeaba5e49abd7c48c04d`, divergence 0/0; status 478 entries (29 tracked modified, 449 untracked), cached index empty. New prompt/develop/handover docs and the Issue/index corrections remain unstaged."
+preflight_commit: df40050e93ef671afe2e98b0b0360cd65bb00caf
+preflight_tree: db01542126570afb398d75ba10964f7e02d3a425
+preflight_worktree: "Fresh read-only observation 2026-10-25: branch main; HEAD=origin/main `df40050e93ef671afe2e98b0b0360cd65bb00caf`, tree `db01542126570afb398d75ba10964f7e02d3a425`, divergence 0/0; worktree 478 entries (29 tracked modified, 449 untracked), index empty. Preserve every unrelated path and Issue hunk."
 last_receipt: receipts/PDK-M11-S01/2026-10-24-local-verification.json
-last_verified_test: "M11-S01 Main Runner/full suite, vet, gofmt, scoped diff check and separate read-only review are recorded in `receipts/PDK-M11-S01/2026-10-24-local-verification.json`; Issue block now has `current_evidence` linked to that Receipt. Current `python3 scripts/lint_design.py --emit-summary` and follow-up lint pass (89/152); planner selects M11-S02. No CI attestation."
-next_action: "Reconcile current_evidence/Receipt pointer, finish POLYGLYPH prompt.md/develop/handover content, then run `python3 scripts/lint_design.py --emit-summary`, lint and Planner. Request fresh VCS approval for exactly five paths: prompt.md, docs/develop.md, full-overwrite docs/handover.md, Issues.md Cursor+M11-S01 block, and generated index from staged snapshot. Target origin/main=`647cdb5a68e0aa874728eeaba5e49abd7c48c04d` (0/0), one docs-only commit. Exclude every other Issue hunk/path and all anomaly DB records. No M11-S02 until approved push/verification; preserve unrelated dirty work."
-confidence: "M11-S01 is DONE and its source/Receipt/Memory ID `6f82df01-219f-4a4f-8396-ea2f94698d76` are pushed/recorded. Current_evidence and the three requested POLYGLYPH docs are local; five-path docs batch has no approval/write yet. Prompt/handover remain experimental and non-authoritative. M10-S02/M06/M07 anomaly remains unresolved; no DB operation. Preserve other dirty paths."
+last_verified_test: "After the Cursor/M11-S01 memory reference update, Main Runner observed `python3 scripts/lint_design.py --emit-summary` Exit 0 and `python3 scripts/lint_design.py` Exit 0 (89 issues/152 edges); `python3 scripts/continue_plan.py` Exit 0 selected PDK-M11-S02; scoped `git diff --check` Exit 0. M11-S01 local source-only Runner/full suite, vet, gofmt and separate read-only review are in `receipts/PDK-M11-S01/2026-10-24-local-verification.json`; no CI attestation."
+next_action: "The exact three-path docs-only VCS batch was approved and staged: full-overwrite docs/handover.md, only the approved Cursor fields plus PDK-M11-S01 memory_ingest field in Issues.md, and docs/issue-dependencies.generated.md generated from that staged Issue snapshot. Verify staged paths/hunks and snapshot equality, then create one commit on main and push to existing origin/main from base `df40050e93ef671afe2e98b0b0360cd65bb00caf`. Exclude all other Issue hunks/paths and all source, Receipt, anomaly, .build, .HARNESS, and unrelated dirty work. After verified upstream push, rerun lint/planner and select M11-S02 only if still READY. Preserve all other dirty paths."
+confidence: "M11-S01 is DONE and its local source-only Receipt is `receipts/PDK-M11-S01/2026-10-24-local-verification.json`. Current-task knowledge ingest returned ADD/ACTIVE ID `2c5de9d9-427c-425b-9971-2ab92cfbf6d5`; no CI/DB/production claim. Exact VCS scope was approved and only the three approved docs paths are staged; commit/push remain pending. M10-S02/M06/M07 anomaly remains unresolved; no DB operation. Preserve all other dirty paths."
 
 
 
@@ -979,7 +979,7 @@ confidence: "M11-S01 is DONE and its source/Receipt/Memory ID `6f82df01-219f-4a4
   - `current_runner_evidence`: Main Runner independently passed full shuffled Go tests, full `go vet ./...`, gofmt, design lint 89/152 and scoped diff-check at the target HEAD/Hashes in the Receipt. No DB/body was run.
   - `independent_review`: Separate read-only Verifier reviewed both files against M11-S01, D-003/D-015 and canonical JCS context; `No findings.` It ran no tests or DB operations.
   - `d016_reconciliation`: Main compared exact two-path diff, current hashes, Runner evidence, test coverage and independent No Findings review. The selected pure Domain contract validates content-addressed Nodes, closed relations, full signed node+edges, trusted signer/domain mapping, graph closure and cycle rejection; no payload/identity/independence/Trust/Authority overclaim. Acceptance is met for selected scope; mark DONE under D-016 with residuals in Receipt.
-  - `memory_ingest`: File ingest failed on the date-derived identity collision (unique active memory identity); retrying the same verified Receipt with Issue-specific title succeeded as knowledge ID `6f82df01-219f-4a4f-8396-ea2f94698d76` (v1, ACTIVE). Only the non-secret Receipt was ingested.
+  - `memory_ingest`: Current-task `llm-mem ingest` of the verified non-secret Receipt-derived outcome returned `[ADD]`, knowledge ID `2c5de9d9-427c-425b-9971-2ab92cfbf6d5` (v1, ACTIVE). Receipt=`receipts/PDK-M11-S01/2026-10-24-local-verification.json`; SHA-256=`e4c4e09299b19d7acab52b467f0d244c5a359003b397a7f05063ff55d7bf3c6e`. No credentials or raw URLs were ingested.
   - `remaining_risks`: Payload digest reference is not resolved/verified against an external artifact; verifier snapshot/key lifecycle is external; no persistent single-use replay ledger; repeated validation of the same immutable graph is idempotent. No CI/Verifier-of-Record or DB/Trust/Quorum behavior is claimed.
 - [ ] `PDK-M11-S02` — 独立性とQuorum判定。
   - `depends_on`: PDK-M11-S01
