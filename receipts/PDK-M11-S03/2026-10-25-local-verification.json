@@ -1,0 +1,78 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M11-S03",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-25T05:45:33Z",
+  "source": {
+    "git_commit": "04af724617827d0ce9313f5418e7a1380dbda087",
+    "git_tree": "1a335cd12140a23e8e8dc2f64ee4a14d654705e7",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED",
+    "target_files_untracked": true
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/trust_policy.go",
+      "sha256": "b6fc84a22d077c1f88f4a42e295f231dae9cedd5f8748d22a402c5c05c880624"
+    },
+    {
+      "path": "internal/governance/domain/trust_policy_test.go",
+      "sha256": "110c48eaa8f7b1e9bafff1ff6b73f69c61263dba24a2f011971671597b4156d1"
+    }
+  ],
+  "checks": [
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./internal/governance/domain -count=1",
+      "exit_code": 0,
+      "result": "PASS; offline focused Domain suite; DB/credential integration variables unset"
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./internal/governance/domain",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "gofmt -d internal/governance/domain/trust_policy.go internal/governance/domain/trust_policy_test.go",
+      "exit_code": 0,
+      "result": "PASS; no output"
+    },
+    {
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "result": "PASS; 89 issues, 152 edges"
+    },
+    {
+      "command": "python3 scripts/continue_plan.py",
+      "exit_code": 0,
+      "result": "PASS; selected PDK-M11-S03 with reason resume_cursor_wip"
+    },
+    {
+      "command": "git diff --check -- internal/governance/domain/trust_policy.go internal/governance/domain/trust_policy_test.go",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "NO_FINDINGS",
+    "scope": "Final policy decoder/evaluator hashes against M11-S03 contract, strict parsing, G0-G3, count/time boundaries, decisions/reason precedence, and no-mutation/authority boundary",
+    "limitations": "Source-only; did not run tests or access DB/live state, credentials, network, or VCS"
+  },
+  "reconciliation": "Main compared each recorded S03 acceptance clause with the final target hashes, offline focused Runner suite/vet/format/lint/planner/diff-check, and distinct general Verifier NO_FINDINGS. The evaluator uses strict versioned flat policy input, caller-trusted per-capability evidence counts, explicit time, and emits deterministic proposals only. Unknown/insufficient evidence does not mutate current profile; Integrity demotion is count-gated and per-capability. Mark DONE only for this pure Domain evaluator scope. No policy signature, update authorization, Trust persistence, Scope/Authority effect, production operation, real-world independence proof, or CI attestation is claimed.",
+  "verdict": "LOCAL ACCEPTANCE PASS; PURE DOMAIN POLICY EVALUATOR ONLY",
+  "remaining_risks": [
+    "TrustSnapshot dispositions and IndependentCount are caller-trusted inputs; this implementation does not independently authenticate evidence source or prove real-world independence.",
+    "Policy thresholds are configured data; no production defaults, policy signature, persistence, or policy-update authorization are implemented.",
+    "The evaluator returns decisions only and does not mutate WorkerCapabilityTrustProfile or grant Scope/Authority. No DB, production, CI, or Verifier-of-Record behavior is claimed."
+  ]
+}
