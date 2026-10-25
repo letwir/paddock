@@ -1,0 +1,50 @@
+dialect: harness-seq/1
+version: 2
+entry: PRECEDENT
+
+# PIDGEN documentation cascade — discovery/routing only; not an execution plan.
+# Shape-only structural reference: ~/.harness/etl/main.seq.
+# Import no HARNESS execution, authority, retry/depth, credential, host, or dispatch policies.
+# Document nature determines which stable LRF IDs to discover; it grants no effects or permissions.
+
+legend:
+  → = ordered reader-discovery phase, not execution or authority
+  gate = inspect document nature and rg the listed exact LRF IDs
+  nature = primary document role; overlays may be multiple and non-exclusive
+
+cascade:
+  PRECEDENT → CLASSIFY
+  CLASSIFY → CONTRACT | PROCESS | REFERENCE_STATE | HANDOFF | SKILL_LIKE | DISPLAY
+  CONTRACT:
+    nature: contract
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.contracts-lrf, formal.core, formal.domain, formal.crosscheck, formal.no-authority
+  PROCESS:
+    nature: process
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.doc-structure, formal.pidgen.lexicon, formal.pidgen.relations, formal.domain, formal.skill-style (when skill-like formatting cues are used)
+  REFERENCE_STATE:
+    nature: reference-state
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.llm-docs, formal.doc-structure, formal.pidgen.lexicon, formal.attention, formal.skill-style (when skill-like formatting cues are used)
+  HANDOFF:
+    nature: handoff
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.legend, formal.core, formal.project-symbols, formal.domain, formal.crosscheck, formal.compression, formal.category-handoff, formal.handoff.bindings, formal.no-authority, formal.skill-style
+    category_lens (descriptive discovery map only; not execution):
+      legend:
+        C_Draft, C_Handoff, C_Runner, C_Verify = typed record-stage categories (see formal.category-handoff)
+        H, R, V = record mappings; A = Acceptance-to-check-schema mapping
+        arrows = mappings between records only; η = comparison between the two displayed paths, not a result
+      paths:
+        record_path: C_Draft --H--> C_Handoff --R--> C_Runner --V--> C_Verify
+        acceptance_path: C_Draft --A--> C_Verify
+      comparison: P=V∘R∘H and Q=A are descriptive path labels; η compares mappings, not outcomes
+    binding_example (discovery/example only; normative semantics remain in formal.handoff.bindings): bind(name;type;meaning;value;scope=HANDOFF) … ref(name)
+  SKILL_LIKE:
+    nature: skill-like document
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.doc-structure, formal.pidgen.lexicon, formal.attention, formal.skill-style, formal.contracts-lrf, formal.no-authority
+  DISPLAY:
+    nature: display
+    gate: discover rules/HANDOFF-FORMAL.lrf IDs formal.attention, formal.pidgen.emoji, formal.pidgen.css, formal.skill-style (only when skill-like formatting cues are used)
+
+# Document-kind routing is an index; normative authority remains the referenced LRF records.
+L|cascade.formal|file:rules/HANDOFF-FORMAL.lrf|MUST|RO_LOCAL|[normative PIDGEN notation rules](HANDOFF-FORMAL.lrf)
+L|cascade.css|file:rules/PIDGEN-CSS.md|MUST|RO_LOCAL|[non-normative display supplement](PIDGEN-CSS.md)
+L|cascade.source|ref:~/.harness/etl/main.seq|MUST|RO_LOCAL|shape-only structural reference; no HARNESS policy imported or activated

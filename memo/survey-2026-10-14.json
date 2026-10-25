@@ -1,0 +1,32 @@
+{
+  "form": {
+    "key": "harness-feedback",
+    "version": 1,
+    "title": "ハーネスご意見アンケート",
+    "questions": [
+      {"key":"hard-to-operate","prompt":"このハーネスで動きづらかったことは？","required":true,"kind":"long_text"},
+      {"key":"ambiguous","prompt":"解釈に迷った、または推測して進めたことは？","required":true,"kind":"long_text"},
+      {"key":"excessive","prompt":"不要・過剰だった指示、SKILL、工程は？","required":true,"kind":"long_text"},
+      {"key":"missing","prompt":"無かったため困ったSKILL・機能は？","required":true,"kind":"long_text"},
+      {"key":"helpful","prompt":"このハーネスのおかげで上手くできたことは？","required":true,"kind":"long_text"},
+      {"key":"next-time","prompt":"次回同じ仕事をするなら何を変えたい？","required":true,"kind":"long_text"},
+      {"key":"other","prompt":"その他、ワイへの実装依頼・ご意見","required":false,"kind":"long_text"}
+    ]
+  },
+  "respondent": "codex-agent-observation",
+  "source": "task-receipt",
+  "task_id": "paddock-issues-loop-2026-10-14",
+  "context": {
+    "observation_scope": "PADDOCK Issue作業での規則確認、Git push、llm-memory記録、検証起動に関するエージェント観測。ユーザー本人の回答ではない。",
+    "signal_kinds": ["FRICTION:1", "REQUEST:1"]
+  },
+  "answers": {
+    "hard-to-operate": "llm-memory記録で、プロジェクト側.buildバイナリとスキル指定CLIの場所が異なり、最初のDB接続タイムアウトと後続の正常疎通を切り分ける必要があった。",
+    "ambiguous": "『進捗を保管』が外部DB登録まで許可するか不明だったため確認した。push対象も先行コミットと複数の未コミットIssue成果が混在し、先行分のみpushするか確認が必要だった。",
+    "excessive": "短い継続作業には規則の広範な再照合がやや重かった。Issue状態・該当ルール・現在の差分に絞った導線が望ましい。",
+    "missing": "CLI優先バイナリ解決と疎通失敗時の再試行を案内するpreflight、および検査がセッション中断で不明になった時の再開可能なreceipt機能があると助かる。",
+    "helpful": "push結果、DB疎通、記憶登録を実観測で分け、成功した登録IDを記録できた。survey templateに沿い、エージェント観測をユーザー本人の回答と混同しないよう明示できた。",
+    "next-time": "最初にスキル指定CLIのstatusとsurvey templateを確認し、進捗登録後にIssue検証へ進む。テストは結果を回収可能な方法で起動し、Exit Codeと対象revisionを記録する。",
+    "other": "本回答はタスク中のエージェント観測でありユーザー本人の回答ではない。llm-memory進捗登録ID: 4d2cb354-f2e1-4261-962e-807eee3b4d54。"
+  }
+}

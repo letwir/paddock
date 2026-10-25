@@ -1,0 +1,836 @@
+{
+  "schema": "lrf-preflight/v1",
+  "status": "PASS",
+  "parser": "invoke-rule-preflight.ps1/v1",
+  "task": "change",
+  "tags": [
+    "code",
+    "state",
+    "worker",
+    "subagent"
+  ],
+  "root": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+  "files": [
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "sha256": "61A0E17A409045C01E0E503CB297EAB12A239637BAC94E88332B8BE21C393AF4"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/MANUAL.lrf",
+      "sha256": "AECE18F3E08DE0682F71EED65BEEBA05F8DD5C93BAF11E321E15B6EE37A1DB07"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "sha256": "CB7172D717CC71E700812C42E85B552F241E6C1D3F07E57860549755590566CA"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/state.lrf",
+      "sha256": "594206B65A6D1BAC90A896E68738C0812D37B93B8F7D316004FBD720149EC132"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "sha256": "D77D64E1D1749A6A6F6458CF80D0FF17B80B664E7670B61154CA62C297A8655D"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "sha256": "FED0C4499F20D997336CE67117BFB29123AB54D610A104817BA441AC45156974"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "sha256": "D9BEC6A5D2F5FECF6E2BE5AD92F60B5ABB4F2DDEB94D040876693DD4AF344AFC"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "sha256": "A2DBDDCB49CCE00003489216CC66832C048F9006C84A817A1ABB2D8CC4F399BA"
+    }
+  ],
+  "selected": [
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 3,
+      "id": "intent.rw",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 4,
+      "id": "ctx",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 5,
+      "id": "effects",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 6,
+      "id": "scope",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 7,
+      "id": "host",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 8,
+      "id": "legacy",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 9,
+      "id": "route.phase",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 10,
+      "id": "route.tags",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 11,
+      "id": "route.order",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 12,
+      "id": "bootstrap.next",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 13,
+      "id": "bootstrap.manual",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/MANUAL.lrf",
+      "line": 3,
+      "id": "persona",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/MANUAL.lrf",
+      "line": 4,
+      "id": "agent.handoff",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/MANUAL.lrf",
+      "line": 5,
+      "id": "agent.roles",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 14,
+      "id": "bootstrap.load",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 2,
+      "id": "load.state",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/state.lrf",
+      "line": 2,
+      "id": "state.guard",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 3,
+      "id": "load.engineering",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 2,
+      "id": "design.effects",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 3,
+      "id": "design.flow",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 4,
+      "id": "design.guards",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 5,
+      "id": "design.contract",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 6,
+      "id": "error",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 7,
+      "id": "resource",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 8,
+      "id": "async",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 9,
+      "id": "ownership",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 10,
+      "id": "naming",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 11,
+      "id": "comments",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 12,
+      "id": "dependency",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 13,
+      "id": "surgical",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 17,
+      "id": "test.native",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 18,
+      "id": "test.effects",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 19,
+      "id": "evidence",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 20,
+      "id": "workflow.code-etl",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 21,
+      "id": "workflow.precedent",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 27,
+      "id": "workflow.explorer",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 28,
+      "id": "workflow.plan",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 29,
+      "id": "workflow.preverify",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 30,
+      "id": "workflow.coding",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 31,
+      "id": "workflow.postverify",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/engineering.lrf",
+      "line": 32,
+      "id": "workflow.finish",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 6,
+      "id": "load.subagents",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 2,
+      "id": "worker.router",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 3,
+      "id": "subagent.filereader",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 4,
+      "id": "subagent.explorer",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 5,
+      "id": "worker.persona",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 6,
+      "id": "worker.ownership",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 7,
+      "id": "subagent.source",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 8,
+      "id": "subagent.invocation-codec",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 9,
+      "id": "subagent.discovery",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 10,
+      "id": "subagent.preflight",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 11,
+      "id": "subagent.nested-handoff",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 12,
+      "id": "subagent.persona-discovery",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 13,
+      "id": "subagent.persona-selection",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 14,
+      "id": "subagent.etl",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 15,
+      "id": "subagent.orchestrate",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 16,
+      "id": "subagent.parallel-safety",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 17,
+      "id": "subagent.etl-explore",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 18,
+      "id": "subagent.etl-plan",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 19,
+      "id": "subagent.etl-implement",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 20,
+      "id": "subagent.etl-verify",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 21,
+      "id": "subagent.etl-summary",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 22,
+      "id": "subagent.etl-context",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 23,
+      "id": "subagent.llm-mem-external",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 24,
+      "id": "subagent.output-min",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 25,
+      "id": "subagent.failure-escalation",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 26,
+      "id": "subagent.evaluation",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 27,
+      "id": "subagent.self-evolution",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 28,
+      "id": "subagent.evaluation-check",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 30,
+      "id": "subagent.reasoning-easy",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 31,
+      "id": "subagent.reasoning-medium",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 32,
+      "id": "subagent.reasoning-hard",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 33,
+      "id": "subagent.reasoning-max",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 34,
+      "id": "subagent.reasoning-resolution",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 36,
+      "id": "subagent.codex-sol",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 37,
+      "id": "subagent.codex-terra",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 38,
+      "id": "subagent.codex-luna",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 39,
+      "id": "subagent.provider-boundary",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 40,
+      "id": "subagent.provider-easy",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 41,
+      "id": "subagent.provider-concept",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 42,
+      "id": "subagent.provider-math",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 43,
+      "id": "subagent.provider-code",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 44,
+      "id": "subagent.provider-review",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 47,
+      "id": "subagent.easy",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 48,
+      "id": "subagent.medium",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 49,
+      "id": "subagent.hard-code",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 50,
+      "id": "subagent.hard-review",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 51,
+      "id": "subagent.researcher",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 52,
+      "id": "subagent.auditor",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 53,
+      "id": "subagent.verifier",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 54,
+      "id": "subagent.refactorer",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 55,
+      "id": "subagent.blackhat",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 56,
+      "id": "subagent.proposer",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 57,
+      "id": "subagent.critic",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 58,
+      "id": "subagent.mode",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 59,
+      "id": "subagent.scope",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 60,
+      "id": "subagent.credentials",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 61,
+      "id": "subagent.external",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 62,
+      "id": "subagent.vcs",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/agents/SUBAGENTS.lrf",
+      "line": 63,
+      "id": "subagent.done",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 7,
+      "id": "load.subagents.worker",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 8,
+      "id": "load.agent-router",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 9,
+      "id": "load.worker-context",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 10,
+      "id": "subagent.eval-evidence",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 13,
+      "id": "load.diary",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 2,
+      "id": "file",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 3,
+      "id": "entry",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 4,
+      "id": "prompt",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 5,
+      "id": "agent",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 6,
+      "id": "ratio",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 7,
+      "id": "feedback",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 8,
+      "id": "analyze",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/DIARY.lrf",
+      "line": 9,
+      "id": "no-defect",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/LOAD.lrf",
+      "line": 14,
+      "id": "load.research",
+      "kind": "L"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 3,
+      "id": "research.order",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 4,
+      "id": "research.retry-trigger",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 5,
+      "id": "research.delegate",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 6,
+      "id": "research.delegate-model",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 7,
+      "id": "research.delegate-output",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 8,
+      "id": "research.delegate-fallback",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 9,
+      "id": "research.web",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 10,
+      "id": "research.epub",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 11,
+      "id": "research.memory",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 12,
+      "id": "research.synthesis",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 16,
+      "id": "research.failure",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/research.lrf",
+      "line": 17,
+      "id": "research.secrets",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 15,
+      "id": "workflow.default",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 16,
+      "id": "agent.mode",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 17,
+      "id": "agent.gates",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 18,
+      "id": "mem.etl",
+      "kind": "R"
+    },
+    {
+      "path": "/data/data/com.termux/files/home/.harness/rules/BOOTSTRAP.lrf",
+      "line": 19,
+      "id": "done",
+      "kind": "R"
+    }
+  ],
+  "total_bytes": 42321
+}

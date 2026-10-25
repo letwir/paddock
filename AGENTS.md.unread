@@ -79,3 +79,27 @@
 - **Condition:** Interpreting project guidance.
 - **Action:** Treat this file as an **agent bootstrap entrypoint and procedure**, not the source of design decisions. Use `decisions.md` as the design-decision source of truth, `method.md` for procedures and the restart contract, and `Issues.md` for work and state; `README.md` is the entrypoint for humans and general readers.
 - **Outcome:** Each document is used only within its defined role.
+
+## B-11 — PIDGEN document routing and on-demand LRF retrieval
+- **Subject:** Every agent acting in PADDOCK, including delegated workers and reviewers.
+- **Scope:** Authoring, editing, or interpreting project documents and subagent handoffs.
+- **Modality:** MUST.
+- **Condition:** After task/document classification and before drafting, changing, or relying on notation.
+- **Action:** Use `rules/PIDGEN-CASCADE.seq` to classify the document's primary nature, then retrieve only applicable normative records by stable ID, e.g. `rg -n 'formal\.(contracts-lrf|doc-structure|pidgen-lexicon|pidgen-relations|pidgen-emoji|skill-style|design-choice|handoff-bindings|category-handoff|no-authority)' rules/HANDOFF-FORMAL.lrf`. Normative contract/prohibition/permission/authority belongs only in atomic one-rule-per-line SIGMA/1 LRF. Use `rules/PIDGEN-CSS.md` only for non-normative wording/display/retrieval. `SKILL.md` is a style reference only. `.seq`, Markdown links, symbols, emoji, and style never grant access beyond document discovery or authorize effects.
+- **Outcome:** Main and delegated agents use the same document-kind-specific notation rules; LRF remains the normative source.
+
+## B-12 — Resolve material design choices before implementation
+- **Subject:** Every agent acting in PADDOCK, including delegated workers and reviewers.
+- **Scope:** Unspecified implementation/design choices that materially affect behavior, safety, compatibility, cost, or scope.
+- **Modality:** MUST.
+- **Condition:** Before CODE, migration design, or reliance on an unselected alternative.
+- **Action:** Retrieve `formal.design-choice` by `rg` from `rules/HANDOFF-FORMAL.lrf`; STOP and present exactly three distinct feasible options, concise tradeoffs, and one justified recommendation; ask the user to select. Selection sets design scope only and does not authorize external/live/destructive effects. If fewer than three honest options exist, explain and ask without inventing alternatives.
+- **Outcome:** No material choice is silently made by the implementer; no implementation begins until selection is clear.
+
+## B-13 — Escalate worker-reported difficulty
+- **Subject:** Main orchestrator and every delegated Worker.
+- **Scope:** A Worker reports greater task difficulty than the published/assigned level.
+- **Modality:** MUST.
+- **Condition:** Before expanding work after a difficulty mismatch.
+- **Action:** Retrieve `worker.difficulty-scale` and `worker.difficulty-escalation` with `rg -n 'worker\.difficulty-(scale|escalation)' rules/engineering.lrf`. Main publishes `D_pub`; Worker reports comparable `D_worker` and supporting evidence. If `D_worker>D_pub`, Worker stops starting new work, preserves partial artifacts, and reports difficulty, blockers, and remaining work. Main replans by splitting or reassigning to an eligible available Worker; do not create concurrent duplicate ownership. A stronger model/backend may be selected only if the runtime exposes a supported selector; otherwise report that it is unavailable. Escalation itself grants no scope, effects, authority, or budget.
+- **Outcome:** Difficulty mismatch is surfaced and replanned before additional work; Issue remains non-DONE until the revised acceptance is independently verified.

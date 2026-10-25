@@ -1,0 +1,32 @@
+{
+  "form": {
+    "key": "harness-feedback",
+    "version": 1,
+    "title": "ハーネスご意見アンケート",
+    "questions": [
+      {"key":"hard-to-operate","prompt":"このハーネスで動きづらかったことは？","required":true,"kind":"long_text"},
+      {"key":"ambiguous","prompt":"解釈に迷った、または推測して進めたことは？","required":true,"kind":"long_text"},
+      {"key":"excessive","prompt":"不要・過剰だった指示、SKILL、工程は？","required":true,"kind":"long_text"},
+      {"key":"missing","prompt":"無かったため困ったSKILL・機能は？","required":true,"kind":"long_text"},
+      {"key":"helpful","prompt":"このハーネスのおかげで上手くできたことは？","required":true,"kind":"long_text"},
+      {"key":"next-time","prompt":"次回同じ仕事をするなら何を変えたい？","required":true,"kind":"long_text"},
+      {"key":"other","prompt":"その他、ワイへの実装依頼・ご意見","required":false,"kind":"long_text"}
+    ]
+  },
+  "respondent": "codex-agent-observation",
+  "source": "PADDOCK task receipt",
+  "task_id": "paddock-m06-s05-2of3-2026-10-14-followup",
+  "context": {
+    "observation_scope": "今回のPADDOCK M06-S05作業におけるエージェント観測。ユーザー本人の回答ではない。実装、paddock_test検証、push、Issue/memory記録を対象とする。",
+    "signal_kinds": ["FRICTION:1", "REQUEST:1"]
+  },
+  "answers": {
+    "ambiguous": "2-of-3 quorum自体はユーザーが決定したが、鍵bootstrap/custodyはO-002/O-010のOPENとして残した。実装前にローカルSafetyGateとdeployed Gatewayの境界を確認し、未決を推測で埋めない必要があった。",
+    "excessive": "未コミット変更が多数混在する再開時に、関連証拠・ファイル・Cursorを何度も照合する工程は重かった。ただしpush対象を限定し、既存変更を保護するため必要な検査だった。",
+    "hard-to-operate": "欠落していたPADDOCK worker/router/LRFファイルを再構成する必要があり、当初のworker dispatchはruntime制約でも失敗した。さらにAndroid/arm64ではGo race detectorが利用できず、CIもなくローカルVerifier経路に依存した。",
+    "helpful": "独立Verifierの指摘で署名検証だけではstate transition/receipt replayが不足と判明し、DB-backed transaction integrationとSafetyGateのfresh authority readまで拡張できた。paddock_test限定preflight、rollback-only fixture、残存件数確認により実DB検証後の副作用を抑制できた。小項目のソースだけをcommit/pushし、混在したIssue/docs変更をremoteに含めなかった。",
+    "missing": "高リスクSafety Plane向けに、署名quorum・receipt replay・Scope/global epoch CAS・fresh SafetyGateを一体で検証する既製テストhelperや、Android環境で利用可能なrace検査/CI verifierがあるとよい。実ネットワークGateway/fencing実装はrepoに存在せず、今後の明示的なIssue境界が必要。",
+    "next-time": "最初にIssue受入条件と実装可能なsystem boundaryを分割し、実装前Verifierが不足する永続化・replay・enforcement条件を列挙する。次にtransaction/receipt設計を先に確定し、rollback-only PostgreSQL integrationを早く追加する。最後に正確な小項目だけをpushし、その後Issue/evidenceとmemoryを同期する。",
+    "other": "M06-S05 commit c38b818578702bbc0bc40240dcd03341952c852e はpush済みで、unit/vet/lintとpaddock_test integrationはPASS、fixture/receipt残存0。Issueは[~] IMPLEMENTEDのまま。deployed Gateway/Scheduler、check-to-side-effect fencing、O-002/O-010 production key lifecycleは未完了/OPEN。Race detectorはandroid/arm64非対応。この回答はエージェント観測でありユーザー本人の回答ではない。"
+  }
+}

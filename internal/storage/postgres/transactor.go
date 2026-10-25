@@ -23,6 +23,17 @@ type transaction interface {
 	Rollback(context.Context) error
 }
 
+func commitKnownAborted(err error) bool {
+	if errors.Is(err, pgx.ErrTxCommitRollback) {
+		return true
+	}
+	var stateErr interface{ SQLState() string }
+	if !errors.As(err, &stateErr) {
+		return false
+	}
+	return stateErr.SQLState() == "40001" || stateErr.SQLState() == "40P01"
+}
+
 type beginner interface {
 	Begin(context.Context) (transaction, error)
 }
@@ -78,30 +89,40 @@ func (t *Transactor) WithinTransaction(ctx context.Context, fn func(port.Governa
 		governanceTx = newSafetyGovernanceTx(tx)
 	}
 	if err := fn(governanceTx); err != nil {
-		if rollbackErr := rollback(tx); rollbackErr != nil {
+		if rollbackErr := rollbackTransaction(tx); rollbackErr != nil {
 			return errors.Join(err, fmt.Errorf("rollback governance transaction: %w", rollbackErr))
 		}
-		return err
+		return errors.Join(port.ErrTransactionRolledBack, err)
 	}
 	if err := ctx.Err(); err != nil {
-		if rollbackErr := rollback(tx); rollbackErr != nil {
+		if rollbackErr := rollbackTransaction(tx); rollbackErr != nil {
 			return errors.Join(err, fmt.Errorf("rollback cancelled governance transaction: %w", rollbackErr))
 		}
-		return err
+		return errors.Join(port.ErrTransactionRolledBack, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		// Commit may have an unknown outcome; propagate it without claiming rollback.
-		return fmt.Errorf("commit governance transaction (outcome may be unknown): %w", err)
+		// An explicit uncertainty marker always wins over a wrapped SQLSTATE.
+		// Server serialization/deadlock errors establish that Commit aborted.
+		if !errors.Is(err, port.ErrCommitOutcomeUnknown) && commitKnownAborted(err) {
+			return fmt.Errorf("commit governance transaction (rolled back): %w", errors.Join(port.ErrTransactionRolledBack, err))
+		}
+		return fmt.Errorf("commit governance transaction (outcome may be unknown): %w", errors.Join(port.ErrCommitOutcomeUnknown, err))
 	}
 	return nil
 }
 
 func rollback(tx transaction) error {
-	ctx, cancel := context.WithTimeout(context.Background(), rollbackTimeout)
-	defer cancel()
-	err := tx.Rollback(ctx)
+	err := rollbackTransaction(tx)
 	if errors.Is(err, pgx.ErrTxClosed) {
 		return nil
 	}
 	return err
+}
+
+// Unlike best-effort cleanup, outcome confirmation must not treat ErrTxClosed
+// as success: a closed transaction could have committed rather than rolled back.
+func rollbackTransaction(tx transaction) error {
+	ctx, cancel := context.WithTimeout(context.Background(), rollbackTimeout)
+	defer cancel()
+	return tx.Rollback(ctx)
 }

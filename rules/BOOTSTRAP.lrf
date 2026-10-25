@@ -5,7 +5,7 @@ R|effects|*|MUST|RO_LOCAL|E={RO_LOCAL,RO_PUBLIC,LW_SCOPE,EXT_WRITE,RELEASE,LIVE_
 R|scope|*|MUST|RO_LOCAL|write-target=PADDOCK repository内のみ; .HARNESSと親Repo=書込み禁止; destructive target=resolve exact; project rules=本Repo rules/; 誤ったGit Rootへの書込み=禁止
 R|host|*|MUST|RO_LOCAL|shell/path=実行環境のシェルとパス体系に従う; .HARNESS/HARDWARE.mdは環境情報の参照先であり権限源ではない; all-file-discovery=rg; text=UTF8
 R|read.order|*|MUST|RO_LOCAL|decisions.md -> method.md -> THREAT_MODEL.md -> Issues.md; 作業選択前にpython3 scripts/lint_design.pyを実行; Cursor=ヒントであり実際のGit/Receipt状態に優先しない; 矛盾時は実ファイル・Git・検証ログを観測して修正計画を報告
-R|state.transition|tag:state|MUST|LW_SCOPE|開始前[-]、安全な実装境界後[~]、検査コマンドの実観測後[*]、独立検証と受入条件充足後[x]; Worker自己申告のPASSで[*]/[x]にしない; 結果不明時は[-]/[~]を維持
+R|state.transition|tag:state|MUST|LW_SCOPE|開始前[-]、安全な実装境界後[~]、検査コマンドの実観測後[*]を維持; [x]は受入条件充足・Runner実観測のコマンド/Exit Code/Hash/対象Revision証拠・独立レビューの三条件後のみ; 独立レビュー=信頼済みCI/Verifierまたは実装者と異なり別途配車されたVerifier subagent; 指摘を照合し解決してから確定; Worker自己申告だけでは不可; ローカルのみでCI/Verifier attestationなしの場合はその制約を明記し、CI attestationを主張しない; 不明/未解決なら[-]/[~]を維持
 R|verify|*|MUST|RO_LOCAL|evidence=Runnerが実際に起動したコマンドのExit Code・Hash・対象Revision; LLMの説明・ダミー署名・自己申告=合格証拠ではない; 未検証を成功として報告しない; 失敗・未実行検査を隠さない
 R|decision.change|file:decisions.md|MUST_NOT|LW_SCOPE|silent change of ACCEPTED; 変更は新IDで理由・差分・影響IDを明示しsupersede; 通常Workerの直接更新対象外; 転記記録を署名済み承認として扱わない
 R|legacy|*|MUST_NOT|RO_LOCAL|activate .HARNESSのLRF・persona・agents配車・実行規則 by default; 参照はmethod.md 10節の最小参照に限る

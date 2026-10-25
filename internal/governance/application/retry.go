@@ -17,9 +17,12 @@ type sqlStateError interface {
 }
 
 // Retry runs the entire callback in a fresh transaction for serialization
-// failures (SQLSTATE 40001) and deadlocks (40P01), up to maxAttempts total
-// attempts. The callback must contain repeatable DB-only effects: it must not
+// failures (SQLSTATE 40001) and deadlocks (40P01) carrying the Transactor's
+// ErrTransactionRolledBack marker, up to maxAttempts total attempts.
+// The callback must contain repeatable DB-only effects: it must not
 // perform external effects. The transactor owns transaction rollback/commit.
+// An explicit UNKNOWN_COMMIT is returned unchanged, never retried, regardless
+// of wrapped SQLSTATE or concurrent context cancellation.
 //
 // retryDelay is the fixed delay between retryable failures. A non-positive
 // delay retries immediately. The final transaction error is returned unchanged.
@@ -40,6 +43,9 @@ func retryWithWait(ctx context.Context, transactor port.Transactor, maxAttempts 
 		if err == nil {
 			return nil
 		}
+		if unknownCommit(err) {
+			return err
+		}
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -59,12 +65,20 @@ func retryWithWait(ctx context.Context, transactor port.Transactor, maxAttempts 
 }
 
 func retryableSQLState(err error) bool {
+	if unknownCommit(err) || !errors.Is(err, port.ErrTransactionRolledBack) {
+		return false
+	}
 	var stateErr sqlStateError
 	if !errors.As(err, &stateErr) {
 		return false
 	}
 	state := stateErr.SQLState()
 	return state == "40001" || state == "40P01"
+}
+
+func unknownCommit(err error) bool {
+	// Check the port contract before inspecting SQLSTATE on any wrapped cause.
+	return errors.Is(err, port.ErrCommitOutcomeUnknown)
 }
 
 func waitContext(ctx context.Context, delay time.Duration) error {

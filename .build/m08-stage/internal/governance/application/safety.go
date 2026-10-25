@@ -1,0 +1,257 @@
+package application
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"sort"
+
+	"github.com/letwir/paddock/internal/governance/domain"
+	"github.com/letwir/paddock/internal/governance/port"
+)
+
+// SafetyService persists quorum-authorized safety transitions using one
+// GovernanceTx. Completed state and command receipt are persisted atomically.
+type SafetyService struct {
+	transactor port.Transactor
+	quorum     domain.SafetyQuorum
+}
+
+func safetyRequestDigest(action domain.SafetyAction, scope domain.ScopeID, epoch domain.Epoch, id string, activation *[32]byte, signatures []domain.SafetySignature) (string, error) {
+	// JSON encoding has stable struct field order; signatures deliberately retain
+	// caller order so changing signer order changes the command identity.
+	v := struct {
+		Action     domain.SafetyAction
+		Scope      domain.ScopeID
+		Epoch      domain.Epoch
+		CommandID  string
+		Activation *string
+		Signatures []struct {
+			ID        string
+			Signature []byte
+		}
+	}{Action: action, Scope: scope, Epoch: epoch, CommandID: id}
+	if activation != nil {
+		d := hex.EncodeToString(activation[:])
+		v.Activation = &d
+	}
+	for _, sig := range signatures {
+		v.Signatures = append(v.Signatures, struct {
+			ID        string
+			Signature []byte
+		}{sig.SignerID, sig.Signature})
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	h := sha256.Sum256(append([]byte("PADDOCK-SAFETY-RECEIPT-v1\x00"), b...))
+	return hex.EncodeToString(h[:]), nil
+}
+func saveReceipt(ctx context.Context, tx port.GovernanceTx, id, digest string, result domain.SafetyTransitionResult) error {
+	b, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+	return tx.InsertCommandReceipt(ctx, port.CommandReceipt{CommandID: id, RequestDigest: digest, Status: "SUCCEEDED", Response: b})
+}
+func reconcileReceipt(r port.CommandReceipt, digest string, current domain.AuthorityState, out *domain.SafetyTransitionResult) error {
+	if r.RequestDigest != digest {
+		return errors.New("safety command ID already used with a different request digest")
+	}
+	if r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+		return errors.New("invalid completed safety command receipt")
+	}
+	var recorded domain.SafetyTransitionResult
+	if err := json.Unmarshal(r.Response, &recorded); err != nil || recorded.CommandID != r.CommandID || recorded.State.Validate() != nil {
+		return errors.New("malformed safety command receipt response")
+	}
+	d1, e1 := domain.ActivationDigest(current)
+	d2, e2 := domain.ActivationDigest(recorded.State)
+	if e1 != nil || e2 != nil || d1 != d2 {
+		return errors.New("safety command receipt is superseded by current persisted state")
+	}
+	*out = recorded
+	return nil
+}
+
+func NewSafetyService(transactor port.Transactor, quorum domain.SafetyQuorum) *SafetyService {
+	return &SafetyService{transactor: transactor, quorum: quorum}
+}
+
+func (s *SafetyService) Stop(ctx context.Context, scopeID domain.ScopeID, expectedSecurityEpoch domain.Epoch, commandID string, signatures []domain.SafetySignature) (domain.SafetyTransitionResult, error) {
+	if err := s.ready(ctx); err != nil {
+		return domain.SafetyTransitionResult{}, err
+	}
+	var result domain.SafetyTransitionResult
+	err := s.transactor.WithinTransaction(ctx, func(tx port.GovernanceTx) error {
+		current, err := lockAuthority(ctx, tx, scopeID)
+		if err != nil {
+			return err
+		}
+		digest, err := safetyRequestDigest(domain.SafetyActionStop, scopeID, expectedSecurityEpoch, commandID, nil, signatures)
+		if err != nil {
+			return err
+		}
+		if receipt, found, err := tx.LookupCommandReceipt(ctx, commandID); err != nil {
+			return err
+		} else if found {
+			return reconcileReceipt(receipt, digest, snapshotAuthority(current), &result)
+		}
+		stopped, err := s.quorum.Stop(snapshotAuthority(current), scopeID, expectedSecurityEpoch, commandID, signatures)
+		if err != nil {
+			return err
+		}
+		next := snapshotWithState(current, stopped.State)
+		if err := tx.CompareAndSwapScope(ctx, current, next); err != nil {
+			return err
+		}
+		if err := tx.CompareAndSwapSecurityEpoch(ctx, expectedSecurityEpoch, stopped.State.SecurityEpoch); err != nil {
+			return err
+		}
+		if err := saveReceipt(ctx, tx, commandID, digest, stopped); err != nil {
+			return err
+		}
+		result = stopped
+		return nil
+	})
+	if err != nil {
+		return domain.SafetyTransitionResult{}, err
+	}
+	return result, nil
+}
+
+func (s *SafetyService) Release(ctx context.Context, scopeID domain.ScopeID, expectedSecurityEpoch domain.Epoch, commandID string, proposedActivation domain.AuthorityState, signatures []domain.SafetySignature) (domain.SafetyTransitionResult, error) {
+	if err := s.ready(ctx); err != nil {
+		return domain.SafetyTransitionResult{}, err
+	}
+	var result domain.SafetyTransitionResult
+	err := s.transactor.WithinTransaction(ctx, func(tx port.GovernanceTx) error {
+		current, err := lockAuthority(ctx, tx, scopeID)
+		if err != nil {
+			return err
+		}
+		activation := cloneState(proposedActivation)
+		activationDigest, err := domain.ActivationDigest(activation)
+		if err != nil {
+			return err
+		}
+		digest, err := safetyRequestDigest(domain.SafetyActionRelease, scopeID, expectedSecurityEpoch, commandID, &activationDigest, signatures)
+		if err != nil {
+			return err
+		}
+		if receipt, found, err := tx.LookupCommandReceipt(ctx, commandID); err != nil {
+			return err
+		} else if found {
+			return reconcileReceipt(receipt, digest, snapshotAuthority(current), &result)
+		}
+		released, err := s.quorum.Release(snapshotAuthority(current), activation, scopeID, expectedSecurityEpoch, commandID, signatures)
+		if err != nil {
+			return err
+		}
+		// Release advances Scope Activation Epoch exactly once; quorum validates
+		// the complete signed activation and the next global Security Epoch.
+		currentState := snapshotAuthority(current)
+		nextActivation, err := currentState.ScopeActivationEpoch.Next()
+		if err != nil {
+			return err
+		}
+		if released.State.ScopeActivationEpoch != nextActivation {
+			return domain.ErrInvalidApproval
+		}
+		next := snapshotWithState(current, released.State)
+		if err := tx.CompareAndSwapScope(ctx, current, next); err != nil {
+			return err
+		}
+		if err := tx.CompareAndSwapSecurityEpoch(ctx, expectedSecurityEpoch, released.State.SecurityEpoch); err != nil {
+			return err
+		}
+		if err := saveReceipt(ctx, tx, commandID, digest, released); err != nil {
+			return err
+		}
+		result = released
+		return nil
+	})
+	if err != nil {
+		return domain.SafetyTransitionResult{}, err
+	}
+	return result, nil
+}
+
+func (s *SafetyService) ready(ctx context.Context) error {
+	if s == nil || s.transactor == nil {
+		return errors.New("safety service is not initialized")
+	}
+	if ctx == nil {
+		return errors.New("nil context")
+	}
+	return ctx.Err()
+}
+
+func lockAuthority(ctx context.Context, tx port.GovernanceTx, scopeID domain.ScopeID) (port.ScopeSnapshot, error) {
+	if tx == nil {
+		return port.ScopeSnapshot{}, errors.New("nil governance transaction")
+	}
+	if err := scopeID.Validate(); err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	snapshot, err := tx.LockScope(ctx, scopeID)
+	if err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	if snapshot.ScopeID != scopeID {
+		return port.ScopeSnapshot{}, fmt.Errorf("malformed scope snapshot: identity mismatch")
+	}
+	if snapshot.LiveRolloutID != nil {
+		rollout, err := tx.LockRollout(ctx, scopeID, *snapshot.LiveRolloutID)
+		if err != nil {
+			return port.ScopeSnapshot{}, err
+		}
+		if rollout.ID != *snapshot.LiveRolloutID || rollout.Scope != scopeID {
+			return port.ScopeSnapshot{}, errors.New("malformed rollout snapshot: identity mismatch")
+		}
+	}
+	if err := snapshotAuthority(snapshot).Validate(); err != nil {
+		return port.ScopeSnapshot{}, fmt.Errorf("malformed authority snapshot: %w", err)
+	}
+	ids := make([]domain.RootID, 0, len(snapshot.Roots))
+	for id := range snapshot.Roots {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	if len(ids) == 0 {
+		return port.ScopeSnapshot{}, errors.New("malformed authority snapshot: no Roots")
+	}
+	if err := tx.ValidateTargets(ctx, scopeID, ids); err != nil {
+		return port.ScopeSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func snapshotAuthority(s port.ScopeSnapshot) domain.AuthorityState {
+	return domain.AuthorityState{Scope: s.ScopeID, ScopeActivationEpoch: s.ActivationEpoch, SecurityEpoch: s.SecurityEpoch, Mode: s.Mode, DatabaseAvailable: true, Roots: s.Roots}
+}
+
+func snapshotWithState(old port.ScopeSnapshot, state domain.AuthorityState) port.ScopeSnapshot {
+	next := old
+	next.ActivationEpoch = state.ScopeActivationEpoch
+	next.Mode = state.Mode
+	next.SecurityEpoch = old.SecurityEpoch // Security Epoch has its own global CAS.
+	next.Roots = make(map[domain.RootID]domain.RootAuthority, len(state.Roots))
+	for id, root := range state.Roots {
+		next.Roots[id] = root
+	}
+	return next
+}
+
+func cloneState(s domain.AuthorityState) domain.AuthorityState {
+	out := s
+	out.Roots = make(map[domain.RootID]domain.RootAuthority, len(s.Roots))
+	for id, root := range s.Roots {
+		out.Roots[id] = root
+	}
+	return out
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S03",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_RECORDED",
+  "time_finish_utc": "2026-10-22T09:35:18Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE"
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "PostgreSQL major 18 confirmed by read-only preflight; minor version not retained"
+  },
+  "targets": [
+    {
+      "path": "internal/storage/postgres/rollout_application_integration_test.go",
+      "sha256": "0a59c73c927f03d39fd86731d13f97c1aa3df4377738b8ead1c58d0e51f4a410",
+      "stage": "source used by the one approved DB test run, before the added direct active-rollout assertion"
+    },
+    {
+      "path": "internal/storage/postgres/rollout_application_integration_test.go",
+      "sha256": "7e202b36c8db8a13a4fdee83104b1d647ecb23e48bf9384b88e45521bc894332",
+      "stage": "current source; compile-only and format checks plus independent source review"
+    }
+  ],
+  "checks": [
+    {
+      "command": "inline Python/psql read-only preflight (initial guard attempt)",
+      "exit_code": 1,
+      "result": "STOP before DB test; wrapper expected psql boolean `f` but received `false`. No database writes occurred."
+    },
+    {
+      "command": "inline Python/psql read-only diagnostic query",
+      "exit_code": 0,
+      "result": "Observed 3 valid required APIs, 0 matching pre-existing rollout fixture rows, forbidden app direct-DML predicate=false (app DML denied), and 2 required tables."
+    },
+    {
+      "command": "corrected inline Python/psql read-only preflight",
+      "exit_code": 0,
+      "result": "READ_ONLY_PREFLIGHT=PASS database=paddock_test postgres_major=18 migrator/app_roles=verified APIs=3 app_direct_DML=denied rollout_fixtures=0"
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestRolloutApplicationAppOnlyIntegration$' -count=1 -v",
+      "exit_code": 0,
+      "result": "PASS; exactly the named body ran once (17.812s), against the first target hash above. This run predates the added direct active-rollout assertion."
+    },
+    {
+      "command": "inline Python/psql read-only exact-fixture postflight",
+      "exit_code": 0,
+      "result": "READ_ONLY_POSTFLIGHT=PASS target=paddock_test exact_rollout_fixture_counts=0 (scope/root/rollout/target/receipt/event/outbox/bundle); against the first target hash above."
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^$' -count=1",
+      "exit_code": 0,
+      "result": "PASS; compile-only for the current source hash, no tests ran and no DB body executed."
+    },
+    {
+      "command": "test -z \"$(gofmt -d internal/storage/postgres/rollout_application_integration_test.go)\" && git diff --check -- internal/storage/postgres/rollout_application_integration_test.go",
+      "exit_code": 0,
+      "result": "FORMAT_AND_WHITESPACE=PASS for the current source hash."
+    }
+  ],
+  "independent_review": {
+    "kind": "Separate read-only Verifier subagent",
+    "result": "No actionable findings on the current source; the earlier missing active-rollout-count assertion was added.",
+    "scope": "Reviewed PDK-M07-S03 acceptance and the current integration test source, including the direct active-row count and preserved BUSY/live-slot/blocked-row assertions.",
+    "limitations": "No DB access or test body execution. The DB PASS and cleanup observation apply only to the first target hash, not the current source hash."
+  },
+  "verdict": "IMPLEMENTED; PRE-CORRECTION DB RUN PASS; CURRENT SOURCE REVIEWED AND COMPILE-ONLY; DB RETEST PENDING NEW APPROVAL",
+  "remaining_risks": [
+    "The current source's direct active-rollout assertion has not been executed against PostgreSQL; a fresh exact current-task approval is required before rerunning the named DB body.",
+    "The successful DB result is local to the isolated paddock_test target and is not CI attestation or production evidence.",
+    "The worktree is broadly dirty; a complete diff hash is unavailable."
+  ]
+}

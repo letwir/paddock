@@ -1,0 +1,3 @@
+ok  	github.com/letwir/paddock/internal/governance/domain	0.064s
+ok  	github.com/letwir/paddock/internal/governance/port	0.012s
+ok  	github.com/letwir/paddock/internal/governance/application	0.114s

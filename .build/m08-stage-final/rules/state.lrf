@@ -1,0 +1,9 @@
+@lrf=1|aud=LLM|scope=state
+R|state.decisions|file:decisions.md|MUST|RO_LOCAL|明示採用された設計判断の転記正本; 承認者・署名・Commit照合済みの記録とは現時点で区別する; 変更はsupersede形式で新ID記録
+R|state.method|file:method.md|MUST|RO_LOCAL|開発作業の手順・検証Gate・CONTINUE/1再開契約の正本; 作業状態機械とConflict Matrixの定義元
+R|state.issues|file:Issues.md|MUST|LW_SCOPE|目標・依存・状態・Durable Cursorの正本; ただし状態の真偽はGit Tree・テストReceiptで照合; 中目標の表はDAGではない
+R|state.readme|file:README.md|MUST|LW_SCOPE|人間・汎用閲覧の入口と操作案内; decisions/method/Issuesに優先しない; 新規Worker向け起動手順
+R|state.threat|file:THREAT_MODEL.md|MUST|RO_LOCAL|脅威・信頼境界・緩和の設計案; 未検証の安全性を保証しない; 実装前ゲートとしてPDK-M00-S05でレビューする
+R|state.memo|dir:memo/|MUST|LW_SCOPE|作業中のメモ・経過記録のみ; 自動で正本（decisions/method/Issues）へ昇格させない
+R|state.cursor|file:Issues.md|MUST|LW_SCOPE|active_issue・phase・next_actionはヒント; 実際のGit/Receipt状態に優先しない; verified_commitはCursor自身の保存Commitを自己参照せず、未作成・未検証ならNONE
+R|state.receipt|dir:receipts/|MUST|LW_SCOPE|将来のReceipt保存先は設計段階; Worker Report≠Verification Receipt≠Verifier of Record; 非機密・非秘密値のみGit参照

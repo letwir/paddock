@@ -36,8 +36,9 @@ func (b AttemptLeaseBinding) Validate() error {
 }
 
 // HighRiskAuthorization composes a reusable Root Grant with an operation's
-// execution binding. Neither value alone authorizes a high-risk action.
+// execution and authentication bindings. None alone authorizes an action.
 type HighRiskAuthorization struct {
-	Grant Grant
-	Lease AttemptLeaseBinding
+	Grant      Grant
+	Lease      AttemptLeaseBinding
+	Credential WorkerCredentialBinding
 }

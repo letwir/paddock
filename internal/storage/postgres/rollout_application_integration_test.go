@@ -204,6 +204,9 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 	})
 	// Real leases are app-issued using the existing configured/READY lifecycle.
 	// Expire only the real expired fixture after issuance, preserving heartbeat_at < expires_at.
+	issuer := seedCredentialIntegrationIssuer(t, ctx, migrator)
+	credentialWorker, credentialKey := credentialIntegrationEnrollment(t, ctx, app, migrator)
+	credentials := make(map[domain.RootID]domain.WorkerCredential)
 	bindings := make(map[domain.RootID]domain.AttemptLeaseBinding)
 	var expiredBinding domain.AttemptLeaseBinding
 	for _, entry := range []struct {
@@ -219,7 +222,7 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 				t.Fatal("app lease fixture configure/ready failed")
 			}
 		}
-		binding := domain.AttemptLeaseBinding{WorkOrderID: domain.WorkOrderID(entry.work), AttemptID: domain.AttemptID(entry.work + "_attempt"), WorkerID: domain.WorkerID(entry.work + "_worker"), SessionID: domain.SessionID(entry.work + "_session")}
+		binding := domain.AttemptLeaseBinding{WorkOrderID: domain.WorkOrderID(entry.work), AttemptID: domain.AttemptID(entry.work + "_attempt"), WorkerID: credentialWorker.ID, SessionID: domain.SessionID(entry.work + "_session")}
 		var attempt, slot string
 		var expires time.Time
 		if err := app.QueryRow(ctx, `SELECT attempt_id,slot_id,lease_epoch,expires_at FROM raw.issue_work_order_lease($1,$2,$3,$4,$5,'[]'::jsonb,'[]'::jsonb,$6::interval)`, entry.work, string(binding.WorkerID), string(binding.SessionID), string(binding.AttemptID), entry.work+"_slot", entry.ttl).Scan(&attempt, &slot, &binding.LeaseEpoch, &expires); err != nil || attempt != string(binding.AttemptID) || slot != entry.work+"_slot" || binding.LeaseEpoch != 1 {
@@ -233,10 +236,11 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 			expiredBinding = binding
 		} else {
 			bindings[entry.root] = binding
+			credentials[entry.root] = issueCredentialIntegration(t, ctx, app, credentialWorker, binding, issuer)
 		}
 	}
 	authorization := func(grant domain.Grant) domain.HighRiskAuthorization {
-		return domain.HighRiskAuthorization{Grant: grant, Lease: bindings[grant.Root]}
+		return credentialIntegrationAuthorization(t, credentials[grant.Root], credentialKey, scope, grant)
 	}
 	gateTransactor, err := NewSafetyGateTransactor(app)
 	if err != nil {
@@ -329,14 +333,14 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 	}
 	// The PoC Gateway boundary is a fresh app-only transaction per check,
 	// not a deployed network Gateway or elimination of external-action TOCTOU.
-	gate := application.NewSafetyGate(gateTransactor)
+	gate := application.NewSafetyGate(gateTransactor, "paddock.coordinator")
 	baselinePolicy := domain.PolicyBinding{Digest: baseline.Digest()}
 	grantA := domain.Grant{Root: rootA, Policy: baselinePolicy, AuthorizationEpoch: 3, SecurityEpoch: security}
 	grantB := domain.Grant{Root: rootB, Policy: baselinePolicy, AuthorizationEpoch: 5, SecurityEpoch: security}
-	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantA)); err != nil {
+	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantA), credentialIntegrationRequest()); err != nil {
 		t.Fatalf("Root B Canary invalidated Root A baseline/v1 grant at epoch 3: %v", err)
 	}
-	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantB)); !errors.Is(err, domain.ErrStaleGrant) {
+	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantB), credentialIntegrationRequest()); !errors.Is(err, domain.ErrStaleGrant) {
 		t.Fatalf("Root B baseline/v1 grant at epoch 5 after Canary: got %v, want ErrStaleGrant", err)
 	}
 	approval := domain.RolloutTransitionApproval{Scope: scope, Roots: []domain.RootID{rootA, rootB}, ScopeEpoch: 41, SecurityEpoch: security, RootEpochs: map[domain.RootID]domain.Epoch{rootA: 3, rootB: 6}, RolloutID: rid, RolloutState: domain.RolloutCanary, CandidateDigest: candidateBundle.Digest(), KernelDigest: pin, Tier: domain.TierG0, ProposerID: transitionProposer.ProposerID, ProposalID: proposalID, Nonce: "promote-nonce"}
@@ -564,13 +568,13 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 	// Rollback audit remains the existing RolloutRolledBack Event/Outbox above.
 	// No mass revoke, Security Epoch increment, denial ledger, or external action.
 	for _, stale := range []domain.Grant{grantA, grantB} {
-		if err := gate.CheckHighRiskAction(ctx, scope, authorization(stale)); !errors.Is(err, domain.ErrStaleGrant) {
+		if err := gate.CheckHighRiskAction(ctx, scope, authorization(stale), credentialIntegrationRequest()); !errors.Is(err, domain.ErrStaleGrant) {
 			t.Fatalf("pre-Rollback grant accepted: %v", err)
 		}
 	}
 	grantA.AuthorizationEpoch, grantB.AuthorizationEpoch = 5, 7
 	for _, grant := range []domain.Grant{grantA, grantB} {
-		if err := gate.CheckHighRiskAction(ctx, scope, authorization(grant)); err != nil {
+		if err := gate.CheckHighRiskAction(ctx, scope, authorization(grant), credentialIntegrationRequest()); err != nil {
 			t.Fatalf("current baseline/v1 grant for Root %q after Rollback: %v", grant.Root, err)
 		}
 	}
@@ -586,15 +590,15 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 	} {
 		invalid := authorization(grantB)
 		mutate(&invalid)
-		if err := gate.CheckHighRiskAction(ctx, scope, invalid); !errors.Is(err, domain.ErrInvalidLease) {
+		if err := gate.CheckHighRiskAction(ctx, scope, invalid, credentialIntegrationRequest()); !errors.Is(err, domain.ErrInvalidLease) {
 			t.Fatalf("%s: got %v, want lease denial", name, err)
 		}
 	}
-	if err := gate.CheckHighRiskAction(ctx, domain.ScopeID(prefix+"_missing_scope"), authorization(grantB)); err == nil {
+	if err := gate.CheckHighRiskAction(ctx, domain.ScopeID(prefix+"_missing_scope"), authorization(grantB), credentialIntegrationRequest()); err == nil {
 		t.Fatal("wrong Scope accepted")
 	}
 	// Denials must not consume/revoke the active matching lease.
-	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantB)); err != nil {
+	if err := gate.CheckHighRiskAction(ctx, scope, authorization(grantB), credentialIntegrationRequest()); err != nil {
 		t.Fatalf("denials altered current lease: %v", err)
 	}
 	keys, signers, quorum := newM04SafetyQuorum(t)
@@ -613,7 +617,7 @@ func TestRolloutApplicationAppOnlyIntegration(t *testing.T) {
 		t.Fatalf("persisted Safety Stop changed Scope/Root epochs or failed to advance Security Epoch: %+v err=%v", afterStop, err)
 	}
 	for _, grant := range []domain.Grant{grantA, grantB} {
-		if err := gate.CheckHighRiskAction(ctx, scope, authorization(grant)); !errors.Is(err, domain.ErrSafeStopped) {
+		if err := gate.CheckHighRiskAction(ctx, scope, authorization(grant), credentialIntegrationRequest()); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("high-risk grant for Root %q after Stop: got %v, want ErrSafeStopped", grant.Root, err)
 		}
 	}

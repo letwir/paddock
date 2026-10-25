@@ -35,7 +35,12 @@ func TestHighRiskAuthorizationKeepsRootGrantReusable(t *testing.T) {
 	second := first
 	second.Lease.AttemptID = "next-attempt"
 	second.Lease.LeaseEpoch++
+	first.Credential = WorkerCredentialBinding{ID: "first"}
+	second.Credential = WorkerCredentialBinding{ID: "second"}
 	if first.Grant != grant || second.Grant != grant || first.Lease == second.Lease {
 		t.Fatal("attempt binding contaminated reusable Root Grant")
+	}
+	if first.Credential.ID == second.Credential.ID {
+		t.Fatal("credential cannot bind separate uses")
 	}
 }

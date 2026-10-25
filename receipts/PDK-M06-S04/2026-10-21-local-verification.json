@@ -1,0 +1,96 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M06-S04",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "2026-10-21T16:53:27Z",
+  "time_finish_utc": "2026-10-21T16:53:29Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "NONE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go version go1.27.3 android/arm64",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {
+      "path": "internal/governance/domain/activation_certificate.go",
+      "sha256": "4d6b40513406b186ac39b56a28e576155855bcb6e66db98b3b5a8db7f03aa38e"
+    },
+    {
+      "path": "internal/governance/domain/activation_certificate_test.go",
+      "sha256": "48f3915741c006122d7a093f564019236155ae2336ac3a8e3b3d936916b0831d"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused activation certificate tests",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain -run '^TestActivationCertificate' -count=10",
+      "exit_code": 0,
+      "stdout_sha256": "481f0c646fbb7a8122222ec3649c91d4a756e20e2869423f0638c5175b9adde5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "full domain tests shuffled",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain -count=1 -shuffle=on",
+      "exit_code": 0,
+      "stdout_sha256": "77b2db27b8cf3e60e0a86e92da0f8af5b11a738004fbe0ff81d43453fc0d157c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "related governance packages",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/domain ./internal/governance/port ./internal/governance/application -count=1",
+      "exit_code": 0,
+      "stdout_sha256": "c156118e469d52f14ce409e3b1d51208c335fb6394c1eea6aecc32e501767d2e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "Domain vet",
+      "command": "env GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go vet ./internal/governance/domain",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "gofmt check",
+      "command": "gofmt -d internal/governance/domain/activation_certificate.go internal/governance/domain/activation_certificate_test.go",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "design lint",
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "stdout_sha256": "2ea49ed33f9cef6ad539f038f79654dd60a3fd6990f25f79aa6bd2b8cabb8c70",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "tracked diff whitespace check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS_LOCAL",
+  "remaining_risks": [
+    "No CI attestation or Verifier-of-Record.",
+    "No DB or persistence behavior is included or claimed; this pure verifier does not make activation atomic. Callers must bind verification to their state transition and recheck trusted state changes.",
+    "The worktree was already dirty; complete dirty-diff hash was not captured. Existing unrelated modifications were preserved."
+  ]
+}

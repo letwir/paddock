@@ -1,0 +1,5 @@
+@lrf=1|aud=LLM|scope=manual
+R|handoff.envelope|task:handoff|MUST|RO_LOCAL|wrapper=正確に開始<Γ>行、プロトコル行 SIGMA/1: PIDGEN/text、タスク固有payload、終端</Γ>行; 可視フィールド=Role,Target,Acceptance,Scope,Known facts の厳密順序; 最終payload行は正確にSIGMA/1; ヘッダはフォーマット識別子であり認可を付与しない; 欠落・不正・順序違い・未閉鎖wrapper=FAILED・dispatchしない
+R|handoff.known-facts|task:handoff|MUST|RO_LOCAL|Known facts=検証済み事実とsource refのみ; 未確認事実・不明点はKnown factsへ入れず、Target/Acceptanceの外へ明示するかIssueへ戻す; 作業者は未定義語を補完しない
+R|handoff.compression|task:handoff|MUST|RO_LOCAL|圧縮しても目的・否定・権限境界・例外・停止条件・受入条件・確認済み事実を不可逆に削らない; 記号/絵文字=提示と検索の手がかりのみで安全・権限の唯一の媒体にしない
+R|handoff.authority|task:handoff|MUST_NOT|RO_LOCAL|エンベロープの提示でVCS・Live DB・Credential・外部副作用・生産環境変更が認可されたことにならない; 効果の認可はBOOTSTRAP.lrfの効果分類に従う

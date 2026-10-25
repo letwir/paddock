@@ -1,0 +1,5 @@
+@lrf=1|aud=LLM|scope=load
+L|load.state|tag:state|MUST|RO_LOCAL|[state](state.lrf)
+R|load.lint|*|MUST|RO_LOCAL|設計文書の前後にpython3 scripts/lint_design.pyを実行してID・DAG・OPEN・リンク・Cursor照合を検査; Python標準ライブラリのみ; 文書構造の検査でありGo/DB/安全性の実証ではない
+R|load.generated|file:docs/issue-dependencies.generated.md|MUST_NOT|LW_SCOPE|hand-edit of generated; 再生成はpython3 scripts/lint_design.py --emit-summary; 再開順序の根拠はIssues.mdの元のdepends_onに限定
+R|load.threat-gate|tag:state|MUST|RO_LOCAL|実装開始前の順序=PDK-M00-S05 Threat Model -> M00-S06 起点/停止境界 -> M01-S06 Epoch/Freeze契約 -> M01-S05 Model Checking -> DB実装; 未検討の脅威がある間、未知Worker登録を有効にしない

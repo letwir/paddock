@@ -1,0 +1,11 @@
+?   	github.com/letwir/paddock/cmd/coordinator	[no test files]
+?   	github.com/letwir/paddock/cmd/worker-sim	[no test files]
+ok  	github.com/letwir/paddock/internal/canonical	0.007s
+ok  	github.com/letwir/paddock/internal/governance/application	0.096s
+ok  	github.com/letwir/paddock/internal/governance/domain	0.062s
+ok  	github.com/letwir/paddock/internal/governance/port	0.005s
+ok  	github.com/letwir/paddock/internal/governance/scheduler	0.005s
+ok  	github.com/letwir/paddock/internal/harness	0.007s
+ok  	github.com/letwir/paddock/internal/steward	0.005s
+ok  	github.com/letwir/paddock/internal/storage/postgres	0.014s
+ok  	github.com/letwir/paddock/internal/testkeys	0.013s

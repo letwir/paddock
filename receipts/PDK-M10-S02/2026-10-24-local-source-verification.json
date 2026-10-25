@@ -1,0 +1,50 @@
+{
+  "schema_version":"paddock.receipt/1",
+  "issue_id":"PDK-M10-S02",
+  "runner":{"kind":"LOCAL","identity":"Main Runner via local shell","run_id":"NONE","attestation":"NONE"},
+  "time_start_utc":"NOT_CAPTURED",
+  "time_finish_utc":"2026-10-24T12:06:35Z",
+  "source":{"git_commit":"6d21a1514b9426e86a2e5bfaf2d78216eaea0100","git_tree":"e1c8015797602c008e982e62fe7b797d1e04969e","dirty":true,"dirty_diff_sha256":"NOT_CAPTURED","target_files_untracked_or_modified":true},
+  "environment":{"go_version":"go1.27.3 android/arm64","db_version":"NOT_RUN"},
+  "targets":[
+    {"path":"internal/governance/domain/worker_credential.go","sha256":"2af2087d18e317721e6fedd28b1bd655fdffc51b47e5aa817ab9c4976c46f7c6"},
+    {"path":"internal/governance/domain/worker_credential_test.go","sha256":"f098d6f7855b47be7f0de5166624ca7f9d6d2ded0452f2a0491ca56f369ef943"},
+    {"path":"internal/governance/domain/high_risk_authorization.go","sha256":"1bec9d71aac17ae46907d5aaa92c5c1bc37c5e084b92a02e8c4e00520e801547"},
+    {"path":"internal/governance/domain/high_risk_authorization_test.go","sha256":"017478cc3afc4eedf5342ce4f473b16d74d39e56a12d14b8b0c5000a2cd267af"},
+    {"path":"internal/governance/port/worker_credential.go","sha256":"07c02746924e7440b9e3572315bad27422afa109b0f3793787064b8b7b9091c7"},
+    {"path":"internal/governance/port/worker_credential_test.go","sha256":"e8f236d979d8051abbc78a0e8457d1b426154eee433a39fbfb284ddfcec3daaf"},
+    {"path":"internal/governance/port/safety_gate_transaction.go","sha256":"7404525acd8476b7726be75e46dea7dbeda5f5948029ab744caa896d72374c74"},
+    {"path":"internal/governance/application/worker_credential.go","sha256":"e2b286ebd65e84caef81e5cdb867b4b7b6ee0222a751fedd73fd80dc1e019aad"},
+    {"path":"internal/governance/application/worker_credential_test.go","sha256":"3085ca4a80618d5f64fb21586c281c9f79bb88eb37e53e339623165c0e3b0548"},
+    {"path":"internal/governance/application/safety_gate.go","sha256":"76d3156e6e61a7d7f22e7c058174127199f3dca630cec73149f7afc5e81964c6"},
+    {"path":"internal/governance/application/safety_gate_test.go","sha256":"59a3b52bb6f199a6f768e4a14b2dd12d07948c31d5c99fdbb7e9b6ab0bd9cc32"},
+    {"path":"internal/storage/postgres/worker_credential_store.go","sha256":"4dc605899dc5425ba923f225603d0b96af0601a9daac616ab1ba0213c62afd11"},
+    {"path":"internal/storage/postgres/worker_credential_store_test.go","sha256":"4cb0cf9e38749045bbbf42f90719ac5fc1daad71c14a4eb5a5022834d2994c05"},
+    {"path":"internal/storage/postgres/worker_credential_integration_test.go","sha256":"d3c2706e826ce1cd62fcbc593f506bfbc38b65fb381db8c00bc337e7b8ea6506"},
+    {"path":"internal/storage/postgres/safety_gate_lease.go","sha256":"3ebc174aab569ac4981a93de5c3ba585bae60059aa92479b7e6629a4b31d5a85"},
+    {"path":"internal/storage/postgres/safety_gate_lease_test.go","sha256":"07015bb601a9770446230d4853bb49ae454a4775a752ea8e45f23436ef2e18f7"},
+    {"path":"internal/storage/postgres/integration_test.go","sha256":"d2784c66a69ddfda6b7c056b7b30ed6767ff264659093cef1b320c82bc35ef89"},
+    {"path":"internal/storage/postgres/rollout_application_integration_test.go","sha256":"14b5fcbd1a442cd8ae7feb81c310b64bf22c18bc54c88f7cd92e1fe92726ca0c"},
+    {"path":"sql/governance_worker_credential.sql","sha256":"c6a1cd3a317049826a53665c9c0a905b7c3274f33a88837dbff734fd269923c3"},
+    {"path":"sql/governance_worker_credential_down.sql","sha256":"1b54630bd5e77be871ac66f44c3b7d26e7d650fe2a8ac3a311bd56be9bffc03d"},
+    {"path":"tests/test_m10_s02_worker_credential_sql.py","sha256":"acaa8017c9dc52fdecfe381a62502ecf5b3b29c1c98bc236ffe2339dbdc0255b"}
+  ],
+  "checks":[
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"result":"PASS; no DB or credential-integration body"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"result":"PASS"},
+    {"command":"env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL -u PADDOCK_WORKER_CREDENTIAL_INTEGRATION GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='integration paddock_test' ./... -run '^$' -count=1","exit_code":0,"result":"PASS; all integration sources compile; no test bodies"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -p '*sql*.py' -q","exit_code":0,"result":"PASS; 94 tests"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -p 'test_m07_s04_safety_lease_api.py' -v","exit_code":0,"result":"PASS; 8 tests"},
+    {"command":"PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -p 'test_m04_rollout_api.py' -v","exit_code":0,"result":"PASS; 7 tests"},
+    {"command":"targeted gofmt -d/whitespace scan for 21 allowlisted files; python3 scripts/lint_design.py; git diff --check","exit_code":0,"result":"PASS; gofmt empty, whitespace clean, lint 89/152, diff-check clean"}
+  ],
+  "independent_review":{"kind":"separate read-only Verifier subagent","verdict":"No findings.","scope":"Revised 21-file M10-S02 allowlist, shared Issuer registry currentness, same-transaction SafetyGate Credential/Lease checks, M07-S04 callsites, app-only SQL ACLs, and exact fixture source.","limitations":"Reviewer did not run tests, DB operations, or VCS. No CI attestation."},
+  "reconciliation":"Main independently ran full tests/vet/static/compile-only/format checks at the current file hashes and reconciled the original P1 with the shared Issuer registry locked/read in the SafetyGate transaction; no unresolved source findings remain. M07-S04/S03/S07 and M06-S05 integration source changed and require current-hash DB acceptance revalidation.",
+  "verdict":"SOURCE ACCEPTANCE PASS; DB RUNTIME UNRUN; DEPENDENT DB ACCEPTANCE REVERIFICATION PENDING",
+  "remaining_risks":[
+    "The M10 credential migration and all current-hash M07-S04/S03/S07/M06-S05 integration bodies have not run. SQL syntax/locking/ACL and cross-Issue runtime behavior remain unverified.",
+    "Issuer context changes are migrator-only deployment migrations; no app update API. The database source row must be present and current or the Gate fails closed.",
+    "The Gate check does not fence an external side effect after transaction commit; existing TOCTOU limitation remains.",
+    "No CI/Verifier-of-Record attestation is claimed; 452 unrelated dirty paths remain preserved."
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M07-S07",
+  "related_issue_ids": ["PDK-M07-S03"],
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_RECORDED",
+  "time_finish_utc": "2026-10-22T11:50:37Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "UNAVAILABLE_PREEXISTING_DIRTY_WORKTREE"
+  },
+  "environment": {
+    "go_version": "go1.27.3 android/arm64",
+    "db_version": "PostgreSQL major 18 confirmed by read-only preflight; minor version not retained"
+  },
+  "targets": [
+    {
+      "path": "internal/storage/postgres/rollout_application_integration_test.go",
+      "sha256": "b3155789e97eef41114effa767c7813c6bc42f70bad37804be650945ffc1cb37"
+    }
+  ],
+  "checks": [
+    {
+      "command": "approved target check: sha256sum internal/storage/postgres/rollout_application_integration_test.go; git rev-parse HEAD",
+      "exit_code": 0,
+      "result": "PASS; source hash and target revision matched the exact approval."
+    },
+    {
+      "command": "initial inline Python/psql read-only preflight (over-broad direct-DML guard)",
+      "exit_code": 1,
+      "result": "STOP before test body. The first guard treated the existing, accepted paddock_app INSERT privilege on raw.policy_bundles as forbidden; no test body or DB write ran."
+    },
+    {
+      "command": "inline Python/psql read-only ACL diagnostic",
+      "exit_code": 0,
+      "result": "Observed policy_bundles INSERT only as the permitted app write; no app INSERT/UPDATE/DELETE on policy_scopes, roots, rollouts, targets, security_generation, receipts, events, or outbox; raw.domain_events SELECT is present."
+    },
+    {
+      "command": "corrected inline Python/psql read-only preflight",
+      "exit_code": 0,
+      "result": "PASS; paddock_test/PostgreSQL major 18; migrator/app roles verified; 12 required fixed-path APIs valid; accepted app bundle INSERT and Event SELECT ACLs present; other direct DML denied; 0 matching fixtures; security_epoch_before=2."
+    },
+    {
+      "command": "GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^TestRolloutApplicationAppOnlyIntegration$' -count=1 -v",
+      "exit_code": 0,
+      "result": "PASS; exactly the named S03/S07 integration body ran once (3.047s) against the current target hash."
+    },
+    {
+      "command": "inline Python/psql read-only exact-fixture and Security Epoch postflight",
+      "exit_code": 0,
+      "result": "PASS; paddock_test/migrator identity; global security_epoch=3 (preflight 2 + 1); exact scope/root/rollout/target/receipt/event/outbox/bundle fixture counts all 0. No epoch rewind."
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test -tags='integration paddock_test' ./internal/storage/postgres -run '^$' -count=1",
+      "exit_code": 0,
+      "result": "PASS; compile-only, no test bodies ran."
+    },
+    {
+      "command": "env -u PADDOCK_DB_URL -u PADDOCK_APP_DB_URL -u PADDOCK_TEST_DB_URL GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off go test ./internal/governance/application ./internal/governance/domain ./internal/storage/postgres -count=1",
+      "exit_code": 0,
+      "result": "PASS; offline application/domain/postgres package tests."
+    },
+    {
+      "command": "test -z \"$(gofmt -d internal/storage/postgres/rollout_application_integration_test.go)\" && git diff --check -- internal/storage/postgres/rollout_application_integration_test.go",
+      "exit_code": 0,
+      "result": "PASS; format and whitespace checks."
+    }
+  ],
+  "plan_audit": {
+    "kind": "Separate read-only PRE_VERIFY auditor",
+    "result": "PASS on the bounded one-file plan, exact race outcome, cleanup coverage, epoch semantics, and approval boundary."
+  },
+  "independent_review": {
+    "kind": "Separate read-only Verifier subagent",
+    "result": "No findings on the current source against S03/S07 acceptance.",
+    "scope": "Reviewed Root A/B grant isolation, Rollback winner/loser, winner-only receipt/Event/Outbox, final Scope/Root epochs, global Safety Stop, and exact cleanup.",
+    "limitations": "Did not access DB or execute the integration body. Main Runner observations are the DB evidence; no CI attestation is claimed."
+  },
+  "verdict": "LOCAL DATABASE RUN PASS; D-016 MAIN RECONCILIATION PENDING",
+  "remaining_risks": [
+    "The approved test permanently advanced the isolated paddock_test global Security Epoch from 2 to 3; it was intentionally not rewound.",
+    "Evidence is local to paddock_test/PostgreSQL major 18; no CI attestation, deployed network Gateway, external side-effect atomicity, or TOCTOU elimination is claimed.",
+    "The worktree is broadly dirty; a complete diff hash is unavailable."
+  ]
+}

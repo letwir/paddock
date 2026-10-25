@@ -109,6 +109,8 @@ SIGMA/1
 
 **Trigger:** `continue`, `続き`, `再開`, 新WorkerによるHandoff。過去会話が閲覧できなくても実行可能にする。
 
+CONTINUE/1では、Issue解決後のmemory記録/pushに関するユーザー指示として`rules/continue.lrf`を読む。この規則はPADDOCKのCONTINUE/1実行に限り適用し、他Repo・非continue作業へ継承しない。
+
 ### M3.1 / §3.1 Preflight：最初は読み取り専用
 
 ```text

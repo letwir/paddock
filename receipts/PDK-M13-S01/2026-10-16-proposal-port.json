@@ -1,0 +1,48 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M13-S01",
+  "runner": {
+    "kind": "local",
+    "identity": "Main Runner",
+    "run_id": "continue-2026-10-16-PDK-M13-S01-proposal-slice",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-16",
+  "source": {
+    "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED; worktree contains broad unrelated and untracked changes"
+  },
+  "targets": [
+    {"path": "internal/steward/proposal.go", "sha256": "fe2b25733c91e54f302ad6a5640d1854a01e85278d8b8f6aef276e67733573c4"},
+    {"path": "internal/steward/proposal_test.go", "sha256": "790289e485988dd14143a66b93631407a6c059b819f424bfd825aea87d5c76d7"},
+    {"path": "Issues.md", "sha256": "bf218fe64fce2dd3575c5e2945c5c7f440e542a02e5e7bdaffb18d3e507739ae"}
+  ],
+  "environment": {"go": "go1.27.1", "os": "android", "arch": "arm64", "ci": false},
+  "checks": [
+    {"command": "go test ./... -count=1", "exit_code": 0, "result": "PASS; all Go packages including internal/steward"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS; locale warnings about unavailable ja_JP.UTF-8 only"},
+    {"command": "go test ./internal/steward -count=1", "exit_code": 0, "result": "PASS; strict JSON and temporary DAG validation"},
+    {"command": "python3 scripts/lint_design.py --emit-summary", "exit_code": 0, "result": "PASS; generated dependency summary from Issues.md"},
+    {"command": "python3 scripts/lint_design.py", "exit_code": 0, "result": "PASS; 89 issues / 148 edges; Issues.md hash at lint time bf218fe64fce2dd3575c5e2945c5c7f440e542a02e5e7bdaffb18d3e507739ae"},
+    {"command": "git diff --check", "exit_code": 0, "result": "PASS"}
+  ],
+  "independent_review": {
+    "kind": "separately dispatched verifier subagent",
+    "result": "No actionable defect in local provider-neutral proposal boundary; recursive duplicate-key scan reviewed; full issue remains incomplete because actual LLM endpoint boundary test is absent/not run.",
+    "scope": "strict JSON decoder, temporary-key DAG validation, failure/no-partial output, no persistence/authority operations"
+  },
+  "authorization": {
+    "source": "Current-task user selected provider-neutral proposer port and temporary-key DAG proposal shape.",
+    "scope": "Local source/tests only; no actual endpoint, network, credentials, DB, persistence, or dispatch."
+  },
+  "verdict": "LOCAL_SOURCE_TESTED; REAL_LLM_BOUNDARY_UNVERIFIED; ISSUE_REMAINS_IMPLEMENTED",
+  "remaining_risks": [
+    "No live or opt-in OpenAI-compatible endpoint boundary test was implemented or run; original evidence_expected still requires mock and real-LLM boundary evidence.",
+    "No model/provider was invoked; agent-dispatch API does not expose a model-selection parameter.",
+    "Proposal is not persisted/admitted/dispatched and no Coordinator integration is included.",
+    "Worktree is dirty; no CI attestation, commit, or push."
+  ]
+}

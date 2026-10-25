@@ -23,6 +23,7 @@ type PolicyRollout struct {
 	BaseRootEpochs    map[RootID]Epoch
 	Baseline          map[RootID]PolicyBinding
 	Candidate         map[RootID]PolicyBinding
+	Monitoring        MonitoringWindow
 }
 
 func hasSafeBaseline(roots map[RootID]RootAuthority) bool {
@@ -44,7 +45,15 @@ func (r PolicyRollout) Validate() error {
 	if err := r.Target.Validate(); err != nil {
 		return err
 	}
-	if r.State != RolloutCanary && r.State != RolloutMonitoring && r.State != RolloutRollingBack && r.State != RolloutRolledBack && r.State != RolloutSafeStopped {
+	if r.State != RolloutCanary && r.State != RolloutMonitoring && r.State != RolloutCompleted && r.State != RolloutRollingBack && r.State != RolloutRolledBack && r.State != RolloutSafeStopped {
+		return ErrInvalidRollout
+	}
+	if r.Monitoring != (MonitoringWindow{}) {
+		if r.State == RolloutCanary || r.Monitoring.Validate() != nil {
+			return ErrInvalidRollout
+		}
+	}
+	if r.State == RolloutCompleted && (r.Monitoring.Validate() != nil || r.Monitoring.Decision != DecisionPass || r.Monitoring.DecisionAt.Before(r.Monitoring.ObservationDeadline) || !r.Monitoring.HoldSince.IsZero() || r.Monitoring.LastObservedAt.Before(r.Monitoring.ObservationDeadline)) {
 		return ErrInvalidRollout
 	}
 	if r.State == RolloutRollingBack {
@@ -320,5 +329,6 @@ func FinalizePolicyRollback(s AuthorityState, r PolicyRollout, lkgStatus LKGStat
 		out.Mode = ScopeSafeStop
 		r.State = RolloutSafeStopped
 	}
+	r.RollbackFrom = ""
 	return out, r, nil
 }

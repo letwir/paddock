@@ -1,0 +1,60 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M04-S05",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-10-20T12:42:03Z",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "git_tree": "NOT_CAPTURED",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go1.27.1 android/arm64",
+    "python_version": "NOT_CAPTURED",
+    "db_version": "NOT_RUN"
+  },
+  "targets": [
+    {"path":"internal/governance/application/receipt_response.go","sha256":"0055a0e5bcdcd4f705f55c4e4cdbb25711cf078c60fbe0a3211818825388d8e8"},
+    {"path":"internal/governance/application/receipt_response_test.go","sha256":"d4775ae9cf13f0a7db248ca1bf4abc582afb78dba702d06b235a04a4c80405be"},
+    {"path":"internal/governance/application/rollout_service.go","sha256":"cc53de748750faf115caae0193651b0e8fcea2c4f10ec8921adaa58c7f030f81"},
+    {"path":"internal/governance/application/rollout_service_test.go","sha256":"57c977c25ba7041eeecc1fc470c92cb336755a6b8ec4dd1699fc56deacbca493"},
+    {"path":"internal/governance/application/safety.go","sha256":"752f80b8506e4dddeccfc3a9d684f038b3ba5aabff8e15f7d9738ba0b7108ae9"},
+    {"path":"internal/governance/application/safety_test.go","sha256":"6fc5712b833ff713226c510f67c696445a4bcd40dbb8dfebde0c7a421b452018"},
+    {"path":"internal/governance/port/transaction.go","sha256":"e93063ab3e3dd55b879feea308abb576ea2c63a6b824f7650983f7495455e656"},
+    {"path":"internal/governance/port/transaction_test.go","sha256":"d963074ffe0d8301ce95b7ad1e511c137ed64321d8f0a3ae94f871e1f3d6cb38"},
+    {"path":"internal/storage/postgres/governance_tx.go","sha256":"5342f95808a08d4f5f8b49f7ab37abf22665b98e689ba3dc6b5c947b813d6f46"},
+    {"path":"internal/storage/postgres/governance_event_test.go","sha256":"76994fcbca8c177db367f1b9d693d0301007a193e566245787d339623eba27b0"},
+    {"path":"internal/storage/postgres/receipt_retention_integration_test.go","sha256":"a42909f0c22af95b188dbb2801189ee6d00ca18d17ca27b6250f2c92b6f9eb05"},
+    {"path":"sql/governance_safety_api.sql","sha256":"899b2a3c43375fb712409a52cbe67cda4aafdbdb385c18eb5ce3dbb542848de1"},
+    {"path":"tests/test_m04_s05_receipts.py","sha256":"13ae3198d045a02f319fc729e01f393f46dad7cc42a841d15297cb00110f87d3"}
+  ],
+  "checks": [
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test ./... -count=1 -shuffle=on","exit_code":0,"stdout_sha256":"c3521b6aaa6d2205a7b5a5453376d28d4f339a3a782470dea38c86f45f2f0c87","stderr_sha256":"c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3","result":"PASS"},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go vet ./...","exit_code":0,"stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3","result":"PASS"},
+    {"command":"python3 -B -m unittest discover -s tests -p 'test_m04*.py' -v","exit_code":0,"stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"6243332ef38cb6a489d714a8c1fb5a4c9d9304c9487e97b87f05ded74a6d16cb","result":"PASS; 13 tests"},
+    {"command":"python3 -B -m unittest discover -s tests -p 'test_m03_s04_safety_api_migration.py' -v","exit_code":0,"stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e4a4482ac39859da543a24a59fd13a0f9cc13ccac9a9dde2aab9d47d5d3903e1","result":"PASS; 6 tests"},
+    {"command":"python3 scripts/lint_design.py","exit_code":0,"stdout_sha256":"8690aaf37e129dabd7f245a7618c565b93008fac06d8a08520b2c7f9fdb599e1","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","result":"PASS; 89 issues/152 edges"},
+    {"command":"GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS= go test -tags='integration paddock_test receipt_retention' ./internal/storage/postgres -run '^$' -count=1","exit_code":0,"stdout_sha256":"c9045f66cc1a4622713159fd634c304acf12ecde647d86c7d0b3909e6b42cb15","stderr_sha256":"c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3","result":"PASS; compile only, no test bodies"},
+    {"command":"gofmt -d internal/governance/application/receipt_response.go internal/governance/application/receipt_response_test.go internal/governance/application/rollout_service.go internal/governance/application/rollout_service_test.go internal/governance/application/safety.go internal/governance/application/safety_test.go internal/governance/port/transaction.go internal/governance/port/transaction_test.go internal/storage/postgres/governance_tx.go internal/storage/postgres/governance_event_test.go internal/storage/postgres/receipt_retention_integration_test.go","exit_code":0,"stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","result":"PASS; no output"},
+    {"command":"git diff --check","exit_code":0,"stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","result":"PASS"}
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "No findings.",
+    "reviewed_target": "PDK-M04-S05 source changes and acceptance",
+    "runner_or_database_execution_by_verifier": "NONE"
+  },
+  "verdict": "LOCAL_SOURCE_AND_OFFLINE_CHECKS_PASS",
+  "remaining_risks": [
+    "PostgreSQL function execution, retention updates, row-lock/advisory-lock behavior, and concurrent DB behavior were not executed; tagged integration test was compile-only.",
+    "CI and Verifier-of-Record are absent; this receipt is not CI attestation.",
+    "Worktree was already dirty with unrelated pending changes; full dirty-diff hash was not captured."
+  ]
+}

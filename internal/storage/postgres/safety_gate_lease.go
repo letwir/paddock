@@ -9,6 +9,14 @@ import (
 
 type safetyGateTx struct{ *safetyGovernanceTx }
 
+func (t *safetyGateTx) LockWorkerCredential(ctx context.Context, id string) (domain.WorkerCredential, []byte, error) {
+	return lockWorkerCredential(ctx, t.tx, id)
+}
+
+func (t *safetyGateTx) LockCurrentCredentialIssuer(ctx context.Context, id string) (domain.CredentialIssuerContext, error) {
+	return lockCurrentCredentialIssuer(ctx, t.tx, id)
+}
+
 func newSafetyGateTx(tx transaction) *safetyGateTx {
 	return &safetyGateTx{safetyGovernanceTx: newSafetyGovernanceTx(tx)}
 }

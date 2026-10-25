@@ -16,10 +16,11 @@ import (
 // unless that effect is protected by an execution-fencing design.
 type SafetyGate struct {
 	transactor port.SafetyGateTransactor
+	audience   string
 }
 
-func NewSafetyGate(transactor port.SafetyGateTransactor) *SafetyGate {
-	return &SafetyGate{transactor: transactor}
+func NewSafetyGate(transactor port.SafetyGateTransactor, audience string) *SafetyGate {
+	return &SafetyGate{transactor: transactor, audience: audience}
 }
 
 // CheckNewDispatch checks fresh authority before creating a dispatch.
@@ -42,9 +43,12 @@ func (g *SafetyGate) CheckNewGrant(ctx context.Context, scopeID domain.ScopeID, 
 	})
 }
 
-// CheckHighRiskAction checks Root/Security authority and current lease in one
+// CheckHighRiskAction checks Root/Security authority, current Lease, Credential
+// status/key proof, and trusted current Issuer context in one
 // short transaction. It neither executes nor fences a subsequent external action.
-func (g *SafetyGate) CheckHighRiskAction(ctx context.Context, scopeID domain.ScopeID, authorization domain.HighRiskAuthorization) error {
+// request is trusted actual-command context, not a Worker claim. This check
+// does not execute a mutation: effects retain the M04-S02 Receipt contract.
+func (g *SafetyGate) CheckHighRiskAction(ctx context.Context, scopeID domain.ScopeID, authorization domain.HighRiskAuthorization, request domain.CredentialRequest) error {
 	return g.check(ctx, scopeID, func(tx port.SafetyGateTx, state domain.AuthorityState) error {
 		if err := domain.Authorize(state, authorization.Grant); err != nil {
 			return fmt.Errorf("high-risk action denied: %w", err)
@@ -54,6 +58,26 @@ func (g *SafetyGate) CheckHighRiskAction(ctx context.Context, scopeID domain.Sco
 		}
 		if err := tx.ValidateCurrentLease(ctx, scopeID, authorization.Grant.Root, authorization.Lease); err != nil {
 			return fmt.Errorf("high-risk action lease validation: %w", err)
+		}
+		if g.audience == "" || authorization.Credential.Validate() != nil || request.Validate() != nil {
+			return domain.ErrWorkerCredential
+		}
+		credential, key, err := tx.LockWorkerCredential(ctx, authorization.Credential.ID)
+		if err != nil {
+			return fmt.Errorf("high-risk credential lookup: %w", err)
+		}
+		issuer, err := tx.LockCurrentCredentialIssuer(ctx, credential.Issuer.IssuerID)
+		if err != nil {
+			return fmt.Errorf("high-risk issuer context: %w", err)
+		}
+		if err := domain.VerifyWorkerCredential(credential, key, scopeID, authorization, request, g.audience, issuer); err != nil {
+			return err
+		}
+		// Credential/Issuer locks may have waited for revocation or deployment.
+		// Keep the established lock order, but sample DB time again now that
+		// all locks are held: a Lease that expired during that wait must deny.
+		if err := tx.ValidateCurrentLease(ctx, scopeID, authorization.Grant.Root, authorization.Lease); err != nil {
+			return fmt.Errorf("high-risk action final lease validation: %w", err)
 		}
 		return nil
 	})

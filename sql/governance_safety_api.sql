@@ -340,6 +340,8 @@ $safety_cas_security_epoch$;
 CREATE OR REPLACE FUNCTION raw.safety_lookup_command_receipt(text)
 RETURNS TABLE(command_id text, request_digest character(64), status text, response_bytes bytea)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $safety_lookup_command_receipt$
+DECLARE
+    v_tombstone constant bytea := pg_catalog.convert_to('{"schema_version":"paddock.command-response/1","kind":"EXPIRED","code":"RECEIPT_EXPIRED","detail":"The command response retention period has expired; this command ID cannot be reused."}', 'UTF8');
 BEGIN
     IF session_user <> 'paddock_app' THEN
         RAISE EXCEPTION 'safety_lookup_command_receipt requires session_user paddock_app';
@@ -347,6 +349,37 @@ BEGIN
     IF $1 IS NULL OR $1 = '' OR $1 <> pg_catalog.btrim($1) THEN
         RAISE EXCEPTION 'safety_lookup_command_receipt requires a nonempty trimmed command ID';
     END IF;
+    -- Serialize all operations on this globally unique command ID before
+    -- callers lock a Scope. Hash collisions only cause extra serialization.
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1, 0));
+
+    -- Requested row first: a backlog must never hide its expired response.
+    -- Keep the original status, digest, and completion anchor forever.
+    UPDATE raw.command_receipts r
+       SET response_bytes = v_tombstone
+     WHERE r.command_id = $1
+       AND r.status IN ('SUCCEEDED', 'REJECTED')
+       AND pg_catalog.clock_timestamp() >= r.completed_at + interval '365 days'
+       AND r.response_bytes <> v_tombstone;
+
+    -- At most 999 additional oldest due terminal rows, plus the requested row.
+    -- Skip locked rows rather than waiting for another command's transaction.
+    WITH due AS (
+        SELECT r.command_id
+          FROM raw.command_receipts r
+         WHERE r.command_id <> $1
+           AND r.status IN ('SUCCEEDED', 'REJECTED')
+           AND pg_catalog.clock_timestamp() >= r.completed_at + interval '365 days'
+           AND r.response_bytes <> v_tombstone
+         ORDER BY r.completed_at, r.command_id
+         LIMIT 999
+         FOR UPDATE OF r SKIP LOCKED
+    )
+    UPDATE raw.command_receipts r
+       SET response_bytes = v_tombstone
+      FROM due
+     WHERE r.command_id = due.command_id;
+
     RETURN QUERY
     SELECT r.command_id, r.request_digest, r.status, r.response_bytes
       FROM raw.command_receipts r
@@ -362,10 +395,15 @@ BEGIN
         RAISE EXCEPTION 'safety_insert_command_receipt requires session_user paddock_app';
     END IF;
     IF $1 IS NULL OR $1 = '' OR $1 <> pg_catalog.btrim($1)
-       OR $2 IS NULL OR $2 !~ '^[0-9a-f]{64}$' OR $3 IS DISTINCT FROM 'SUCCEEDED'
+       OR $2 IS NULL OR $2 !~ '^[0-9a-f]{64}$'
+       OR $3 IS NULL OR $3 NOT IN ('SUCCEEDED', 'REJECTED')
        OR $4 IS NULL OR pg_catalog.octet_length($4) = 0 THEN
         RAISE EXCEPTION 'safety_insert_command_receipt requires a completed valid Receipt';
     END IF;
+    IF $4 = pg_catalog.convert_to('{"schema_version":"paddock.command-response/1","kind":"EXPIRED","code":"RECEIPT_EXPIRED","detail":"The command response retention period has expired; this command ID cannot be reused."}', 'UTF8') THEN
+        RAISE EXCEPTION 'safety_insert_command_receipt cannot insert a retention tombstone';
+    END IF;
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1, 0));
     INSERT INTO raw.command_receipts(command_id, request_digest, status, response_bytes, completed_at)
     VALUES ($1, $2, $3, $4, pg_catalog.clock_timestamp());
 END

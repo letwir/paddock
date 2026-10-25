@@ -1,0 +1,32 @@
+{
+  "form": {
+    "key": "harness-feedback",
+    "version": 1,
+    "title": "ハーネスご意見アンケート",
+    "questions": [
+      {"key":"hard-to-operate","prompt":"このハーネスで動きづらかったことは？","required":true,"kind":"long_text"},
+      {"key":"ambiguous","prompt":"解釈に迷った、または推測して進めたことは？","required":true,"kind":"long_text"},
+      {"key":"excessive","prompt":"不要・過剰だった指示、SKILL、工程は？","required":true,"kind":"long_text"},
+      {"key":"missing","prompt":"無かったため困ったSKILL・機能は？","required":true,"kind":"long_text"},
+      {"key":"helpful","prompt":"このハーネスのおかげで上手くできたことは？","required":true,"kind":"long_text"},
+      {"key":"next-time","prompt":"次回同じ仕事をするなら何を変えたい？","required":true,"kind":"long_text"},
+      {"key":"other","prompt":"その他、ワイへの実装依頼・ご意見","required":false,"kind":"long_text"}
+    ]
+  },
+  "respondent": "codex-agent-observation",
+  "source": "task-receipt",
+  "task_id": "paddock-issues-2026-10-13",
+  "context": {
+    "observation_scope": "PADDOCK Issues work: finite-state model-test adjustment, PostgreSQL DDL preparation, static checks, and attempted operator-provided database URL workflow.",
+    "signal_kinds": ["FRICTION", "REQUEST"]
+  },
+  "answers": {
+    "ambiguous": "The overall request was clear. I treated setting PADDOCK_DB_URL as authorization to attempt the requested DB validation, but checked for the client first; no connection or SQL execution occurred because psql is absent.",
+    "excessive": "No clearly unnecessary instruction or skill step was observed in this task.",
+    "hard-to-operate": "The runtime lacks psql, so a configured PADDOCK_DB_URL alone cannot be used to verify the database or apply sql/init.sql. This forced stopping before DB checks; installing tools was not authorized.",
+    "helpful": "Keeping the database target constrained to paddock_test and the DDL schema-qualified under raw, preserving unrelated working-tree changes, and separating static validation from unverified database execution helped avoid unsafe claims or writes.",
+    "missing": "A preinstalled PostgreSQL client or an approved, secret-safe database validation mechanism that can run a specified SQL file and report only version, target database, and exit status.",
+    "next-time": "Check client availability before preparing a DB run, then verify the database identity/version without exposing the URL and only then apply the SQL. If no client exists, stop and give the operator a minimal safe command to run elsewhere.",
+    "other": "Observation by the assistant during task execution; these are not user-authored survey answers. No database operation was performed."
+  }
+}

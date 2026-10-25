@@ -153,3 +153,35 @@ func TestSafetyGateTransactionCancellationAndPanicRollback(t *testing.T) {
 	}()
 	_ = gate.WithinSafetyGateTransaction(context.Background(), func(port.SafetyGateTx) error { panic("panic fixture") })
 }
+
+// The additional credential read borrows exactly the same underlying tx and
+// never starts/commits an independent transaction after Lease validation.
+type credentialGateRecordingTx struct {
+	fakeTransaction
+	row   pgx.Row
+	query string
+	args  []any
+}
+
+func (tx *credentialGateRecordingTx) QueryRow(_ context.Context, q string, args ...any) pgx.Row {
+	tx.query = q
+	tx.args = args
+	return tx.row
+}
+func TestSafetyGateCredentialUsesBorrowedAuthorityTransaction(t *testing.T) {
+	c, key := storageCredentialFixture(t)
+	tx := &credentialGateRecordingTx{row: enrollmentScan{values: credentialScanValues(c, key)}}
+	gate := newSafetyGateTx(tx)
+	got, pub, err := gate.LockWorkerCredential(context.Background(), c.ID)
+	if err != nil || got != c || !reflect.DeepEqual(pub, key) || !reflect.DeepEqual(tx.args, []any{c.ID}) {
+		t.Fatalf("credential lookup failed: %v", err)
+	}
+	tx.row = enrollmentScan{values: []any{c.Issuer.IssuerID, "1", string(c.Issuer.CeilingDigest)}}
+	issuer, err := gate.LockCurrentCredentialIssuer(context.Background(), c.Issuer.IssuerID)
+	if err != nil || issuer != c.Issuer || tx.query != `SELECT issuer_id,issuer_revision,ceiling_digest FROM raw.lock_current_worker_issuer_context($1)` || !reflect.DeepEqual(tx.args, []any{c.Issuer.IssuerID}) {
+		t.Fatalf("issuer not read on borrowed transaction: %v", err)
+	}
+	if gate.tx != tx || tx.commits != 0 || tx.rollbacks != 0 {
+		t.Fatal("credential read took transaction ownership")
+	}
+}

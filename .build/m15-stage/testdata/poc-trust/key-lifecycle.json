@@ -1,0 +1,19 @@
+{
+  "test_only": true,
+  "purpose": "pure policy fixture; not operational key lifecycle",
+  "verify_at": "2030-01-01T00:00:00Z",
+  "valid_until": "2031-01-01T00:00:00Z",
+  "expired_at": "2029-01-01T00:00:00Z",
+  "fingerprints": {
+    "known_test_key": "sha256:21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+    "rotation_successor_fixture": "sha256:8d095ee8eea1b7ff5403d7a90fc2d2d0113d93a06e1ea55aa90f74378da951a1"
+  },
+  "cases": [
+    {"name": "current key valid accepted", "active_fingerprint": "known_test_key", "candidate_fingerprint": "known_test_key", "at": "verify_at", "revoked": false, "accepted": true},
+    {"name": "expired current key rejected", "active_fingerprint": "known_test_key", "candidate_fingerprint": "known_test_key", "at": "expired_at", "revoked": false, "accepted": false},
+    {"name": "revoked current key rejected", "active_fingerprint": "known_test_key", "candidate_fingerprint": "known_test_key", "at": "verify_at", "revoked": true, "accepted": false},
+    {"name": "successor current key accepted after rotation", "active_fingerprint": "rotation_successor_fixture", "candidate_fingerprint": "rotation_successor_fixture", "at": "verify_at", "revoked": false, "accepted": true},
+    {"name": "old key rejected after rotation without revocation", "active_fingerprint": "rotation_successor_fixture", "candidate_fingerprint": "known_test_key", "at": "verify_at", "revoked": false, "accepted": false}
+  ],
+  "production_status": "O-002 production algorithm and custody remain open; this fixture defines no operational key lifecycle"
+}

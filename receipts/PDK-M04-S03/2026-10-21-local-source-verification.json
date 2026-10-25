@@ -1,0 +1,119 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M04-S03",
+  "runner": {
+    "kind": "LOCAL",
+    "identity": "Main Runner via local shell",
+    "run_id": "NONE",
+    "attestation": "NONE"
+  },
+  "time_utc": "2026-10-21T03:42:39.989952+00:00",
+  "source": {
+    "git_commit": "74750c3d5218fa3dc8f7082123402191def73086",
+    "dirty": true,
+    "dirty_diff_sha256": "NOT_CAPTURED"
+  },
+  "environment": {
+    "go_version": "go version go1.27.1 android/arm64",
+    "python_version": "3.14.6"
+  },
+  "targets": [
+    {
+      "path": "internal/storage/postgres/rollout_concurrency_integration_test.go",
+      "sha256": "c37510cb5800301813a7b1821cc8035a59c7ef3ef08416d3d58b34c690e8e5a1"
+    },
+    {
+      "path": "tests/test_m04_s03_concurrency.py",
+      "sha256": "2b04c28736c4de54aa283f7c139aa658fe60b446754d9925c03493087f72c4dd"
+    }
+  ],
+  "checks": [
+    {
+      "name": "S03 static source contracts",
+      "command": "python3 -B -m unittest discover -s tests -p test_m04_s03_concurrency.py -v",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "47a89f5d196285026177314043b264db4f9c71633ab3ea893d6d54044b055b3b",
+      "result": "PASS"
+    },
+    {
+      "name": "existing M04 rollout API static suite",
+      "command": "python3 -B -m unittest discover -s tests -p test_m04_rollout_api.py -v",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "d9cc6414bed0e075abf8aad4acabac5c942c497bc954b3877a2101666199f2e3",
+      "result": "PASS"
+    },
+    {
+      "name": "design lint",
+      "command": "python3 scripts/lint_design.py",
+      "exit_code": 0,
+      "stdout_sha256": "ba3c270e37dadf8e8dec53719f9b7e3742e99d49c9c8e89bf8c339c8d30d6208",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "tagged integration compile only; no bodies",
+      "command": "go test -tags=integration paddock_test rollout_concurrency ./internal/storage/postgres -run ^$ -count=1",
+      "exit_code": 0,
+      "stdout_sha256": "51abe6939077119d6621e4056933d00028d366c943a05b76d862cd0775a3826b",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "tagged integration vet",
+      "command": "go vet -tags=integration paddock_test rollout_concurrency ./internal/storage/postgres",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "full offline Go tests",
+      "command": "go test ./... -count=1 -shuffle=on",
+      "exit_code": 0,
+      "stdout_sha256": "a5df339cf5263536bad8cb1462700f741d7f996d6080ab0b6868ef8beac39f10",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "full offline Go vet",
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c5b268f662c89bbf998c11ff34f99ab1e66bcc4b6a08c4751b93686d6532a2b3",
+      "result": "PASS"
+    },
+    {
+      "name": "gofmt check",
+      "command": "gofmt -d internal/storage/postgres/rollout_concurrency_integration_test.go",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    },
+    {
+      "name": "diff whitespace check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "PASS"
+    }
+  ],
+  "independent_review": {
+    "kind": "separate read-only Verifier subagent",
+    "verdict": "No findings.",
+    "reviewed_paths": [
+      "internal/storage/postgres/rollout_concurrency_integration_test.go",
+      "tests/test_m04_s03_concurrency.py"
+    ],
+    "did_not_run": "database test body"
+  },
+  "verdict": "IMPLEMENTED_SOURCE_AND_OFFLINE_CHECKS_PASS",
+  "remaining_risks": [
+    "S03 integration body not executed: independent processes, PostgreSQL lock contention/transaction result, persisted assertions and cleanup are not runtime-verified.",
+    "No CI/Verifier-of-Record attestation; local evidence only.",
+    "Existing unrelated dirty worktree was preserved; no full overlay hash captured."
+  ]
+}

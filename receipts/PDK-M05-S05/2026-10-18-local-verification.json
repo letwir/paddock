@@ -10,11 +10,11 @@
   },
   "source": {
     "git_commit": "2f1dcfe143c3ef66e33d82c003e2432256b11518",
-    "git_tree": "UNAVAILABLE_STAGED_PUSH_SNAPSHOT",
+    "git_tree": "UNAVAILABLE_DIRTY_WORKTREE",
     "branch": "main",
     "dirty": true,
     "dirty_status_entries": 471,
-    "dirty_diff_sha256": "NOT_CAPTURED; selected candidate index contains 166 completed/dependency-support paths; unrelated/WIP paths remain unstaged"
+    "dirty_diff_sha256": "NOT_CAPTURED; broad tracked and untracked work from other issues remains"
   },
   "selected_policy": {
     "d019_schema": "schema_version uses canonical event/<positive-major>; event/1 is major 1. Unknown positive majors fail closed to a compatibility quarantine classification without downcast or business effect.",
@@ -38,11 +38,11 @@
     },
     {
       "path": "Issues.md",
-      "sha256": "10be52667dceaca204e02ae5bf807d5fb810f0ab4e43a73734105384933029a1"
+      "sha256": "43cb5f8aa53f1b1659a59cb72465eb9ba4168744c833452ef9b429dd57dc9f3d"
     },
     {
       "path": "docs/issue-dependencies.generated.md",
-      "sha256": "07ae63e1355ff5d5839e7223c4dba9b760827d704af603f4b74c9036c95c1f17"
+      "sha256": "b8e9d672b55ed5ee57fde1d7394e5af881b5694855a57c1be260105538d66eb9"
     }
   ],
   "runner_checks": [
@@ -89,7 +89,7 @@
     {
       "command": "python3 scripts/continue_plan.py after evidence-key reconciliation",
       "exit_code": 0,
-      "result": "PASS; selected PDK-M14-S01 before the completed-only push snapshot Cursor update; the pushed snapshot now selects dependency-ready PDK-M04-S05 after WIP pruning."
+      "result": "PASS; selected next dependency-ready PDK-M14-S01 (first_ready_incomplete). The completed Issue records now use the planner-required current_evidence key."
     },
     {
       "command": "python3 scripts/lint_design.py --emit-summary && python3 scripts/lint_design.py (final Cursor/Issue reconciliation)",
@@ -110,31 +110,6 @@
       "command": "python3 -m unittest discover -s tests -q (push-scope audit regression)",
       "exit_code": 0,
       "result": "PASS; 184/184 Python tests, including repaired disposable lint/continue fixtures."
-    },
-    {
-      "command": "Candidate snapshot: go test ./... -count=1",
-      "exit_code": 0,
-      "result": "PASS; all untagged packages with completed candidate sources and the explicitly authorized shared M08-S04 domain/Gateway dependency; M13-S01 WIP and temporary/nested repo files excluded."
-    },
-    {
-      "command": "Candidate snapshot: go vet ./...",
-      "exit_code": 0,
-      "result": "PASS."
-    },
-    {
-      "command": "Candidate snapshot: go test -tags='integration paddock_test' -run '^$' ./internal/storage/postgres -count=1",
-      "exit_code": 0,
-      "result": "PASS; compile-only, no DB test body."
-    },
-    {
-      "command": "Candidate snapshot: python3 -m unittest discover -s tests -q",
-      "exit_code": 0,
-      "result": "PASS; 184/184."
-    },
-    {
-      "command": "Candidate snapshot: python3 scripts/lint_design.py",
-      "exit_code": 0,
-      "result": "PASS; 89 issues / 148 dependency edges for the completed-only Issue snapshot."
     }
   ],
   "independent_review": {
@@ -160,5 +135,5 @@
     "Full Python suite required repairs to disposable test fixtures because Issue/README local links evolved; fixtures now copy referenced local files. These fixture tests are included in the full suite and separately source-reviewed."
   ],
   "verdict": "POLICY_AND_BOUNDARY_TESTS_PASS; INDEPENDENT_SOURCE_REVIEW_NO_FINDINGS; DONE_D016_LOCAL; NO_DB_EFFECTS; NO_CI_ATTESTATION",
-  "next_action": "PDK-M05-S03..S05 are pushed in commit 5d842cf89f08aafd06928fe9f0f0bacb6497e7e0. Next dependency-ready issue in this pushed snapshot is PDK-M04-S05; resolve its design before CODE. Local WIP remains unpushed."
+  "next_action": "All 24 new DONE issue states are being audited for a safe completed-only push manifest. Do not stage/commit/push until the manifest excludes WIP, scratch and nested-repository artifacts and source/receipt gaps are resolved."
 }

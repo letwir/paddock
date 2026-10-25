@@ -1,0 +1,25 @@
+{
+  "task_id": "paddock-issues-loop-20261023-verifier-blocked",
+  "comparison_key": "paddock-m04-s05-verifier-preflight-20261023",
+  "axes": {
+    "scope": {
+      "requested": "Use ~/.harness and continue PADDOCK Issues until completion.",
+      "observed": "Stopped at active PDK-M04-S05 because the mandatory independent-review preflight could not run; broad pre-existing worktree changes were preserved."
+    },
+    "checks": {
+      "source_static": "PASS: 7/7",
+      "go_integration_compile_only": "PASS: no test bodies run",
+      "design_lint": "PASS: 89 issues / 152 edges",
+      "independent_review": "BLOCKED: pwsh/powershell unavailable for required preflight",
+      "database_runtime": "NOT_RUN: pending independent review and fresh target preflight"
+    },
+    "authority_and_effects": {
+      "db_approval": "User approved one SQL reapplication and only TestReceiptRetentionAppOnlyIntegration; approval remains unused.",
+      "vcs": "No commit, push, or other VCS mutation."
+    }
+  },
+  "attribution": {
+    "prompt": "User requested the Harness workflow and all-Issue continuation; user clarified the Hardware file location and approved the exact M04-S05 DB operation.",
+    "agent": "Codex Main"
+  }
+}

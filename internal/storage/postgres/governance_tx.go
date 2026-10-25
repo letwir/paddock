@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -82,14 +83,15 @@ func (g *safetyGovernanceTx) LookupCommandReceipt(ctx context.Context, commandID
 	if err != nil {
 		return port.CommandReceipt{}, false, fmt.Errorf("lookup command receipt: malformed request digest: %w", err)
 	}
-	if r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+	if (r.Status != "SUCCEEDED" && r.Status != "REJECTED") || len(r.Response) == 0 {
 		return port.CommandReceipt{}, false, fmt.Errorf("invalid or incomplete command receipt %q", commandID)
 	}
+	r.Expired = bytes.Equal(r.Response, []byte(port.ReceiptTombstoneResponse))
 	return r, true, nil
 }
 
 func (g *safetyGovernanceTx) InsertCommandReceipt(ctx context.Context, r port.CommandReceipt) error {
-	if r.CommandID == "" || r.RequestDigest.Validate() != nil || r.Status != "SUCCEEDED" || len(r.Response) == 0 {
+	if r.CommandID == "" || r.RequestDigest.Validate() != nil || (r.Status != "SUCCEEDED" && r.Status != "REJECTED") || len(r.Response) == 0 || r.Expired || bytes.Equal(r.Response, []byte(port.ReceiptTombstoneResponse)) {
 		return errors.New("invalid completed command receipt")
 	}
 	_, err := g.tx.Exec(ctx, `SELECT raw.safety_insert_command_receipt($1, $2, $3, $4)`, r.CommandID, string(r.RequestDigest), r.Status, r.Response)

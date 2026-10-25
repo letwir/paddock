@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/letwir/paddock/internal/governance/domain"
@@ -11,49 +13,56 @@ import (
 )
 
 type gateTransactor struct {
-	snapshot      port.ScopeSnapshot
-	lockErr       error
-	calls         int
-	leaseErr      error
-	leaseCalls    int
-	inTransaction bool
-	order         []string
-	binding       domain.AttemptLeaseBinding
+	snapshot            port.ScopeSnapshot
+	lockErr             error
+	calls               int
+	leaseErr            error
+	leaseCalls          int
+	inTransaction       bool
+	order               []string
+	binding             domain.AttemptLeaseBinding
+	credential          *domain.WorkerCredential
+	credentialErr       error
+	credentialKey       []byte
+	issuer              *domain.CredentialIssuerContext
+	issuerErr           error
+	issuerCalls         int
+	leaseErrAfterIssuer error
 }
 
 func TestSafetyGateRequiresFreshLeaseInAuthorityTransaction(t *testing.T) {
 	f := &gateTransactor{snapshot: gateState(domain.ScopeActive, 7)}
-	gate := NewSafetyGate(f)
+	gate := NewSafetyGate(f, "coordinator")
 	authorization := gateAuthorization(gateGrant(f.snapshot))
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", authorization); err != nil {
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", authorization, gateRequest()); err != nil {
 		t.Fatal(err)
 	}
-	if f.calls != 1 || f.leaseCalls != 1 || f.binding != authorization.Lease || !reflect.DeepEqual(f.order, []string{"authority", "lease"}) {
+	if f.calls != 1 || f.leaseCalls != 2 || f.binding != authorization.Lease || !reflect.DeepEqual(f.order, []string{"authority", "lease", "credential", "issuer", "lease"}) {
 		t.Fatalf("not composed in order: %+v", f)
 	}
 	// The same Gate must consult the lease again, not cache the previous success.
 	for _, denial := range []error{domain.ErrInvalidLease, domain.ErrDatabaseUnavailable} {
 		f.leaseErr = denial
-		if err := gate.CheckHighRiskAction(context.Background(), "scope", authorization); !errors.Is(err, denial) {
+		if err := gate.CheckHighRiskAction(context.Background(), "scope", authorization, gateRequest()); !errors.Is(err, denial) {
 			t.Fatalf("fresh lease denial: %v", err)
 		}
 	}
-	if f.calls != 3 || f.leaseCalls != 3 {
+	if f.calls != 3 || f.leaseCalls != 4 {
 		t.Fatal("lease validation was cached")
 	}
 }
 
 func TestSafetyGateRejectsMissingBindingAndStaleGrantBeforeLeaseCheck(t *testing.T) {
 	f := &gateTransactor{snapshot: gateState(domain.ScopeActive, 7)}
-	gate := NewSafetyGate(f)
+	gate := NewSafetyGate(f, "coordinator")
 	auth := gateAuthorization(gateGrant(f.snapshot))
 	missing := auth
 	missing.Lease = domain.AttemptLeaseBinding{}
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", missing); !errors.Is(err, domain.ErrInvalidLease) {
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", missing, gateRequest()); !errors.Is(err, domain.ErrInvalidLease) {
 		t.Fatal(err)
 	}
 	f.snapshot.Roots["root-a"] = domain.RootAuthority{Policy: auth.Grant.Policy, AuthorizationEpoch: 4}
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", auth); !errors.Is(err, domain.ErrStaleGrant) {
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", auth, gateRequest()); !errors.Is(err, domain.ErrStaleGrant) {
 		t.Fatal(err)
 	}
 	if f.leaseCalls != 0 {
@@ -70,16 +79,16 @@ func TestSafetyGateRollbackEpochBoundaryWithActiveLease(t *testing.T) {
 	root := f.snapshot.Roots["root-a"]
 	root.AuthorizationEpoch++
 	f.snapshot.Roots["root-a"] = root
-	gate := NewSafetyGate(f)
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", before); !errors.Is(err, domain.ErrStaleGrant) {
+	gate := NewSafetyGate(f, "coordinator")
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", before, gateRequest()); !errors.Is(err, domain.ErrStaleGrant) {
 		t.Fatal(err)
 	}
 	current := gateAuthorization(gateGrant(f.snapshot))
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", current); err != nil {
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", current, gateRequest()); err != nil {
 		t.Fatal(err)
 	}
 	f.leaseErr = domain.ErrInvalidLease
-	if err := gate.CheckHighRiskAction(context.Background(), "scope", current); !errors.Is(err, domain.ErrInvalidLease) {
+	if err := gate.CheckHighRiskAction(context.Background(), "scope", current, gateRequest()); !errors.Is(err, domain.ErrInvalidLease) {
 		t.Fatal(err)
 	}
 	if f.snapshot.SecurityEpoch != 7 {
@@ -123,7 +132,13 @@ func (f *gateTransactor) ValidateCurrentLease(_ context.Context, scope domain.Sc
 }
 
 func gateAuthorization(grant domain.Grant) domain.HighRiskAuthorization {
-	return domain.HighRiskAuthorization{Grant: grant, Lease: domain.AttemptLeaseBinding{WorkOrderID: "work", AttemptID: "attempt", WorkerID: "worker", SessionID: "session", LeaseEpoch: 1}}
+	authorization := domain.HighRiskAuthorization{Grant: grant, Lease: domain.AttemptLeaseBinding{WorkOrderID: "work", AttemptID: "attempt", WorkerID: domain.WorkerID("worker_" + strings.Repeat("2", 64)), SessionID: "session", LeaseEpoch: 1}}
+	credential := unitCredential(authorization.Lease)
+	message, err := credential.SigningBytes("scope", grant, gateRequest())
+	if err == nil {
+		authorization.Credential = domain.WorkerCredentialBinding{ID: credential.ID, Signature: ed25519.Sign(unitCredentialKey(), message)}
+	}
+	return authorization
 }
 
 func gateState(mode domain.ScopeMode, epoch domain.Epoch) port.ScopeSnapshot {
@@ -136,7 +151,7 @@ func gateGrant(state port.ScopeSnapshot) domain.Grant {
 
 func TestSafetyGateReadsAuthorityFreshForEveryCheck(t *testing.T) {
 	f := &gateTransactor{snapshot: gateState(domain.ScopeActive, 7)}
-	gate := NewSafetyGate(f)
+	gate := NewSafetyGate(f, "coordinator")
 	ctx := context.Background()
 	grant := gateGrant(f.snapshot)
 	if err := gate.CheckNewDispatch(ctx, "scope", "root-a"); err != nil {
@@ -145,7 +160,7 @@ func TestSafetyGateReadsAuthorityFreshForEveryCheck(t *testing.T) {
 	if err := gate.CheckNewGrant(ctx, "scope", "root-a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := gate.CheckHighRiskAction(ctx, "scope", gateAuthorization(grant)); err != nil {
+	if err := gate.CheckHighRiskAction(ctx, "scope", gateAuthorization(grant), gateRequest()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -155,7 +170,7 @@ func TestSafetyGateReadsAuthorityFreshForEveryCheck(t *testing.T) {
 	for name, check := range map[string]func() error{
 		"dispatch":              func() error { return gate.CheckNewDispatch(ctx, "scope", "root-a") },
 		"grant":                 func() error { return gate.CheckNewGrant(ctx, "scope", "root-a") },
-		"stale high-risk grant": func() error { return gate.CheckHighRiskAction(ctx, "scope", gateAuthorization(grant)) },
+		"stale high-risk grant": func() error { return gate.CheckHighRiskAction(ctx, "scope", gateAuthorization(grant), gateRequest()) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := check(); !errors.Is(err, domain.ErrSafeStopped) {
@@ -182,7 +197,7 @@ func TestSafetyGateFailsClosedOnDatabaseAndFrozen(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &gateTransactor{snapshot: tc.state, lockErr: tc.lockErr}
-			if err := NewSafetyGate(f).CheckNewDispatch(ctx, "scope", "root-a"); !errors.Is(err, tc.want) {
+			if err := NewSafetyGate(f, "coordinator").CheckNewDispatch(ctx, "scope", "root-a"); !errors.Is(err, tc.want) {
 				t.Fatalf("got %v, want %v", err, tc.want)
 			}
 		})
@@ -191,8 +206,68 @@ func TestSafetyGateFailsClosedOnDatabaseAndFrozen(t *testing.T) {
 
 func TestSafetyGateTransactorErrorFailsClosed(t *testing.T) {
 	want := errors.New("database transaction failed")
-	gate := NewSafetyGate(&gateTransactor{lockErr: want})
+	gate := NewSafetyGate(&gateTransactor{lockErr: want}, "coordinator")
 	if err := gate.CheckNewGrant(context.Background(), "scope", "root-a"); !errors.Is(err, want) {
 		t.Fatalf("got %v, want transaction error", err)
+	}
+}
+
+func (f *gateTransactor) LockWorkerCredential(_ context.Context, id string) (domain.WorkerCredential, []byte, error) {
+	if !f.inTransaction {
+		return domain.WorkerCredential{}, nil, errors.New("credential outside transaction")
+	}
+	f.order = append(f.order, "credential")
+	if f.credentialErr != nil {
+		return domain.WorkerCredential{}, nil, f.credentialErr
+	}
+	c := unitCredential(f.binding)
+	if f.credential != nil {
+		c = *f.credential
+	}
+	if id != c.ID {
+		return domain.WorkerCredential{}, nil, domain.ErrWorkerCredential
+	}
+	key := []byte(unitCredentialKey().Public().(ed25519.PublicKey))
+	if f.credentialKey != nil {
+		key = f.credentialKey
+	}
+	return c, key, nil
+}
+
+func (f *gateTransactor) LockCurrentCredentialIssuer(_ context.Context, id string) (domain.CredentialIssuerContext, error) {
+	if !f.inTransaction {
+		return domain.CredentialIssuerContext{}, errors.New("issuer outside transaction")
+	}
+	if len(f.order) == 0 || f.order[len(f.order)-1] != "credential" {
+		return domain.CredentialIssuerContext{}, errors.New("issuer before credential lock")
+	}
+	f.order = append(f.order, "issuer")
+	f.issuerCalls++
+	if f.leaseErrAfterIssuer != nil {
+		f.leaseErr = f.leaseErrAfterIssuer
+	}
+	if f.issuerErr != nil {
+		return domain.CredentialIssuerContext{}, f.issuerErr
+	}
+	issuer := unitCredentialIssuer().issuer
+	if f.issuer != nil {
+		issuer = *f.issuer
+	}
+	if issuer.IssuerID != id {
+		return domain.CredentialIssuerContext{}, domain.ErrWorkerCredential
+	}
+	return issuer, nil
+}
+
+func TestSafetyGateRechecksLeaseAfterCredentialAndIssuerLockWait(t *testing.T) {
+	for _, cause := range []error{domain.ErrInvalidLease, domain.ErrDatabaseUnavailable} {
+		f := &gateTransactor{snapshot: gateState(domain.ScopeActive, 7), leaseErrAfterIssuer: cause}
+		auth := gateAuthorization(gateGrant(f.snapshot))
+		if err := NewSafetyGate(f, "coordinator").CheckHighRiskAction(context.Background(), "scope", auth, gateRequest()); !errors.Is(err, cause) {
+			t.Fatalf("stale lease after lock wait accepted: %v", err)
+		}
+		if f.leaseCalls != 2 || f.issuerCalls != 1 || !reflect.DeepEqual(f.order, []string{"authority", "lease", "credential", "issuer", "lease"}) {
+			t.Fatal("lease not rechecked after locks in same transaction")
+		}
 	}
 }

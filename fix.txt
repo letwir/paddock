@@ -1,0 +1,115 @@
+-- PADDOCK test DB role fix
+-- Paste this entire file into an ADMIN psql console connected to paddock_test.
+-- Changes ownership/grants for existing roles only; creates no roles/passwords.
+-- The whole operation is transactional and aborts on any guard failure.
+
+BEGIN;
+
+DO $guard$
+BEGIN
+  IF current_database() <> 'paddock_test' THEN
+    RAISE EXCEPTION 'refusing database %, expected paddock_test', current_database();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'paddock_app')
+     OR NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'paddock_migrator') THEN
+    RAISE EXCEPTION 'both paddock_app and paddock_migrator must already exist';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_roles
+    WHERE rolname IN ('paddock_app', 'paddock_migrator')
+      AND (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls)
+  ) THEN
+    RAISE EXCEPTION 'PADDOCK roles must not have elevated attributes';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pg_auth_members m
+    JOIN pg_roles granted_role ON granted_role.oid = m.roleid
+    JOIN pg_roles member_role ON member_role.oid = m.member
+    WHERE granted_role.rolname IN ('paddock_app', 'paddock_migrator')
+       OR member_role.rolname IN ('paddock_app', 'paddock_migrator')
+  ) THEN
+    RAISE EXCEPTION 'PADDOCK roles must have no role memberships in either direction';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'raw' AND r.rolname = 'paddock_app'
+  ) OR EXISTS (
+    SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid = n.nspowner
+    WHERE n.nspname = 'raw' AND r.rolname = 'paddock_app'
+  ) THEN
+    RAISE EXCEPTION 'paddock_app must not own raw objects';
+  END IF;
+END
+$guard$;
+
+ALTER SCHEMA raw OWNER TO paddock_migrator;
+ALTER TABLE raw.policy_bundles       OWNER TO paddock_migrator;
+ALTER TABLE raw.policy_scopes        OWNER TO paddock_migrator;
+ALTER TABLE raw.roots                OWNER TO paddock_migrator;
+ALTER TABLE raw.policy_rollouts      OWNER TO paddock_migrator;
+ALTER TABLE raw.rollout_targets      OWNER TO paddock_migrator;
+ALTER TABLE raw.governance_approvals OWNER TO paddock_migrator;
+ALTER TABLE raw.command_receipts     OWNER TO paddock_migrator;
+ALTER TABLE raw.domain_events        OWNER TO paddock_migrator;
+ALTER TABLE raw.event_outbox         OWNER TO paddock_migrator;
+ALTER TABLE raw.event_inbox          OWNER TO paddock_migrator;
+ALTER TABLE raw.security_generation  OWNER TO paddock_migrator;
+
+DO $ownership_check$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid = n.nspowner
+    WHERE n.nspname = 'raw' AND r.rolname = 'paddock_migrator'
+  ) THEN
+    RAISE EXCEPTION 'paddock_migrator must own raw schema';
+  END IF;
+  IF (
+    SELECT count(*) FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_roles r ON r.oid = c.relowner
+    WHERE n.nspname = 'raw' AND c.relkind IN ('r', 'p')
+      AND c.relname IN ('policy_bundles', 'policy_scopes', 'roots', 'policy_rollouts',
+        'rollout_targets', 'governance_approvals', 'command_receipts', 'domain_events',
+        'event_outbox', 'event_inbox', 'security_generation')
+      AND r.rolname = 'paddock_migrator'
+  ) <> 11 THEN
+    RAISE EXCEPTION 'paddock_migrator must own all 11 raw base tables';
+  END IF;
+END
+$ownership_check$;
+
+-- Remove explicit column-level grants too; table-level REVOKE alone is insufficient.
+DO $revoke_column_privileges$
+DECLARE
+  column_record record;
+BEGIN
+  FOR column_record IN
+    SELECT n.nspname, c.relname, a.attname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid
+    WHERE n.nspname = 'raw' AND c.relkind IN ('r', 'p')
+      AND a.attnum > 0 AND NOT a.attisdropped
+    ORDER BY c.oid, a.attnum
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL (%I) ON TABLE %I.%I FROM PUBLIC, paddock_app',
+      column_record.attname, column_record.nspname, column_record.relname
+    );
+  END LOOP;
+END
+$revoke_column_privileges$;
+
+REVOKE ALL ON SCHEMA raw FROM PUBLIC;
+REVOKE ALL ON ALL TABLES IN SCHEMA raw FROM PUBLIC;
+REVOKE ALL ON SCHEMA raw FROM paddock_app;
+REVOKE ALL ON ALL TABLES IN SCHEMA raw FROM paddock_app;
+GRANT USAGE ON SCHEMA raw TO paddock_app;
+GRANT SELECT, INSERT ON TABLE raw.policy_bundles, raw.domain_events TO paddock_app;
+
+GRANT USAGE, CREATE ON SCHEMA raw TO paddock_migrator;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA raw TO paddock_migrator;
+
+COMMIT;

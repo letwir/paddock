@@ -1,0 +1,20 @@
+@lrf=1|aud=LLM|scope=paddock-engineering
+R|design.effects|tag:code|MUST|LW_SCOPE|keep pure domain separate from filesystem process network DB clock randomness and UI; classify every effect before execution
+R|design.flow|tag:code|MUST|LW_SCOPE|prefer explicit data flow and composition over ambient mutation
+R|design.contract|tag:code|MUST|LW_SCOPE|preserve existing public behavior unless issue acceptance requires a change
+R|error|tag:code|MUST_NOT|LW_SCOPE|silently swallow failures; include operation and target context when propagating
+R|resource|tag:code|MUST|LW_SCOPE|deterministically release acquired resources using language conventions
+R|async|tag:code|MUST|LW_SCOPE|bound/cancel asynchronous work and define retry/partial-failure behavior
+R|surgical|tag:code|MUST_NOT|LW_SCOPE|unrelated formatting, generated churn, opportunistic refactors
+R|dependency|tag:code|MUST|PROD_DEP|production dependency changes require explicit current-task approval
+R|test.behavior|tag:code|MUST|LW_SCOPE|behavior changes require focused tests for the changed path and regression boundary
+R|test.highrisk|tag:code|MUST|LW_SCOPE|persistence concurrency security and lifecycle changes require failure/boundary tests and independent review per method.md
+R|test.scope|tag:code|MUST|LW_SCOPE|keep temporary/build outputs bounded and compare final diff against observed start state
+R|evidence|tag:code|MUST|RO_LOCAL|report actual commands exit codes target hashes changed files and unverified risks
+R|persistence.ledger-deltas|tag:code|MUST|LW_SCOPE|append-only accounting journal rows MUST record every affected counter delta explicitly (granted_delta,spent_delta,reserved_delta,delegated_delta) plus operation/allocation/account identity; an auditor must reconstruct the complete before→after counter movement from journal records without inferring omitted reserve releases or refunded escrow from mutable current account state
+R|worker.difficulty-scale|tag:code|MUST|RO_LOCAL|difficulty scale D={EASY<MEDIUM<HARD}; Main records D_pub before CODE and Worker records D_worker after bounded inspection/before further work; EASY=single-file isolated behavior with deterministic local tests and no persistence/security/concurrency boundary; MEDIUM=bounded multi-file API/adapter or persistence without novel cross-component security/concurrency invariant; HARD=multi-layer persistence/security/concurrency/epoch/Gateway/model boundary or unresolved integration risk; Worker MUST justify rating with observed scope/risk/evidence; value above HARD or incomparable/missing rating=STOP+ask; the scale affects planning/routing only, never authority/effects/budget
+R|worker.difficulty-escalation|tag:code|MUST|RO_LOCAL|define D_pub and D_worker on the same declared ordered scale; if D_worker>D_pub, Worker MUST stop starting new work, preserve partial artifacts, and report observed difficulty, evidence/blockers, and remaining work to Orchestrator; Orchestrator MUST replan by splitting or reassigning to an eligible available Worker, preserve one active owner per file/task, and keep Issue non-DONE until acceptance is reverified; incomparable/missing scales=STOP+ask; escalation/replanning MUST NOT silently widen scope, effects, authority, or budget; choose a stronger model/backend only if the runtime exposes a supported selector, otherwise report selector unavailable and never invent a model claim
+R|worker.route|tag:code|MUST|RO_LOCAL|before CODE read agents/AGENT_ROUTER.md and context fallback; select exactly one available eligible worker for the bounded issue; current task authority and method.md control effects and review
+R|workflow.order|tag:code|MUST|RO_LOCAL|follow method.md §4 PRECEDENT RESEARCH PLAN PRE_VERIFY CODE POST_VERIFY FINISH; failed gate cannot be skipped
+R|workflow.finish|tag:code|MUST|RO_LOCAL|reconcile diff acceptance checks receipt and cursor; never claim unexecuted checks or CI attestation
+R|vcs|tag:code|MUST|VCS_WRITE|stage commit push only with explicit current-task authorization and only the verified completed issue scope; preserve unrelated/unverified work

@@ -12,36 +12,31 @@ Legend: `A`=ACCEPTED+LRF; `P`=DESIGN_BASELINE/OPEN; `Cursor`=navigation hint; `R
 
 §1 REPOSITORY SNAPSHOT
 - Repo=PADDOCK; branch=`main`.
-- Fresh observation 2026-10-25: `HEAD=origin/main=04af724617827d0ce9313f5418e7a1380dbda087`; tree=`1a335cd12140a23e8e8dc2f64ee4a14d654705e7`; divergence=0/0.
-- Status has 481 entries: 29 tracked modified/deleted, 3 staged additions, 449 untracked. Exactly six paths are staged: `Issues.md`, `docs/handover.md`, `docs/issue-dependencies.generated.md`, `internal/governance/domain/trust_policy.go`, `internal/governance/domain/trust_policy_test.go`, and `receipts/PDK-M11-S03/2026-10-25-local-verification.json`. Preserve every other path, including tracked `AGENTS.md` deletion and all unrelated source, SQL, receipts, rules, `.build`, and untracked work.
-- `prompt.md`/`docs/develop.md` are already in HEAD ancestry. S02/S04 are pushed; S03 is locally staged but not committed/pushed.
+- Fresh pre-refresh observation 2026-10-25: `HEAD=origin/main=004d5d6b38a3e2b8d6301e461ac2668fa3f0f0cc`; tree=`1a335cd12140a23e8e8dc2f64ee4a14d654705e7`; divergence=0/0; staged index empty.
+- Before this full handover replacement, status had 477 entries (28 tracked modified/deleted, 449 untracked). This replacement adds one tracked change; preserve every unrelated path, including tracked `AGENTS.md` deletion and all source, SQL, receipts, rules, `.build`, and untracked work.
+- `prompt.md`/`docs/develop.md` are already in HEAD ancestry. M11-S02/M10-S04/M11-S03 commits are pushed.
 
-§2 PDK-M11-S03 · DONE, LOCAL PURE-DOMAIN EVALUATOR
-- Cursor: active=`PDK-M11-S03`, state=`[x] DONE`; dependencies PDK-M11-S02 and PDK-M06-S02 are DONE.
-- Receipt=`receipts/PDK-M11-S03/2026-10-25-local-verification.json`, SHA-256=`b3c6dce309dd5fab02be08811eb984b2bed6a2e56cbec62abc2c4ae42335e486`.
-- Target SHA-256: `internal/governance/domain/trust_policy.go`=`b6fc84a22d077c1f88f4a42e295f231dae9cedd5f8748d22a402c5c05c880624`; `_test.go`=`110c48eaa8f7b1e9bafff1ff6b73f69c61263dba24a2f011971671597b4156d1`.
-- Main Runner: offline focused Domain tests/vet, gofmt, lint 89/152, planner and target diff-check all Exit 0. A distinct general Verifier reviewed the final hashes and returned `NO_FINDINGS`. No DB body or CI attestation.
-- The user selected a strict versioned flat per-risk/per-capability threshold policy. It uses explicit time and typed caller-trusted evidence counts; q1≥2 and q1<q2<q3 are policy data. Unknown/missing/stale/unavailable evidence preserves current tier; Integrity demotion is q1-gated and capability-scoped. It returns deterministic proposals only; no policy persistence, Authority, production Trust, or real-world independence proof.
-- Memory ID=`d15aa3b7-c721-48e1-986f-4a4d4770b178` (ACTIVE; title read-back confirmed).
-- Selected staged Issue snapshot SHA-256=`065197bb1b842f537358673f3ecac4b98e80d2a048139021230434e6bbfc2c6a`; official generated index matches and staged-snapshot Lint passed (89 Issues/151 edges). Full-worktree lint passed (89 Issues/152 edges); full-worktree index remains the separate unstaged local output.
+§2 COMPLETED ISSUES
+- PDK-M11-S02 DONE/pushed=`ea0e6650204e3f683b0ead5b909089fe1f8888ef`; Receipt=`receipts/PDK-M11-S02/2026-10-25-local-verification.json`; Memory ID=`1280a653-9cfd-47be-b56f-a988b76edc62`.
+- PDK-M10-S04 DONE/pushed=`04af724617827d0ce9313f5418e7a1380dbda087`; Receipt=`receipts/PDK-M10-S04/2026-10-25-local-verification.json`; Memory ID=`5d2f466e-dd61-4332-8f46-23ec80f9308f`.
+- PDK-M11-S03 DONE/pushed=`004d5d6b38a3e2b8d6301e461ac2668fa3f0f0cc`; Receipt=`receipts/PDK-M11-S03/2026-10-25-local-verification.json`; Memory ID=`d15aa3b7-c721-48e1-986f-4a4d4770b178`.
+- These were local pure-Domain/source scopes with separate review/Runner evidence as recorded. No CI/Verifier-of-Record, DB, production, or real-world independence claim.
 
-§3 APPROVED VCS GATE · COMMIT/PUSH PENDING
-- User explicitly approved one S03 issue-scoped commit/push for the six staged paths, including the `verified_commit` Cursor field. No S03 commit/push has occurred yet.
-- Include exactly: two new Trust Policy Domain files; S03 Runner Receipt; only the Cursor and PDK-M11-S03 Issue hunks; this full-overwrite handover; generated index from the selected staged Issue snapshot. Other Issue hunks remain excluded.
-- Base=`04af724617827d0ce9313f5418e7a1380dbda087`; current `HEAD=origin/main`; target existing upstream=`origin/main`; divergence=0/0. Approved effect=one issue-scoped commit, then normal push to origin/main.
-- Exclude all other Issue hunk/path, all unrelated source/test/receipt/SQL/rules, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, all remaining dirty/untracked work, and already-committed `prompt.md`/`docs/develop.md`. No force-push, remote change, history rewrite, or unrelated staging.
-- Before commit: reverify exact six staged names/hunks, staged Issue/index SHA, staged/worktree diff checks, and base/upstream. Any mismatch=stop without push and preserve state.
+§3 PDK-M11-S04 · BLOCKED BEFORE CODE
+- Planner selected PDK-M11-S04 after M11-S03 push. Dependency PDK-M11-S03 is DONE. Issue remains `[-] WIP`; Cursor `execution_state=BLOCKED_APPROVAL_GRAPH_SEMANTICS`. No S04 code/tests or VCS changes exist.
+- Accepted D-009 is high-level Bounded Self-Evolution within a fixed Governance Kernel. S04 acceptance requires Builder self-approval rejection, rejection of changes outside the Kernel boundary, and risk-adaptive independent verification. Detailed actor-separation text in `decisions.md` §6 is DESIGN_BASELINE, not additional ACCEPTED authority.
+- A separate attacker-medium design evaluation compared: (1) existing DomainApproval records normalized to a graph; (2) a dedicated typed EvolutionApprovalGraph; (3) a two-layer verifier/approval DAG. Option 2 was provisional rec with no strictly superior alternative, but the report found HIGH blockers: no machine-testable Kernel/allowed-delta predicate; no trusted Builder identity or reviewer/approver overlap/counting rules; no risk-tier independent-quorum thresholds; and no signed dependency binding for candidate/Kernel/review/replay. Issue/ACCEPTED sources do not settle these semantics. No code worker was dispatched.
+- S04 blocker summary is in Memory ID=`29292e9b-e8a9-4a6c-8aa6-d4cee222f564` (ACTIVE). Current `python3 scripts/lint_design.py --emit-summary`/lint PASS (89/152); planner was not rerun after the blocker to avoid selecting another Issue. No S04 tests ran.
+- **Next action:** ask the user to define/accept the immutable Kernel fields and allowed policy-delta predicate; Builder/proposer identity; verifier/approver roles, permitted overlap, trusted independence source/count; risk-adaptive thresholds; and signed candidate/Kernel/review binding/replay semantics. Do not promote DESIGN_BASELINE, invent the boundary, dispatch CODE, or select another Issue automatically.
 
-§4 OTHER STATE / LIMITS
-- M11-S02 is DONE/pushed in `ea0e6650204e3f683b0ead5b909089fe1f8888ef`; Memory ID=`1280a653-9cfd-47be-b56f-a988b76edc62`.
-- M10-S04 is DONE/pushed in `04af724617827d0ce9313f5418e7a1380dbda087`; Memory ID=`5d2f466e-dd61-4332-8f46-23ec80f9308f`.
-- Earlier records describe unresolved Security Epoch anomaly around M10-S02 (4→5 without attributable event) and later approved M07 activity (5→6). These are historical observations, not fresh DB observations. Cause remains UNKNOWN. No DB operation or credential access occurred here; do not touch DB before separate reconciliation/approval.
-- Preserve all unrelated dirty work. No CI/Verifier-of-Record or production claim.
+§4 DATABASE ANOMALY · NO ACTION
+- Earlier records describe an unresolved Security Epoch anomaly around M10-S02 (4→5 without attributable event) and later approved M07 activity (5→6). These are historical observations, not fresh DB observations. Cause remains UNKNOWN. No DB operation or credential access occurred in this task; do not touch DB before separate reconciliation/approval.
+- Preserve all unrelated local work. No CI/Verifier-of-Record or production claim.
 
 §5 RESUME
 1. Re-read current instructions, routed LRF, decisions→method→threat model→Issues, Git and Receipts; this snapshot may be stale.
-2. Verify the exact approved six-path staged scope and Issue/index SHA equality, then commit and push only this batch.
-3. Verify remote push, rerun design lint/planner, and select the next READY Issue only if still eligible. Reassess dependencies/design/effects.
+2. Ask the user to clarify the blocked M11-S04 Kernel/approval-graph semantics. Keep S04 WIP and do not start CODE or another Issue until resolved.
+3. After a bounded accepted contract, repeat the required three-option independent evaluation if material choices remain; then record exact scope/difficulty/effect gates and route one eligible worker.
 4. Preserve unrelated work and the unresolved Security Epoch boundary. On refresh, replace this entire file from new observations; never append stale state.
 
 POLYGLYPH invariants: Meaning∧Constraints∧Authority∧Uncertainty preserved; compression≠semantic-loss permission; snapshot≠evidence; prompt≠canonical authority; no document grants effects.

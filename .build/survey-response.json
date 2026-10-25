@@ -1,0 +1,24 @@
+{
+  "form": {"key": "harness-feedback", "version": 1, "title": "ハーネスご意見アンケート", "questions": [
+    {"key":"hard-to-operate","prompt":"このハーネスで動きづらかったことは？","required":true,"kind":"long_text"},
+    {"key":"ambiguous","prompt":"解釈に迷った、または推測して進めたことは？","required":true,"kind":"long_text"},
+    {"key":"excessive","prompt":"不要・過剰だった指示、SKILL、工程は？","required":true,"kind":"long_text"},
+    {"key":"missing","prompt":"無かったため困ったSKILL・機能は？","required":true,"kind":"long_text"},
+    {"key":"helpful","prompt":"このハーネスのおかげで上手くできたことは？","required":true,"kind":"long_text"},
+    {"key":"next-time","prompt":"次回同じ仕事をするなら何を変えたい？","required":true,"kind":"long_text"},
+    {"key":"other","prompt":"その他、ワイへの実装依頼・ご意見","required":false,"kind":"long_text"}
+  ]},
+  "respondent":"Codex",
+  "source":"PADDOCK repository task",
+  "task_id":"PADDOCK-2026-10-14-PDK-M01-S05",
+  "context":{"observation_scope":"This session only; local repository observations and llm-memory CLI output","signal_kinds":["FRICTION","REQUEST"]},
+  "answers": {
+    "hard-to-operate":"作業開始時、未コミット・未追跡ファイルが多数あり、対象Issueの成果物と既存作業の所有範囲を安全に切り分けにくかった。検査の出力がツール側で中断表示になり、コマンドを再実行して確証を得る必要もあった。",
+    "ambiguous":"指示書は全Issue完了までの反復と小項目ごとのpushを求める一方、既存作業ツリーには由来不明の変更があり、Issue単位のコミット対象を確定できなかった。llm-memoryのスキル説明は利用可能スキル一覧になかったが、バイナリは.build/llm-memに存在した。今回はユーザーの追加指示でそのバイナリ利用を確認できた。",
+    "excessive":"現時点で過剰と断定できる指示は見当たらない。複数の規範文書を照合する工程は時間を要するが、権限境界と未検証作業の誤認防止には有用だった。",
+    "missing":"llm-memoryバイナリのリポジトリ内配置・使い方・保存先を示す、呼び出し可能なスキル説明がこのセッションでは見つからなかった。バイナリの存在を自動発見して案内する機能があるとよい。",
+    "helpful":"設計Lint、モデル検査、全PythonテストをRunnerで実行し、出力から検査範囲と状態数を確認できた。モデル検査は変異検出と公平性を欠く停止トレースも示し、無条件のliveness保証を避けられた。llm-memory CLIに進捗と改善シグナルを記録できた。",
+    "next-time":"開始時にGitの変更一覧とIssue依存・各変更の所有者を突き合わせ、完了Issueの正確な差分だけを先に識別する。llm-memoryを実行する手順・配置も作業開始時に案内し、検査は中断出力ではなく終了コードまでRunnerで確認する。",
+    "other":"このセッションではS05に関係するモデル検査と78件のPythonテストがPASSしたが、変更の所有範囲を特定できずコミット・pushは行っていない。小項目単位のpushを進めるには、既存変更がどのIssue/作業者に属するかの照合が必要。"
+  }
+}

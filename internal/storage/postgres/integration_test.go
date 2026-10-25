@@ -315,14 +315,25 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 				t.Fatal("app safety WorkOrder configuration/ready failed")
 			}
 		}
-		binding := domain.AttemptLeaseBinding{WorkOrderID: domain.WorkOrderID(workID), AttemptID: domain.AttemptID(workID + "_attempt"), WorkerID: domain.WorkerID(workID + "_worker"), SessionID: domain.SessionID(workID + "_session")}
+		issuer := seedCredentialIntegrationIssuer(t, caseCtx, pool)
+		credentialWorker, credentialKey := credentialIntegrationEnrollment(t, caseCtx, tx, nil)
+		t.Cleanup(func() {
+			cleanCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			var remaining int
+			if err := pool.QueryRow(cleanCtx, `SELECT (SELECT count(*) FROM raw.worker_credentials WHERE worker_id=$1)+(SELECT count(*) FROM raw.worker_enrollment_workers WHERE worker_id=$1)+(SELECT count(*) FROM raw.worker_enrollment_challenges WHERE fingerprint=$2)`, string(credentialWorker.ID), string(credentialWorker.Fingerprint)).Scan(&remaining); err != nil || remaining != 0 {
+				t.Error("rollback left safety credential/enrollment fixture rows")
+			}
+		})
+		binding := domain.AttemptLeaseBinding{WorkOrderID: domain.WorkOrderID(workID), AttemptID: domain.AttemptID(workID + "_attempt"), WorkerID: credentialWorker.ID, SessionID: domain.SessionID(workID + "_session")}
 		var issuedAttempt, issuedSlot string
 		var leaseExpiry time.Time
 		if err := tx.QueryRow(caseCtx, `SELECT attempt_id,slot_id,lease_epoch,expires_at FROM raw.issue_work_order_lease($1,$2,$3,$4,$5,'[]'::jsonb,'[]'::jsonb,interval '10 minutes')`, workID, string(binding.WorkerID), string(binding.SessionID), string(binding.AttemptID), workID+"_slot").Scan(&issuedAttempt, &issuedSlot, &binding.LeaseEpoch, &leaseExpiry); err != nil || issuedAttempt != string(binding.AttemptID) || issuedSlot != workID+"_slot" || binding.LeaseEpoch != 1 {
 			t.Fatal("app safety lease issuance failed")
 		}
+		credential := issueCredentialIntegration(t, caseCtx, tx, credentialWorker, binding, issuer)
 		authorization := func(grant domain.Grant) domain.HighRiskAuthorization {
-			return domain.HighRiskAuthorization{Grant: grant, Lease: binding}
+			return credentialIntegrationAuthorization(t, credential, credentialKey, domain.ScopeID(f.scope), grant)
 		}
 		gov := newSafetyGovernanceTx(tx)
 		snapshot, err := gov.LockScope(caseCtx, domain.ScopeID(f.scope))
@@ -344,7 +355,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		service := application.NewSafetyService(outerTxTransactor{tx: tx, safetyAPI: true}, quorum)
-		gate := application.NewSafetyGate(outerTxTransactor{tx: tx, safetyAPI: true})
+		gate := application.NewSafetyGate(outerTxTransactor{tx: tx, safetyAPI: true}, "paddock.coordinator")
 		makeSigs := func(action domain.SafetyAction, epoch domain.Epoch, id string, activation *[32]byte) []domain.SafetySignature {
 			var msg []byte
 			var e error
@@ -385,7 +396,7 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		if err := gate.CheckNewGrant(caseCtx, snapshot.ScopeID, domain.RootID(f.root)); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("CheckNewGrant after Stop = %v, want ErrSafeStopped", err)
 		}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant)); !errors.Is(err, domain.ErrSafeStopped) {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant), credentialIntegrationRequest()); !errors.Is(err, domain.ErrSafeStopped) {
 			t.Fatalf("CheckHighRiskAction after Stop = %v, want ErrSafeStopped", err)
 		}
 		stoppedSnapshot, err := newSafetyGovernanceTx(tx).LockScope(caseCtx, snapshot.ScopeID)
@@ -431,10 +442,10 @@ func TestPostgresGovernanceIntegration(t *testing.T) {
 		}
 		releasedRoot := released.State.Roots[domain.RootID(f.root)]
 		releasedGrant := domain.Grant{Root: domain.RootID(f.root), Policy: releasedRoot.Policy, AuthorizationEpoch: releasedRoot.AuthorizationEpoch, SecurityEpoch: released.State.SecurityEpoch}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(releasedGrant)); err != nil {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(releasedGrant), credentialIntegrationRequest()); err != nil {
 			t.Fatalf("CheckHighRiskAction after Release with current grant: %v", err)
 		}
-		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant)); !errors.Is(err, domain.ErrStaleGrant) {
+		if err := gate.CheckHighRiskAction(caseCtx, snapshot.ScopeID, authorization(preStopGrant), credentialIntegrationRequest()); !errors.Is(err, domain.ErrStaleGrant) {
 			t.Fatalf("CheckHighRiskAction after Release with stale grant = %v, want ErrStaleGrant", err)
 		}
 		if _, err = service.Release(caseCtx, snapshot.ScopeID, stopped.State.SecurityEpoch, releaseID, "safety-fixture-nonce", activation, releaseSigs); err != nil {

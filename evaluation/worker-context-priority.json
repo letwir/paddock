@@ -1,0 +1,8 @@
+{
+  "as_of": "2026-10-14",
+  "provenance": "PADDOCK-local routing fallback reconstructed with user authorization; no measured context-consumption observations available",
+  "metric": "Comparable measured context consumption for the exact bounded CODE workstream; context window capacity is not consumption",
+  "official_comparable_measurements": null,
+  "fallback_order": ["general"],
+  "selection": "Use only currently available and eligible subagent types listed in agents/AGENT_ROUTER.md. This ranking is nonnormative, grants no authority, and must not be treated as a quality claim. If no eligible worker is available, stop and report the routing block."
+}

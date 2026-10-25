@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -371,5 +373,44 @@ func TestAppendEventRejectsInvalidEnvelopeBeforeWrites(t *testing.T) {
 	})
 	if err == nil || len(tx.statements) != 0 || tx.commits != 0 || tx.rollbacks != 1 {
 		t.Fatalf("AppendEvent invalid event: err=%v statements=%d commits=%d rollbacks=%d", err, len(tx.statements), tx.commits, tx.rollbacks)
+	}
+}
+
+func TestCommandReceiptTerminalReadWriteAndTombstone(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	for _, status := range []string{"SUCCEEDED", "REJECTED"} {
+		for _, expired := range []bool{false, true} {
+			t.Run(status+"/expired="+fmt.Sprint(expired), func(t *testing.T) {
+				body := []byte(`{"schema_version":"paddock.command-response/1"}`)
+				if expired {
+					body = []byte(port.ReceiptTombstoneResponse)
+				}
+				tx := &eventAppendTransaction{row: commandReceiptRow{values: []any{"command", digest, status, body}}}
+				got, found, err := newSafetyGovernanceTx(tx).LookupCommandReceipt(context.Background(), "command")
+				if err != nil || !found || got.Expired != expired || got.Status != status || string(got.RequestDigest) != digest || !bytes.Equal(got.Response, body) {
+					t.Fatalf("got=%+v found=%v err=%v", got, found, err)
+				}
+				if err := newSafetyGovernanceTx(tx).InsertCommandReceipt(context.Background(), got); (err != nil) != expired {
+					t.Fatalf("insert expired=%v error=%v", expired, err)
+				}
+				if expired && len(tx.statements) != 0 {
+					t.Fatal("tombstone insert reached SQL")
+				}
+			})
+		}
+	}
+	for _, status := range []string{"IN_PROGRESS", "TRANSIENT", "UNKNOWN_COMMIT", "invalid"} {
+		tx := &eventAppendTransaction{row: commandReceiptRow{values: []any{"command", digest, status, []byte(`{}`)}}}
+		if _, _, err := newSafetyGovernanceTx(tx).LookupCommandReceipt(context.Background(), "command"); err == nil {
+			t.Fatalf("nonterminal status %s returned", status)
+		}
+		if err := newSafetyGovernanceTx(tx).InsertCommandReceipt(context.Background(), port.CommandReceipt{CommandID: "command", RequestDigest: domain.Digest(digest), Status: status, Response: []byte(`{}`)}); err == nil || len(tx.statements) != 0 {
+			t.Fatalf("nonterminal status %s inserted", status)
+		}
+	}
+	// Even a caller omitting Expired cannot forge the reserved retention marker.
+	tx := &eventAppendTransaction{}
+	if err := newSafetyGovernanceTx(tx).InsertCommandReceipt(context.Background(), port.CommandReceipt{CommandID: "command", RequestDigest: domain.Digest(digest), Status: "REJECTED", Response: []byte(port.ReceiptTombstoneResponse)}); err == nil || len(tx.statements) != 0 {
+		t.Fatal("forged tombstone inserted")
 	}
 }
