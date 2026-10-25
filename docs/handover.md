@@ -12,35 +12,35 @@ Legend: `A`=ACCEPTED+LRF; `P`=DESIGN_BASELINE/OPEN; `Cursor`=navigation hint; `R
 
 §1 REPOSITORY SNAPSHOT
 - Repo=PADDOCK; branch=`main`.
-- Fresh observation 2026-10-25: `HEAD=origin/main=321b92e44cd42b292b561806f1b37158ada244da`; tree=`4aeda1b29674f831afd6ba22d664b5c8e256f805`; divergence=0/0.
-- Status has 481 entries: 29 tracked modified/deleted, 3 staged additions, 449 untracked. Exactly six paths are staged: `Issues.md`, `docs/handover.md`, `docs/issue-dependencies.generated.md`, `internal/governance/domain/independent_evidence.go`, `internal/governance/domain/independent_evidence_test.go`, and `receipts/PDK-M11-S02/2026-10-25-local-verification.json`. Preserve every other path, including tracked `AGENTS.md` deletion and unrelated source, SQL, receipt, rules, `.build`, and untracked work.
-- `prompt.md` and `docs/develop.md` are already in HEAD ancestry and are not part of this batch.
+- Fresh read-only observation 2026-10-25: `HEAD=origin/main=ea0e6650204e3f683b0ead5b909089fe1f8888ef`; tree=`4a2bfb2172ec68b48ca0a9441187bcb46f7b2a60`; divergence=0/0.
+- Status has 481 entries: 29 tracked modified/deleted, 3 staged additions, 449 untracked. Exactly six paths are staged: `Issues.md`, `docs/handover.md`, `docs/issue-dependencies.generated.md`, `internal/governance/domain/capability_trust.go`, `internal/governance/domain/capability_trust_test.go`, and `receipts/PDK-M10-S04/2026-10-25-local-verification.json`. Preserve every other path, including tracked `AGENTS.md` deletion and all unrelated source, SQL, receipts, rules, `.build`, and untracked work.
+- `prompt.md` and `docs/develop.md` are already in HEAD ancestry and unchanged.
 
-§2 PDK-M11-S02 · DONE, LOCAL SOURCE ONLY
-- Cursor: active=`PDK-M11-S02`, state=`[x] DONE`; Receipt=`receipts/PDK-M11-S02/2026-10-25-local-verification.json`, SHA-256=`8796769f59911aab717cfbc1524427f19fb28b564d50800ae18d43023d8a9ebd`.
-- Target SHA-256: `internal/governance/domain/independent_evidence.go`=`2426672c12fb90e3c8131079db0c64f5fdf6a1d66022b9401692c1fccf8cbea8`; `_test.go`=`573f7186261c46770cb5a09c68140c39fd02129002e3e070320c2e36b3084837`.
-- Main Runner: offline focused Domain tests, Domain vet, gofmt, design lint and target diff-check all Exit 0. Receipt records exact commands, target revision/hashes and dirty-state limitation. No DB body or CI attestation.
-- Separate final read-only Verifier reviewed the final hashes and acceptance; verdict `NO_FINDINGS`. It ran no tests or DB/network operations.
-- Design: separate immutable caller-trusted signer→ControlDomain mapping; at most one count per exact `(Subject, PayloadDigest)`; unknown mapping=zero. This deduplicates declared labels only; it does not prove real-world/organizational independence, mapping provenance, key custody, risk-tier thresholds, Trust promotion, or production quorum.
-- Memory ingest returned `[ADD]`, knowledge ID=`1280a653-9cfd-47be-b56f-a988b76edc62` (v1, ACTIVE); title search returned the same ID. Only the non-secret verified Receipt-derived outcome was ingested.
-- Full worktree Lint Exit 0 (89 Issues/152 edges). The selected staged Issue snapshot has SHA-256=`443dbd9424b0474c3fbb36cf2b099e9d59f544e53e7372ac611be46a9a9135ab`; its official generated index matches and staged-snapshot Lint passed Exit 0 (89 Issues/151 edges). Full worktree index remains separately regenerated at 152 edges and unstaged outside the approved index blob.
+§2 PDK-M10-S04 · DONE, LOCAL PROFILE MODEL ONLY
+- Cursor: active=`PDK-M10-S04`, state=`[x] DONE`; dependencies M10-S03 and M11-S02 are DONE.
+- Receipt=`receipts/PDK-M10-S04/2026-10-25-local-verification.json`, SHA-256=`a5d47e4d3241c60e828f624d8c48266b67b3222248223af8c9d5abeff492d54f`.
+- Target SHA-256: `internal/governance/domain/capability_trust.go`=`9dd0d6ff2eb3de3748dada742609803659e4cedb80b3b3ba0c48e4d8a87bc7fe`; `_test.go`=`bb25464b07f445ad50dd6f4b773d8b21b3d22e4d515bef1db983cb0c09360220`.
+- Main Runner: offline focused Domain tests, Domain vet, gofmt, design lint, planner and target diff-check all Exit 0. Separate final read-only Verifier returned `NO_FINDINGS`. No DB body or CI attestation.
+- Selected design: immutable profile bound to enrolled opaque WorkerID, per-capability Q0–Q3, missing entry defaults to Q0, and immutable one-capability update. Connectivity interruption returns an equivalent profile and is not Integrity evidence. Target tier is supplied by a future trusted evaluator. This does not validate evidence, select thresholds, implement complete D-007 automated Trust formation, or grant Scope/Authority.
+- Current-task Memory ingest returned `[ADD]`, knowledge ID=`5d2f466e-dd61-4332-8f46-23ec80f9308f` (v1, ACTIVE); title search returned the same ID. Only the non-secret verified Receipt-derived outcome was ingested.
+- Staged Issue snapshot SHA-256=`1bf51ec896e3fbd2fcf54876ac08905685dd31c83190f7c3eed7d1206f2a87e1`; official generated index matches and staged-snapshot Lint passed Exit 0 (89 Issues/151 edges). Full-worktree Lint passed Exit 0 (89 Issues/152 edges); full-worktree index remains the unstaged local representation outside the approved index blob.
 
 §3 APPROVED VCS GATE · COMMIT/PUSH PENDING
-- User explicitly approved one issue-scoped commit and push for the six staged paths, including the `verified_commit` Cursor field. No S02 commit or push has occurred yet.
-- Include exactly: two new pure-Domain files; the S02 local verification Receipt; `Issues.md` Cursor and PDK-M11-S02 block only (no other Issue hunk); this full-overwrite handover; and the generated index from the selected staged Issue snapshot. Staged Issue/index SHA equality is verified; staged DAG has 151 edges.
-- Base=`321b92e44cd42b292b561806f1b37158ada244da`; current `HEAD=origin/main`; target existing upstream=`origin/main`; divergence=0/0. Approved operation=one issue-scoped commit on `main`, then push to `origin/main`.
-- Exclude every other Issue hunk/path (including M01/M04/M06/M07/M10/M13 changes), all unrelated source/test/receipt/SQL/rules paths, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, all remaining dirty/untracked work, and `prompt.md`/`docs/develop.md`. No force-push, remote change, history rewrite, or unrelated staging.
-- Before commit: reverify exact six staged names/hunks, staged Issue/index SHA, staged and worktree diff checks, and base/upstream. Then commit once and push normally. Any mismatch=stop without push and preserve state.
+- User explicitly approved one M10-S04 issue-scoped commit and push for the six staged paths, including `verified_commit` in the Cursor hunk. No commit or push has occurred yet.
+- Include exactly: the two new Domain files; the S04 local verification Receipt; only the Cursor block and PDK-M10-S04 Issue block changes in `Issues.md`; this full-overwrite handover; and the generated index from the selected staged Issue snapshot. The Issue patch excludes all other Issue hunks.
+- Base=`ea0e6650204e3f683b0ead5b909089fe1f8888ef`; current `HEAD=origin/main`; target existing upstream=`origin/main`; divergence=0/0. Approved operation=one issue-scoped commit on `main`, then push normally to `origin/main`.
+- Exclude every other Issue hunk/path, all unrelated source/test/receipt/SQL/rules files, `.build/**`, `.HARNESS`, tracked `AGENTS.md` deletion, all remaining dirty/untracked work, and `prompt.md`/`docs/develop.md` already in HEAD. No force-push, remote change, history rewrite, or unrelated staging.
+- Before commit: reverify exact staged six names/hunks, staged Issue/index SHA, staged/worktree diff checks, and base/upstream. Then commit once and push. Any mismatch=stop without push and preserve state.
 
 §4 OTHER STATE / LIMITS
-- PDK-M11-S01 local source-only Receipt remains `receipts/PDK-M11-S01/2026-10-24-local-verification.json`; Memory ID=`2c5de9d9-427c-425b-9971-2ab92cfbf6d5`. No CI/Verifier-of-Record or DB runtime claim.
+- PDK-M11-S02 is DONE; Receipt=`receipts/PDK-M11-S02/2026-10-25-local-verification.json`; Memory ID=`1280a653-9cfd-47be-b56f-a988b76edc62`. No CI/DB/production claim.
 - Earlier records describe unresolved Security Epoch anomaly around M10-S02 (4→5 without attributable event) and later approved M07 activity (5→6). These are historical observations, not fresh DB observations in this task. Cause remains UNKNOWN. No DB operation or credential access occurred here; do not touch DB before separate reconciliation/approval.
-- All unrelated pre-existing dirty work remains and must be preserved.
+- All unrelated prior dirty work remains and must be preserved.
 
 §5 RESUME
 1. Re-read current instructions, routed LRF, decisions→method→threat model→Issues, Git and Receipts; this snapshot may be stale.
-2. Verify the approved staged six-path scope and base/upstream, then commit/push only this batch.
-3. Verify remote push, rerun design lint/planner, and select the next READY Issue only if still eligible. Reassess dependencies, design choices, and effect gates first.
+2. Verify the approved staged six-path scope, staged Issue/index SHA and base/upstream; then commit/push only the approved batch.
+3. Verify remote push, rerun design lint/planner, and select the next READY Issue only if still eligible. Reassess dependencies, design choices and effect gates first.
 4. Preserve unrelated work and the unresolved Security Epoch boundary. On refresh, replace this entire file from new observations; never append stale state.
 
 POLYGLYPH invariants: Meaning∧Constraints∧Authority∧Uncertainty preserved; compression≠semantic-loss permission; snapshot≠evidence; prompt≠canonical authority; no document grants effects.
