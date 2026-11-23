@@ -1,0 +1,168 @@
+name: PADDOCK CI Verification & Ephemeral PostgreSQL PoC
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  design-and-decisions-guard:
+    name: Design Lint & Decisions Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run design lint & domain dependency boundary tests
+        run: |
+          python3 scripts/lint_design.py
+          python3 -m unittest tests.test_domain_dependency_boundary -v
+
+      - name: Check decisions.md ACCEPTED immutability on PRs
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" | grep -qx "decisions.md"; then
+            echo "::notice file=decisions.md::decisions.md modified in PR; CODEOWNERS human approval required per PDK-M00-S07."
+          fi
+
+  verify-and-postgres-poc:
+    name: Go Suite, Fuzz & Ephemeral PostgreSQL PoC
+    runs-on: ubuntu-latest
+    needs: design-and-decisions-guard
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_bootstrap_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go 1.25
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.0"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Provision ephemeral paddock_test DB & apply ordered SQL migrations
+        run: |
+          set -euo pipefail
+          MIG_PW=$(openssl rand -hex 16)
+          APP_PW=$(openssl rand -hex 16)
+          echo "::add-mask::$MIG_PW"
+          echo "::add-mask::$APP_PW"
+          export PGHOST=127.0.0.1
+          export PGPORT=5432
+          export PGPASSWORD=ci_bootstrap_password
+
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c "CREATE DATABASE paddock_test ENCODING 'UTF8' TEMPLATE template0;"
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c "CREATE ROLE paddock_app LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS PASSWORD '$APP_PW';"
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c "CREATE ROLE paddock_migrator LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS PASSWORD '$MIG_PW';"
+
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d paddock_test -f sql/init.sql
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d paddock_test -f sql/governance_constraints.sql
+          psql -X -v ON_ERROR_STOP=1 -U postgres -d paddock_test -v app_role=paddock_app -v migration_role=paddock_migrator -f sql/governance_roles.sql
+
+          export PGPASSWORD="$MIG_PW"
+          for f in \
+            sql/governance_safety_constraints.sql \
+            sql/governance_domain_events_schema.sql \
+            sql/governance_safety_api.sql \
+            sql/governance_outbox_dispatch.sql \
+            sql/governance_consumer_inbox.sql \
+            sql/governance_rollout_api.sql \
+            sql/governance_rollout_deadlines.sql \
+            sql/governance_work_orders.sql \
+            sql/governance_pull.sql \
+            sql/governance_pull_capability_repair.sql \
+            sql/governance_lease.sql \
+            sql/governance_safety_lease_api.sql \
+            sql/governance_offline_policy.sql \
+            sql/governance_budget.sql \
+            sql/governance_budget_storage_bytes.sql \
+            sql/governance_spawn_policy.sql \
+            sql/governance_checkpoints.sql \
+            sql/governance_m09_s02_s03_repair.sql \
+            sql/governance_worker_enrollment.sql \
+            sql/governance_worker_credential.sql
+          do
+            echo "Applying $f ..."
+            psql -X -v ON_ERROR_STOP=1 -U paddock_migrator -d paddock_test -f "$f"
+          done
+
+          MIG_URL="postgres://paddock_migrator:${MIG_PW}@127.0.0.1:5432/paddock_test?sslmode=disable"
+          APP_URL="postgres://paddock_app:${APP_PW}@127.0.0.1:5432/paddock_test?sslmode=disable"
+          echo "::add-mask::$MIG_URL"
+          echo "::add-mask::$APP_URL"
+          {
+            echo "PADDOCK_DB_URL=$MIG_URL"
+            echo "PADDOCK_APP_DB_URL=$APP_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Run full Go unit suite (-race, -shuffle=on), vet & domain fuzz
+        run: |
+          go test ./... -count=1 -shuffle=on -race
+          go vet ./...
+          go test -fuzz=FuzzTrustPolicyParse -fuzztime=5s ./internal/governance/domain
+
+      - name: Run PostgreSQL integration, TCP fault-proxy & PoC E2E tests
+        env:
+          PADDOCK_WORKER_ENROLLMENT_INTEGRATION: "1"
+          PADDOCK_WORKER_CREDENTIAL_INTEGRATION: "1"
+          PADDOCK_RECEIPT_RETENTION_INTEGRATION: "1"
+        run: |
+          # Exclude TestPullReservationConcurrentOneWinner because its checkPullPrivileges helper asserts a closed-world 10-function-only schema profile incompatible with the full combined governance APIs installed above.
+          # Exclude TestRolloutScopeConflictProcessHelper (parent-invoked child process helper for TestRolloutScopeConflictTwoProcessesIntegration).
+          go test -tags="integration paddock_test" ./internal/storage/postgres -run '^Test(M04S03|M04S06|M15|RolloutApplication|RolloutMonitoring|RolloutFullField|RolloutDeadline|RolloutConcurrent|RolloutScopeConflictTwoProcesses|Postgres|OfflinePolicy|WorkOrder|WorkerEnrollment|WorkerCredential|Spawn|Checkpoint|Budget|ReceiptRetention)' -v -count=1
+
+      - name: Generate signed CI Verification Receipt
+        run: |
+          set -euo pipefail
+          KEY_HEX=$(openssl rand -hex 32)
+          echo "::add-mask::$KEY_HEX"
+          export PADDOCK_RUNNER_SIGNING_KEY_HEX="$KEY_HEX"
+          go run ./cmd/verify-runner \
+            --issue PDK-M14-S04 \
+            --key-id "github-run-${GITHUB_RUN_ID}" \
+            --targets "internal/verification/runner.go,cmd/verify-runner/main.go,internal/storage/postgres/poc_m15_integration_test.go,.github/workflows/paddock-ci.yml" \
+            --out ci-verification-receipt.json
+
+      - name: Upload CI Verification Receipt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-verification-receipt
+          path: ci-verification-receipt.json
+          retention-days: 30

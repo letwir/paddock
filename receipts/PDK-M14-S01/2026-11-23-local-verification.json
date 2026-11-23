@@ -1,0 +1,34 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M14-S01",
+  "runner": {"kind": "LOCAL", "identity": "Main Runner via local shell", "run_id": "NONE", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-11-23T04:34:19+09:00",
+  "source": {"git_commit": "df40050e93ef671afe2e98b0b0360cd65bb00caf", "dirty": true, "target_files_untracked": true},
+  "environment": {"go_version": "go local windows/amd64", "db_version": "NOT_RUN"},
+  "targets": [
+    {"path": "internal/governance/domain/observability_trace.go", "sha256": "ffe83cfd3286407d38287156dc462ba3779d11247e575c708b77adc094e1b99a"},
+    {"path": "internal/governance/domain/observability_trace_test.go", "sha256": "1d433f979c9a3238257ecadaf649464814a7f3a1721392b1d2c304a002a8394b"}
+  ],
+  "checks": [
+    {"command": "go test ./... -count=1 -shuffle=on", "exit_code": 0, "result": "PASS; all 8 Go test packages"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "gofmt -d internal/governance/domain/observability_trace.go internal/governance/domain/observability_trace_test.go", "exit_code": 0, "result": "PASS; empty"},
+    {"command": "python -m unittest tests.test_domain_dependency_boundary tests.test_lint_design tests.test_s03_tracking_contract -v", "exit_code": 0, "result": "PASS; 25/25"}
+  ],
+  "independent_review": {
+    "kind": "separate read-only GPT Verifier subagent via pi CLI",
+    "provider": "openai",
+    "model": "gpt-6.1-sol",
+    "thinking_level": "high",
+    "verdict": "No findings.",
+    "scope": "observability_trace.go, observability_trace_test.go",
+    "limitations": "Verifier ran no tests, DB, or external operations; no CI attestation."
+  },
+  "reconciliation": "Main verified target SHA-256 hashes, full shuffled Go suite, vet, gofmt, domain dependency boundary, and pi gpt-6.1-sol No findings review (including order-independent DSN detection and isolated neutral-key tests). Marked DONE under D-016.",
+  "verdict": "LOCAL ACCEPTANCE PASS; SOURCE ONLY",
+  "remaining_risks": [
+    "Pure Domain structured event/trace correlation and credential redaction only; no persistent log sink or OTel exporter.",
+    "No CI/Verifier-of-Record attestation."
+  ]
+}

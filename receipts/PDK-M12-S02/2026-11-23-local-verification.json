@@ -1,0 +1,34 @@
+{
+  "schema_version": "paddock.receipt/1",
+  "issue_id": "PDK-M12-S02",
+  "runner": {"kind": "LOCAL", "identity": "Main Runner via local shell", "run_id": "NONE", "attestation": "NONE"},
+  "time_start_utc": "NOT_CAPTURED",
+  "time_finish_utc": "2026-11-23T04:29:34+09:00",
+  "source": {"git_commit": "df40050e93ef671afe2e98b0b0360cd65bb00caf", "dirty": true, "target_files_untracked": true},
+  "environment": {"go_version": "go local windows/amd64", "db_version": "NOT_RUN"},
+  "targets": [
+    {"path": "internal/governance/domain/skill_manifest.go", "sha256": "d57b907fe713cc21735f5030ad11d0adb571adbd0e3fe8012e11cafdf81a8fe2"},
+    {"path": "internal/governance/domain/skill_manifest_test.go", "sha256": "55d5eac808e66f9892c2a8f43850f1c845f2bef2d006efa1266a28db56528c00"}
+  ],
+  "checks": [
+    {"command": "go test ./... -count=1 -shuffle=on", "exit_code": 0, "result": "PASS; all 8 Go test packages"},
+    {"command": "go vet ./...", "exit_code": 0, "result": "PASS"},
+    {"command": "gofmt -d internal/governance/domain/skill_manifest.go internal/governance/domain/skill_manifest_test.go", "exit_code": 0, "result": "PASS; empty"},
+    {"command": "python -m unittest tests.test_domain_dependency_boundary tests.test_lint_design tests.test_s03_tracking_contract -v", "exit_code": 0, "result": "PASS; 25/25"}
+  ],
+  "independent_review": {
+    "kind": "separate read-only GPT Verifier subagent via pi CLI",
+    "provider": "openai",
+    "model": "gpt-6.1-sol",
+    "thinking_level": "high",
+    "verdict": "No findings.",
+    "scope": "skill_manifest.go, skill_manifest_test.go.",
+    "limitations": "Verifier ran no tests, DB, or external operations; no CI attestation."
+  },
+  "reconciliation": "Main verified target SHA-256 hashes, full shuffled Go suite, vet, gofmt, domain dependency boundary, and pi gpt-6.1-sol No findings review. Marked DONE under D-016.",
+  "verdict": "LOCAL ACCEPTANCE PASS; SOURCE ONLY",
+  "remaining_risks": [
+    "Pure Domain manifest/signature verification only; artifact bytes and runtime execution sandboxes are outside this unit boundary.",
+    "No CI/Verifier-of-Record attestation."
+  ]
+}
