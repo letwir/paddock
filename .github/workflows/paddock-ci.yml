@@ -113,7 +113,6 @@ jobs:
             sql/governance_rollout_deadlines.sql \
             sql/governance_work_orders.sql \
             sql/governance_pull.sql \
-            sql/governance_pull_capability_repair.sql \
             sql/governance_lease.sql \
             sql/governance_safety_lease_api.sql \
             sql/governance_offline_policy.sql \
