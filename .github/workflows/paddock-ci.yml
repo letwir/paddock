@@ -152,7 +152,7 @@ jobs:
           # Exclude TestPullReservationConcurrentOneWinner (asserts closed-world 10-function-only schema profile).
           # Exclude TestRolloutScopeConflictProcessHelper (parent-invoked helper process for TestRolloutScopeConflictTwoProcessesIntegration).
           # Exclude legacy M03/M04 TestPostgresGovernanceIntegration and TestPostgresSafetyReceiptReplayAfterCommitAcknowledgementLoss due to pre-existing origin/main schema-drift with M07-S06 monitoring constraints and M04-S05 receipt envelope format.
-          go test -tags="integration paddock_test" ./internal/storage/postgres -run '^Test(M04S03|M04S06|M15|RolloutApplication|RolloutMonitoring|RolloutFullField|RolloutDeadline|RolloutConcurrent|RolloutScopeConflictTwoProcesses|PostgresOutbox|PostgresConsumerInbox|OfflinePolicy|WorkOrder|WorkerEnrollment|WorkerCredential|Spawn|Checkpoint|Budget|ReceiptRetention)' -v -count=1
+          go test -tags="integration paddock_test rollout_concurrency receipt_retention" ./internal/storage/postgres -run '^Test(M04S03|M04S06|M15|RolloutApplication|RolloutMonitoring|RolloutFullField|RolloutDeadline|RolloutConcurrent|RolloutScopeConflictTwoProcesses|PostgresOutbox|PostgresConsumerInbox|OfflinePolicy|WorkOrder|WorkerEnrollment|WorkerCredential|Spawn|Checkpoint|Budget|ReceiptRetention)' -v -count=1
 
       - name: Generate signed CI Verification Receipt
         run: |
