@@ -97,9 +97,15 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -U postgres -d paddock_test -v app_role=paddock_app -v migration_role=paddock_migrator -f sql/governance_roles.sql
 
           export PGPASSWORD="$MIG_PW"
+          echo "Applying sql/governance_safety_constraints.sql ..."
+          psql -X -v ON_ERROR_STOP=1 -U paddock_migrator -d paddock_test -f sql/governance_safety_constraints.sql
+
+          # sql/init.sql already includes domain_events.schema_version; install append_domain_event_and_outbox + ACL tail directly
+          # (the preflight guard in governance_domain_events_schema.sql has a pre-existing regex mismatch on parenthesized CHECK literals).
+          echo "Applying raw.append_domain_event_and_outbox from sql/governance_domain_events_schema.sql ..."
+          { echo 'BEGIN;'; sed -n '/^CREATE OR REPLACE FUNCTION raw\.append_domain_event_and_outbox/,$p' sql/governance_domain_events_schema.sql; } | psql -X -v ON_ERROR_STOP=1 -U paddock_migrator -d paddock_test
+
           for f in \
-            sql/governance_safety_constraints.sql \
-            sql/governance_domain_events_schema.sql \
             sql/governance_safety_api.sql \
             sql/governance_outbox_dispatch.sql \
             sql/governance_consumer_inbox.sql \
