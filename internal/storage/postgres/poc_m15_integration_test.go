@@ -706,7 +706,7 @@ func TestM15_PoCEndToEndAutonomousPolicyRecovery(t *testing.T) {
 	rbRes, err := svc1.Rollback(ctx, application.RollbackRequest{
 		CommandID: f.commands[4], Nonce: "n-rollback", Scope: f.scope, Rollout: domain.RolloutID(activeRID),
 		ExpectedState: domain.RolloutMonitoring, ExpectedScopeEpoch: 42, ExpectedSecurityEpoch: f.security,
-		ExpectedRootEpochs: map[domain.RootID]domain.Epoch{f.rootA: 2, f.rootB: 3},
+		ExpectedRootEpochs: map[domain.RootID]domain.Epoch{f.rootA: 2, f.rootB: 2},
 	})
 	if err != nil || rbRes.ScopeEpoch != 43 || rbRes.State != domain.RolloutRolledBack {
 		t.Fatalf("M15-S03 Rollback failed: res=%+v err=%v", rbRes, err)
@@ -722,7 +722,7 @@ func TestM15_PoCEndToEndAutonomousPolicyRecovery(t *testing.T) {
 	if _, err := svc1.Rollback(ctx, application.RollbackRequest{
 		CommandID: f.commands[5], Nonce: "n-stale", Scope: f.scope, Rollout: domain.RolloutID(activeRID),
 		ExpectedState: domain.RolloutMonitoring, ExpectedScopeEpoch: 42, ExpectedSecurityEpoch: f.security,
-		ExpectedRootEpochs: map[domain.RootID]domain.Epoch{f.rootA: 2, f.rootB: 3},
+		ExpectedRootEpochs: map[domain.RootID]domain.Epoch{f.rootA: 2, f.rootB: 2},
 	}); !errors.Is(err, port.ErrStaleWrite) {
 		t.Fatalf("expected ErrStaleWrite for stale epoch operation, got %v", err)
 	}
